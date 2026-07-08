@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plan - Training App</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav><a href="/">Today</a><a href="/plan" class="active">Plan</a></nav>
+
+  {% if race %}
+    <div class="header">
+      <h1>{{ race.name }}</h1>
+      <div class="countdown">{{ race.race_date }} &middot; {{ race.distance_km }} km</div>
+    </div>
+
+    <div class="phase-bar">
+      {% for seg in phase_segments %}
+        <div style="width: {{ seg.pct }}%; background: {{ seg.color }};" title="{{ seg.name }}: {{ seg.focus }}">
+          {{ seg.name }}
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty">No race configured yet. POST to /api/races to generate a plan.</p>
+  {% endif %}
+
+  {% for week_start, sessions in weeks %}
+    <div class="card">
+      <h3>Week of {{ week_start.strftime("%-d %b") }}</h3>
+      <table class="calendar">
+        <thead>
+          <tr>
+            {% for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}<th>{{ d }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {% set by_date = {} %}
+            {% for s in sessions %}{% set _ = by_date.update({s.date: s}) %}{% endfor %}
+            {% for i in range(7) %}
+              {% set d = week_start + timedelta(days=i) %}
+              {% set s = by_date.get(d) %}
+              <td>
+                {% if s %}
+                  <strong>{{ s.name }}</strong><br>
+                  <span class="meta">
+                    {% if s.type.value == "run" %}{{ s.content.get("total_distance_km", "") }} km
+                    {% elif s.type.value == "strength" %}{{ s.content.get("prescriptions", [])|length }} patterns{% endif %}
+                  </span>
+                  {% if s.content.get("note") %}<div class="note">{{ s.content.get("note") }}</div>{% endif %}
+                {% else %}
+                  <span class="empty">Rest</span>
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  {% endfor %}
+</body>
+</html>

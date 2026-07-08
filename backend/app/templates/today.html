@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Today - Training App</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav><a href="/" class="active">Today</a><a href="/plan">Plan</a></nav>
+  <div class="header">
+    <h1>{{ today.strftime("%A %-d %b") }}</h1>
+    {% if race %}
+      <div class="countdown">{{ race.name }} in {{ days_to_race }} days</div>
+    {% endif %}
+  </div>
+
+  {% if not sessions %}
+    <p class="empty">No sessions scheduled today.</p>
+  {% endif %}
+
+  {% for s in sessions %}
+    <div class="card" data-session-id="{{ s.id }}">
+      <div class="session-type">{{ s.type.value if s.type.value else s.type }} &middot; {{ s.phase_name or "" }}</div>
+      <h3>{{ s.name }}</h3>
+
+      {% if s.type.value == "run" %}
+        {% for step in s.content.get("steps", []) %}
+          <div class="step">
+            {{ step.label }}
+            {% if step.distance_km %} &mdash; {{ step.distance_km }} km{% endif %}
+            {% if step.duration_min %} &mdash; {{ step.duration_min }} min{% endif %}
+            <div class="target">
+              {% if step.target_pace_sec_per_km %}Pace {{ step.target_pace_sec_per_km|pace }}{% endif %}
+              {% if step.hr_ceiling %} &middot; HR ceiling {{ step.hr_ceiling }}{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+        {% if s.status.value == "planned" %}
+          <form class="log-form" onsubmit="return submitRunComplete(event, {{ s.id }})">
+            <input name="actual_pace_sec_per_km" type="number" placeholder="pace s/km">
+            <input name="actual_hr" type="number" placeholder="avg HR">
+            <button type="submit">Log complete</button>
+          </form>
+        {% else %}
+          <div class="feedback">Completed</div>
+        {% endif %}
+      {% elif s.type.value == "strength" %}
+        {% for p in s.content.get("prescriptions", []) %}
+          <div class="prescription">
+            <div>
+              <strong>{{ p.exercise_name or p.pattern }}</strong>
+              <div class="meta">{{ p.pattern }} &middot; {{ p.sets }} x {{ p.reps }} @ RIR {{ p.rir }}</div>
+            </div>
+            {% if s.status.value == "planned" %}
+              <form class="log-form" onsubmit="return submitStrengthLog(event, {{ s.id }}, '{{ p.pattern }}')">
+                <input name="reps" type="number" placeholder="reps" required>
+                <input name="weight_kg" type="number" step="0.5" placeholder="kg" required>
+                <input name="rir_actual" type="number" step="0.5" placeholder="RIR">
+                <button type="submit">Log</button>
+              </form>
+            {% endif %}
+          </div>
+        {% endfor %}
+        <div id="feedback-{{ s.id }}"></div>
+      {% endif %}
+
+      {% if s.content.get("note") %}
+        <div class="note">{{ s.content.get("note") }}</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
