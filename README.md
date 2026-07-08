@@ -88,6 +88,30 @@ docker run -p 8000:8000 -v training_app_data:/app/data training-app
 (Not build-tested in this environment -- no Docker daemon available here. It's a
 straightforward pip-install-and-run image; sanity-check it once before relying on it.)
 
+### Hosting: Fly.io (recommended)
+
+The spec just needs "a small always-on cloud instance" (single user, one SQLite file,
+an in-process daily cron) -- Fly.io fits that with the least setup, deploying straight
+from the existing `Dockerfile`. `backend/fly.toml` is set up for this:
+
+```bash
+cd backend
+fly auth login
+# app names are globally unique on Fly -- edit the `app = "..."` line in fly.toml first
+fly volumes create training_app_data --size 1 --region iad   # match primary_region in fly.toml
+fly secrets set INTERVALS_ICU_API_KEY=... INTERVALS_ICU_ATHLETE_ID=...  # only if using intervals.icu
+fly deploy
+```
+
+Note `auto_stop_machines = false` in `fly.toml`: the daily autoregulation job runs via an
+in-process APScheduler cron regardless of HTTP traffic, so the machine must never be
+suspended for being idle, unlike Fly's usual scale-to-zero default.
+
+Alternative: any cheap VPS (Hetzner/DigitalOcean) running the same image via
+`docker compose`, with Caddy in front for automatic HTTPS -- more manual setup (your own
+restart/backup story) but full control. Either way, back up the SQLite file
+(`/app/data/training_app.db`) periodically -- it's the only durable state.
+
 ## Architecture
 
 ```
