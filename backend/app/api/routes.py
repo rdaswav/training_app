@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.engines import autoregulation
+from app.intervals_sync import sync_upcoming_runs_to_intervals
+from app.jobs.daily_autoregulation import run_daily_job
 from app.models import (
     AthleteProfile,
     CompletedSession,
@@ -63,6 +65,7 @@ def create_race(payload: RaceCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(race)
     generate_and_persist_plan(db, athlete, race)
+    sync_upcoming_runs_to_intervals(db, athlete)
     return race
 
 
@@ -79,6 +82,7 @@ def regenerate_plan(race_id: int, db: Session = Depends(get_db)):
     if not race:
         raise HTTPException(404, "Race not found")
     generate_and_persist_plan(db, athlete, race)
+    sync_upcoming_runs_to_intervals(db, athlete)
     return race
 
 
@@ -228,4 +232,17 @@ def apply_plan_edit(payload: PlanApplyRequest, db: Session = Depends(get_db)):
 
     db.commit()
     macrocycle = generate_and_persist_plan(db, athlete, race)
-    return {"status": "regenerated", "macrocycle_start": macrocycle.start_date, "macrocycle_end": macrocycle.end_date}
+    sync_result = sync_upcoming_runs_to_intervals(db, athlete)
+    return {
+        "status": "regenerated",
+        "macrocycle_start": macrocycle.start_date,
+        "macrocycle_end": macrocycle.end_date,
+        "intervals_icu_sync": sync_result,
+    }
+
+
+@router.post("/jobs/daily-autoregulation")
+def trigger_daily_job(db: Session = Depends(get_db)):
+    """Manual trigger for the daily job (spec section 3) -- useful for ops/testing
+    without waiting for the in-process scheduler (see main.py)."""
+    return run_daily_job(db)

@@ -16,6 +16,7 @@ from app.models import (
     Phase,
     PlannedSession,
     Race,
+    SessionStatus,
     SessionType,
 )
 
@@ -63,8 +64,11 @@ def _select_exercises(db: Session, prescriptions: list[strength_engine.StrengthP
 
 def generate_and_persist_plan(db: Session, athlete: AthleteProfile, race: Race, today: date | None = None) -> Macrocycle:
     """Race date + distance + current fitness -> full block of planned sessions
-    (spec section 10, MVP steps 2-4). Wipes and regenerates any existing plan
-    for this race (used both on creation and on LLM-driven re-plans)."""
+    (spec section 10, MVP steps 2-4). Regenerates the plan for this race --
+    used on creation, on LLM-driven re-plans, and by the daily autoregulation
+    job. Never touches a day that's already completed/missed or before
+    `today`: only still-`planned` sessions from today forward are replaced,
+    so re-running this daily can't erase training history."""
     today = today or date.today()
     fitness = _fitness_from_athlete(athlete)
 
@@ -77,13 +81,26 @@ def generate_and_persist_plan(db: Session, athlete: AthleteProfile, race: Race, 
         db.delete(race.macrocycle)
         db.flush()
 
-    # Regenerating (e.g. after an LLM-driven edit) must not leave stale
-    # duplicate sessions for the dates the new plan also covers.
+    # Regenerating (e.g. after an LLM-driven edit, or the daily job) must not
+    # leave stale duplicate sessions for the dates the new plan also covers --
+    # but must also never discard a day that's already been logged.
     db.query(PlannedSession).filter(
         PlannedSession.athlete_id == athlete.id,
-        PlannedSession.date >= macro_start,
+        PlannedSession.date >= today,
         PlannedSession.date <= macro_end,
+        PlannedSession.status == SessionStatus.PLANNED,
     ).delete(synchronize_session=False)
+
+    preserved_dates = {
+        d
+        for (d,) in db.query(PlannedSession.date)
+        .filter(
+            PlannedSession.athlete_id == athlete.id,
+            PlannedSession.date >= today,
+            PlannedSession.date <= macro_end,
+        )
+        .all()
+    }
 
     macrocycle = Macrocycle(race_id=race.id, start_date=macro_start, end_date=macro_end)
     db.add(macrocycle)
@@ -120,7 +137,7 @@ def generate_and_persist_plan(db: Session, athlete: AthleteProfile, race: Race, 
     unified = calendar_engine.build_unified_calendar(run_session_dicts, strength_session_dicts, macro_start, total_weeks)
 
     for u in unified:
-        if u.session_type == "rest":
+        if u.session_type == "rest" or u.date < today or u.date in preserved_dates:
             continue
         week_index = min(max((u.date - macro_start).days // 7, 0), total_weeks - 1)
         content = {k: v for k, v in u.content.items() if k not in ("date", "name")}

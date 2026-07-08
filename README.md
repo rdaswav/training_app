@@ -8,7 +8,7 @@ See `SPEC.md` for the full build specification this implements.
 
 ## Status
 
-MVP-complete for the deterministic core (spec build sequence steps 2-4, 5-9):
+All ten build-sequence steps from `SPEC.md` section 10 are implemented:
 
 - Data model + persistence (SQLite via SQLAlchemy)
 - Running periodization engine (phases, volume ramp/down-weeks/taper, pace/HR targets)
@@ -16,14 +16,25 @@ MVP-complete for the deterministic core (spec build sequence steps 2-4, 5-9):
 - Exercise library + injury-flag substitution
 - Unified calendar with the hard-lower/key-run adjacency guardrail (auto-shuffle + flag)
 - Autoregulation (run pace/HR feedback loop, strength `NxNxN` logging -> progress/hold/back-off)
+- intervals.icu client wired into the plan flow: creating/regenerating a plan pushes the
+  next 10 days of run sessions via `upsert_planned_workout` (skipped as a safe no-op if
+  credentials aren't configured)
+- Daily autoregulation job (`app/jobs/daily_autoregulation.py`): pulls yesterday's
+  activities/wellness, marks sessions completed (with pace/HR feedback) or missed,
+  regenerates the plan from today forward, and re-syncs to intervals.icu. Runs on an
+  in-process APScheduler cron (default 06:00 local) and is also reachable manually via
+  `POST /api/jobs/daily-autoregulation`
 - FastAPI app: race creation, calendar, today, session logging, structured plan export/apply
 - Web UI: phone today-view, desktop plan-view (phase timeline + weekly calendar)
-- 42 passing pytest tests covering all four engines
+- 51 passing pytest tests covering all engines, the plan-regeneration/history-preservation
+  logic, the intervals.icu sync, and the daily job
 
 **Not yet live**: the intervals.icu integration (`app/integrations/intervals_icu.py`) is
 written against the documented API shape but has not been exercised against a real
-account -- there's no API key in this environment. See "Confirm before relying on this"
-below. Nothing here calls Garmin directly (by design -- that's intervals.icu's job).
+account -- there's no API key in this environment. Every write path degrades gracefully
+(no-ops) without credentials, so the app is fully usable standalone; see "Confirm before
+relying on this" below before pointing it at a real intervals.icu account. Nothing here
+calls Garmin directly (by design -- that's intervals.icu's job).
 
 ## Running it
 
@@ -59,26 +70,47 @@ Environment variables (see `app/config.py`):
 
 - `DATABASE_URL` -- defaults to a local SQLite file.
 - `INTERVALS_ICU_API_KEY`, `INTERVALS_ICU_ATHLETE_ID`, `INTERVALS_ICU_BASE_URL` -- needed
-  only for the intervals.icu client; unset in this environment.
+  only for the intervals.icu client; unset in this environment, in which case every
+  intervals.icu-touching code path (plan sync, daily job's activity pull) no-ops safely.
+- `DAILY_JOB_HOUR` -- local hour the in-process scheduler runs the daily autoregulation
+  job (default `6`).
+- `ENABLE_SCHEDULER` -- set to `false` to disable the in-process APScheduler entirely
+  (e.g. if you'd rather trigger `POST /api/jobs/daily-autoregulation` from an external cron).
+
+### Docker
+
+```bash
+cd backend
+docker build -t training-app .
+docker run -p 8000:8000 -v training_app_data:/app/data training-app
+```
+
+(Not build-tested in this environment -- no Docker daemon available here. It's a
+straightforward pip-install-and-run image; sanity-check it once before relying on it.)
 
 ## Architecture
 
 ```
 app/
-  models.py            SQLAlchemy models: AthleteProfile, Race, Macrocycle, Phase,
-                        Mesocycle, PlannedSession, CompletedSession, Exercise
+  models.py                 SQLAlchemy models: AthleteProfile, Race, Macrocycle, Phase,
+                             Mesocycle, PlannedSession, CompletedSession, Exercise
   engines/
-    running.py          Pure, DB-free periodization engine (race date + fitness -> weeks)
-    strength.py          RP mesocycle skeleton + race-proximity modulation
-    calendar.py           Unified calendar + adjacency guardrail
-    autoregulation.py    Run and strength feedback loops (pure functions)
+    running.py              Pure, DB-free periodization engine (race date + fitness -> weeks)
+    strength.py              RP mesocycle skeleton + race-proximity modulation
+    calendar.py               Unified calendar + adjacency guardrail
+    autoregulation.py        Run and strength feedback loops (pure functions)
   integrations/
-    intervals_icu.py    intervals.icu client (read activities/wellness, write planned
-                         workouts) -- see the "unconfirmed wire format" docstring
-  plan_service.py        Wires the engines to persistence for one race
-  api/routes.py           FastAPI routes
-  main.py                 App wiring + today/plan HTML views
-  templates/, static/     Jinja2 + vanilla JS/CSS, no build step
+    intervals_icu.py        intervals.icu client (read activities/wellness, write planned
+                             workouts) -- see the "unconfirmed wire format" docstring
+  plan_service.py            Wires the engines to persistence for one race (history-safe:
+                             only regenerates still-`planned` sessions from today forward)
+  intervals_sync.py          Guarded push of upcoming run sessions to intervals.icu
+  jobs/
+    daily_autoregulation.py  The daily job: pull yesterday -> autoregulate -> refresh
+                             -> re-sync (spec section 3 & build step 8)
+  api/routes.py               FastAPI routes
+  main.py                     App wiring, today/plan HTML views, APScheduler cron
+  templates/, static/         Jinja2 + vanilla JS/CSS, no build step
 ```
 
 The engines are deliberately pure/dataclass-based with no DB or HTTP dependency, so the
@@ -114,15 +146,16 @@ a live account:
    placeholder. Replace with either a proper VDOT model or intervals.icu's own derived
    pace zones once confirmed.
 
-## Not yet built
+## Not yet built / hardened
 
-Per the spec's build sequence, still outstanding beyond the deterministic core:
-
-- The daily autoregulation job (pull yesterday's intervals.icu activities/wellness,
-  run autoregulation, refresh the next 7-10 days) -- the autoregulation *logic* exists
-  in `engines/autoregulation.py` and is wired to the manual `/api/sessions/{id}/complete`
-  and `/log` endpoints, but nothing schedules it automatically yet.
-- Writing generated run sessions to intervals.icu automatically (the client exists;
-  nothing calls `upsert_planned_workout` from the plan-generation flow yet, pending the
-  spike above).
-- Hosting/always-on deployment.
+- **The intervals.icu spike itself** (build step 1) -- the client, sync, and daily-job
+  field-name guesses (`start_date_local`, `distance`, `moving_time`, `average_heartrate`,
+  `readiness`, the `/events` calendar schema) all need checking against a real account
+  before the first automated write is trusted to land correctly on the Fenix.
+- **Multi-day backlog handling** in the daily job: it only pulls *yesterday's* activities
+  per the spec's wording. If the job doesn't run for several days, older stale `planned`
+  sessions get marked missed rather than retroactively matched -- fine for a job that
+  runs daily without gaps, worth widening the fetch window if that assumption breaks.
+- **Deployment**: a `Dockerfile` exists (`backend/Dockerfile`) but hasn't been build-tested
+  here (no Docker daemon in this environment) -- verify it once, and add whatever your
+  actual host needs (reverse proxy/TLS, process supervision, backups of the SQLite file).

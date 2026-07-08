@@ -1,17 +1,36 @@
+import logging
 from datetime import date, timedelta
 from pathlib import Path
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.api.routes import get_or_create_athlete, router
+from app.config import DAILY_JOB_HOUR, ENABLE_SCHEDULER
 from app.db import SessionLocal, init_db
+from app.jobs.daily_autoregulation import run_daily_job
 from app.models import PlannedSession, Race
 from app.seed import seed_exercise_library
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Training App")
 app.include_router(router)
+
+scheduler = BackgroundScheduler()
+
+
+def _run_daily_job_with_own_session():
+    db = SessionLocal()
+    try:
+        summary = run_daily_job(db)
+        logger.info("daily autoregulation job ran: %s", summary)
+    except Exception:
+        logger.exception("daily autoregulation job failed")
+    finally:
+        db.close()
 
 BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
@@ -37,6 +56,22 @@ def on_startup():
         seed_exercise_library(db)
     finally:
         db.close()
+
+    if ENABLE_SCHEDULER and not scheduler.running:
+        scheduler.add_job(
+            _run_daily_job_with_own_session,
+            "cron",
+            hour=DAILY_JOB_HOUR,
+            id="daily_autoregulation",
+            replace_existing=True,
+        )
+        scheduler.start()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
 
 
 @app.get("/")
