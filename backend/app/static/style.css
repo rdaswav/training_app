@@ -77,6 +77,29 @@ nav a.active { color: var(--accent); font-weight: 600; }
 }
 .prescription:last-child { border-bottom: none; }
 .prescription .meta { color: var(--muted); font-size: 0.85rem; }
+.link-button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.2rem 0;
+  text-decoration: underline;
+}
+.swap-picker {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.3rem;
+  flex-basis: 100%;
+}
+.swap-picker select {
+  padding: 0.3rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
 form.log-form {
   display: flex;
   gap: 0.4rem;

@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -11,7 +11,7 @@ from app.api.routes import get_or_create_athlete, router
 from app.config import DAILY_JOB_HOUR, ENABLE_SCHEDULER
 from app.db import SessionLocal, init_db
 from app.jobs.daily_autoregulation import run_daily_job
-from app.models import PlannedSession, Race
+from app.models import CompletedSession, PlannedSession, Race, SessionType
 from app.seed import seed_exercise_library
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ def today_view(request: Request):
         days_to_race = (race.race_date - today).days if race else None
         return templates.TemplateResponse(
             "today.html",
-            {"request": request, "sessions": sessions, "today": today, "race": race, "days_to_race": days_to_race},
+            {"request": request, "sessions": sessions, "today": today, "race": race, "days_to_race": days_to_race, "active": "today"},
         )
     finally:
         db.close()
@@ -139,7 +139,7 @@ def plan_view(request: Request):
             weeks.setdefault(week_monday, []).append(s)
         return templates.TemplateResponse(
             "plan.html",
-            {"request": request, "race": race, "phase_segments": phase_segments, "weeks": sorted(weeks.items())},
+            {"request": request, "race": race, "phase_segments": phase_segments, "weeks": sorted(weeks.items()), "active": "plan"},
         )
     finally:
         db.close()
@@ -154,7 +154,58 @@ def settings_view(request: Request):
         macrocycle_start = race.macrocycle.start_date if race and race.macrocycle else None
         return templates.TemplateResponse(
             "settings.html",
-            {"request": request, "athlete": athlete, "race": race, "macrocycle_start": macrocycle_start},
+            {"request": request, "athlete": athlete, "race": race, "macrocycle_start": macrocycle_start, "active": "settings"},
+        )
+    finally:
+        db.close()
+
+
+@app.get("/session/{session_id}")
+def session_view(session_id: int, request: Request):
+    db = SessionLocal()
+    try:
+        session = db.query(PlannedSession).filter(PlannedSession.id == session_id).first()
+        if not session:
+            raise HTTPException(404, "Session not found")
+        return templates.TemplateResponse("session.html", {"request": request, "s": session, "active": None})
+    finally:
+        db.close()
+
+
+@app.get("/strength-history")
+def strength_history_view(request: Request):
+    db = SessionLocal()
+    try:
+        athlete = get_or_create_athlete(db)
+        completed = (
+            db.query(CompletedSession)
+            .join(PlannedSession, CompletedSession.planned_session_id == PlannedSession.id)
+            .filter(PlannedSession.athlete_id == athlete.id, PlannedSession.type == SessionType.STRENGTH)
+            .order_by(CompletedSession.date.desc())
+            .limit(200)
+            .all()
+        )
+        by_pattern: dict[str, list[dict]] = {}
+        for c in completed:
+            pattern = c.actual.get("pattern")
+            if not pattern:
+                continue
+            exercise_name = next(
+                (p.get("exercise_name") for p in c.planned_session.content.get("prescriptions", []) if p["pattern"] == pattern),
+                None,
+            )
+            by_pattern.setdefault(pattern, []).append(
+                {
+                    "date": c.date,
+                    "exercise_name": exercise_name,
+                    "sets": c.actual.get("sets", []),
+                    "feedback": c.feedback,
+                    "next_instruction": c.next_instruction,
+                }
+            )
+        return templates.TemplateResponse(
+            "strength_history.html",
+            {"request": request, "by_pattern": sorted(by_pattern.items()), "active": "history"},
         )
     finally:
         db.close()

@@ -100,3 +100,16 @@ class PlanApplyRequest(BaseModel):
     race_date: date | None = None
     weekly_volume_km: float | None = None
     injury_flags: list[str] | None = None
+
+
+class ExerciseOut(BaseModel):
+    name: str
+    pattern: str
+    injury_tags: list[str]
+
+    model_config = {"from_attributes": True}
+
+
+class ExerciseSwapRequest(BaseModel):
+    pattern: str
+    exercise_name: str

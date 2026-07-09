@@ -7,11 +7,12 @@ what's left and in what order.
 ## Where things stand
 
 All ten of the spec's build-sequence steps (section 10) are implemented and tested
-(53 passing tests): data model, running periodization engine, RP-style strength
+(57 passing tests): data model, running periodization engine, RP-style strength
 engine, exercise library + substitution, unified calendar with the adjacency
 guardrail, run/strength autoregulation, a confirmed-working intervals.icu
-integration, the daily autoregulation job, a FastAPI backend, and a minimal web UI.
-It's deployed and live at `training-app-v1.fly.dev`.
+integration, the daily autoregulation job, a FastAPI backend, and a web UI covering
+today/plan/settings/history/session-detail views. It's deployed and live at
+`training-app-v1.fly.dev`.
 
 What's below is genuinely unbuilt or thin -- not spec gaps exactly, but the gap
 between "MVP works end to end" and "pleasant, complete to actually live with day to
@@ -19,49 +20,34 @@ day."
 
 ---
 
-## 1. Athlete/race management UI -- next up
+## 1. Athlete/race management UI -- DONE
 
-**Problem**: setting your fitness profile, creating a race, and deleting/editing one
-are curl-only right now (`USER_GUIDE.md`). Every edit so far in this project has
-gone through me running curl against the live app on your behalf, which doesn't
-scale as a normal workflow.
+Shipped: a `/settings` page with an athlete profile form (weekly volume, paces
+entered as M:SS, HR ceiling/max HR, injury flags) and a race form (name, date,
+distance, priority, plan start date). Editing an existing race deletes and
+recreates it transparently in one action, pre-filling the current macrocycle's
+start date so it stays anchored unless deliberately changed.
 
-**Scope**:
-- A `/settings` page (or similar) with:
-  - An athlete profile form (weekly volume, easy/threshold pace, HR ceiling, max HR,
-    injury flags) pre-filled from `GET /api/athlete`, saving via `PUT /api/athlete`.
-  - Current race display (name/date/distance/priority) with an edit-in-place or
-    delete-and-recreate flow, since race name/distance/priority aren't editable via
-    `/api/plan/apply` today (only `race_date`, `weekly_volume_km`, `injury_flags`
-    are) -- either extend `PlanApplyRequest` to cover the rest, or keep
-    delete+recreate but make it a single UI action instead of two curl calls.
-  - A "create race" form including `plan_start_date`.
-- Nav link from the existing Today/Plan views.
-
-**Not in scope for this pass**: auth/login (single-user app, spec explicitly doesn't
-call for it).
+**Not in scope**: auth/login (single-user app, spec explicitly doesn't call for it).
 
 ---
 
-## 2. Strength UI depth
+## 2. Strength UI depth -- DONE
 
-**Problem**: the RP engine, substitution, and `NxNxN` logging all work, but the UI
-only shows *today's* prescription -- there's no way to see what you actually lifted
-last time, track a working weight over a mesocycle, or substitute an exercise
-without an injury flag forcing it.
+Shipped:
+- **History view** (`/strength-history`): past completed strength sessions grouped
+  by movement pattern, showing exercise, sets/reps/weight/RIR, and the
+  autoregulation feedback for each, most recent first.
+- **Manual exercise substitution**: a "Swap exercise" control on any still-planned
+  strength prescription, backed by `GET /api/exercises?pattern=X` and
+  `PATCH /api/sessions/{id}/exercise` -- picks freely within the pattern, not just
+  the injury-flag-forced substitution.
+- **Retroactive logging**: a `/session/{id}` detail page (linked from every day on
+  `/plan`) shows the log/complete form for any session that isn't yet `completed`,
+  including ones sitting as `missed` or `planned` in the past -- not just today's.
 
-**Scope**:
-- A history view: past `CompletedSession` rows for strength, grouped by
-  pattern/exercise, so you can see trend (e.g. squat 3x5 across the last 5 sessions).
-- A "swap exercise" control on today's view: pick any other exercise tagged with
-  the same movement pattern, not just the injury-flag-forced substitution.
-  `engines/strength.py`'s `select_exercise` already supports arbitrary
-  pattern-scoped selection; this is a UI + a small API endpoint
-  (`PATCH /api/sessions/{id}` to override one prescription's exercise) away.
-- Retroactive logging: right now if you forget to log a session the day of, the
-  daily job will mark it missed at the next run. Worth a "log a past session"
-  entry point on the plan view for sessions still sitting as `missed` or `planned`
-  in the past.
+Shared a `_session_card.html` Jinja macro between the today-view and the new
+session-detail page to avoid duplicating the run/strength rendering logic.
 
 ---
 
@@ -115,10 +101,10 @@ things documented in the README as known gaps remain:
 
 ## 5. Smaller hardening items
 
-- **API-level tests**: current test suite covers engines and `plan_service`/
-  `intervals_sync`/the daily job directly; nothing exercises `api/routes.py` through
-  FastAPI's `TestClient`. Worth adding once the UI work above starts touching routes
-  more, so regressions get caught by CI rather than manual curl checks.
+- **API-level tests**: `test_exercise_swap.py` calls route functions directly (not
+  through FastAPI's `TestClient`/HTTP layer) for the new swap endpoint; the rest of
+  `api/routes.py` still isn't covered that way. Worth a real `TestClient` pass at
+  some point so regressions get caught by CI rather than manual curl checks.
 - **Docker build verification**: `backend/Dockerfile` has never actually been
   built in an environment with a Docker daemon (blocked in this sandbox). Fly.io
   deploys via its own remote builder and that's confirmed working, but the Dockerfile
@@ -132,8 +118,8 @@ things documented in the README as known gaps remain:
 
 ## Suggested order
 
-1. Athlete/race management UI (this session's next task)
-2. Strength UI depth
-3. intervals.icu polish (interval decomposition first, VDOT/​%HR are lower-stakes)
+1. ~~Athlete/race management UI~~ -- done
+2. ~~Strength UI depth~~ -- done
+3. intervals.icu polish (interval decomposition first, VDOT/​%HR are lower-stakes) -- next up
 4. Visual design overhaul (scope tightly -- e.g. one load chart, not a full redesign)
-5. Hardening items, opportunistically alongside 2-4 rather than as a dedicated pass
+5. Hardening items, opportunistically alongside 3-4 rather than as a dedicated pass
