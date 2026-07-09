@@ -44,7 +44,15 @@ def format_pace(sec_per_km: int | None) -> str:
     return f"{m}:{s:02d}/km"
 
 
+def format_pace_mmss(sec_per_km: int | None) -> str:
+    if not sec_per_km:
+        return ""
+    m, s = divmod(int(sec_per_km), 60)
+    return f"{m}:{s:02d}"
+
+
 templates.env.filters["pace"] = format_pace
+templates.env.filters["pace_mmss"] = format_pace_mmss
 templates.env.globals["timedelta"] = timedelta
 
 
@@ -132,6 +140,21 @@ def plan_view(request: Request):
         return templates.TemplateResponse(
             "plan.html",
             {"request": request, "race": race, "phase_segments": phase_segments, "weeks": sorted(weeks.items())},
+        )
+    finally:
+        db.close()
+
+
+@app.get("/settings")
+def settings_view(request: Request):
+    db = SessionLocal()
+    try:
+        athlete = get_or_create_athlete(db)
+        race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
+        macrocycle_start = race.macrocycle.start_date if race and race.macrocycle else None
+        return templates.TemplateResponse(
+            "settings.html",
+            {"request": request, "athlete": athlete, "race": race, "macrocycle_start": macrocycle_start},
         )
     finally:
         db.close()

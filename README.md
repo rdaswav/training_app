@@ -4,9 +4,10 @@ A personal running + strength periodization app. Generates a race-driven half-ma
 (default) training block, unifies running and RP-style strength into one calendar, and
 pushes structured run workouts to intervals.icu (and from there, the Fenix 8).
 
-See `SPEC.md` for the full build specification this implements, and
-`USER_GUIDE.md` for how to actually use a running deployment day to day
-(creating a race, logging sessions, editing the plan).
+See `SPEC.md` for the full build specification this implements, `USER_GUIDE.md`
+for how to actually use a running deployment day to day (creating a race,
+logging sessions, editing the plan), and `PROJECT_PLAN.md` for the prioritized
+roadmap of what's left between this MVP and a fuller build.
 
 ## Status
 
