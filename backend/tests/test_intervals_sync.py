@@ -90,3 +90,72 @@ def test_sync_records_failure_without_aborting_batch(db_session, monkeypatch):
 
     assert result["failed"] == 1
     assert result["synced"] >= 1
+
+
+def test_sync_handles_repeat_step_sessions(db_session, monkeypatch):
+    monkeypatch.setattr(intervals_sync, "INTERVALS_ICU_API_KEY", "test-key")
+    monkeypatch.setattr(intervals_sync, "INTERVALS_ICU_ATHLETE_ID", "i123")
+    today = date(2026, 7, 8)
+    athlete, race = _make_athlete_and_race(db_session, today)
+    generate_and_persist_plan(db_session, athlete, race, today=today)
+
+    descriptions = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        descriptions.append(body["description"])
+        return httpx.Response(200, json={"id": f"evt-{len(descriptions)}"})
+
+    client = IntervalsIcuClient(api_key="test-key", athlete_id="i123", transport=httpx.MockTransport(handler))
+    result = intervals_sync.sync_upcoming_runs_to_intervals(db_session, athlete, today=today, window_days=10, client=client)
+
+    assert result["failed"] == 0
+    # The Re-base "Strides" quality session (6x repeat block) should fall within
+    # the 10-day window and produce an "Nx" line in its synced description.
+    assert any("6x" in d for d in descriptions)
+
+
+def test_sync_backward_compatible_with_legacy_flat_step_rows(db_session, monkeypatch):
+    monkeypatch.setattr(intervals_sync, "INTERVALS_ICU_API_KEY", "test-key")
+    monkeypatch.setattr(intervals_sync, "INTERVALS_ICU_ATHLETE_ID", "i123")
+    today = date(2026, 7, 8)
+    athlete, _race = _make_athlete_and_race(db_session, today)
+
+    # Manually construct a row in the OLD shape (no "type" key at all) --
+    # simulates data persisted before repeat-block support existed.
+    legacy_session = PlannedSession(
+        athlete_id=athlete.id,
+        date=today,
+        type=SessionType.RUN,
+        name="Cruise intervals",
+        status=SessionStatus.PLANNED,
+        content={
+            "steps": [
+                {
+                    "label": "3 x 1.6km cruise interval @ threshold, 90s jog",
+                    "distance_km": 4.8,
+                    "duration_min": None,
+                    "target_pace_sec_per_km": 330,
+                    "hr_ceiling": None,
+                }
+            ],
+            "total_distance_km": 4.8,
+            "role": "quality",
+        },
+        phase_name="Build 1",
+    )
+    db_session.add(legacy_session)
+    db_session.commit()
+
+    plan = intervals_sync._to_run_session_plan(legacy_session)
+    assert len(plan.steps) == 1
+    assert not hasattr(plan.steps[0], "repeat_count")  # a plain RunStep, not RunRepeatStep
+    assert plan.steps[0].distance_km == 4.8
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"id": "evt-legacy"})
+
+    client = IntervalsIcuClient(api_key="test-key", athlete_id="i123", transport=httpx.MockTransport(handler))
+    result = intervals_sync.sync_upcoming_runs_to_intervals(db_session, athlete, today=today, window_days=0, client=client)
+    assert result["synced"] == 1
+    assert result["failed"] == 0

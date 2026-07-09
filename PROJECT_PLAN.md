@@ -74,28 +74,32 @@ exists yet.
 
 ---
 
-## 4. intervals.icu polish
+## 4. intervals.icu polish -- DONE
 
-**Problem**: the integration works and is confirmed against a real account, but two
-things documented in the README as known gaps remain:
-
-**Scope**:
-- **Interval/repeat-block decomposition**: composite quality-session steps (e.g.
-  "6 x 20s strides w/ 60s float") currently get sent to intervals.icu as one
-  aggregate distance+pace line, not a real `Nx` repeat block. Fixing this means
-  teaching `engines/running.py`'s quality-session builders to emit a list of
-  sub-steps (work interval + recovery, repeated N times) instead of one flattened
-  `RunStep`, and teaching `integrations/intervals_icu.py`'s formatter to emit
-  intervals.icu's repeat-block syntax for those.
-- **VDOT/critical-pace model**: `AthleteFitness.race_pace_sec_per_km` is currently
-  `threshold_pace + 12s/km`, a placeholder. Replace with a real VDOT table lookup
-  or critical-pace calculation once weekly_volume/paces are more than manually
-  entered defaults (this matters more once there's real logged run history to
-  derive fitness from automatically, which is arguably its own future item: "derive
-  the athlete's current fitness from intervals.icu history instead of manual entry").
-- **%HR basis spot-check**: confirm whether intervals.icu's `%HR` target is a
-  percentage of max HR or LTHR by comparing one generated event against the
-  athlete's own HR zone chart in the intervals.icu UI.
+Shipped:
+- **VDOT race-pace model**: `AthleteFitness.race_pace_sec_per_km` now runs Daniels'
+  VDOT formulas (`engines/vdot.py`) instead of the old `threshold_pace + 12s/km`
+  placeholder -- threshold pace calibrates a VDOT, then a fixed-point iteration
+  solves for the pace matching the athlete's actual race distance
+  (`AthleteFitness.race_distance_km`, threaded through from `Race.distance_km`).
+- **Interval/repeat-block decomposition**: quality-session builders in
+  `engines/running.py` now emit a `RunRepeatStep` (work + optional recovery,
+  repeated N times) for every composite session (Re-base strides, Build 1 cruise
+  intervals, Build 2 threshold/race-pace reps, Taper race-pace touch) instead of one
+  flattened `RunStep`. Serializes to a `"type": "repeat"` JSON shape
+  (`plan_service.py`) with full backward-compatibility for already-persisted
+  flat-shape rows (`intervals_sync.py` defaults missing/unrecognized `type` to a
+  plain step). `integrations/intervals_icu.py` emits the corresponding `Nx`
+  repeat-block wire syntax.
+  - **Caveat**: the `Nx` repeat-block syntax itself is UNCONFIRMED against a live
+    intervals.icu account (unlike the pace/HR tokens, which were confirmed
+    2026-07-09) -- tracked via `REPEAT_BLOCK_SYNTAX_CONFIRMED = False` in that
+    module. A follow-up live spike (post a repeat-block workout, inspect the parsed
+    `workout_doc`, correct the syntax if needed) is a separate future step, not
+    bundled into this one.
+- **%HR basis spot-check**: still an open manual follow-up, not code -- once real
+  syncing runs against the live account, compare a synced event's `%HR` value
+  against the athlete's own HR zone chart to confirm whether it's %max HR or %LTHR.
 
 ---
 
@@ -116,10 +120,27 @@ things documented in the README as known gaps remain:
 
 ---
 
+## 6. Maintenance mode (v2, not yet scoped)
+
+**Idea**: when there's no race currently planned (between blocks, or before the
+first one is ever created), the app currently has no concept of what to generate --
+`generate_and_persist_plan` requires a `Race`. Worth a "maintenance mode" that
+prescribes a sensible steady-state week (strength at MEV/MAV-ish accumulation,
+running at a stable base volume, no phase progression/taper logic) when there's no
+active race, rather than leaving the athlete with an empty calendar between blocks.
+
+Not scoped yet -- flagged here for a future pass. Open questions when it's picked
+up: does it need its own `PlannedSession` generation path independent of
+`Race`/`Macrocycle`, or a synthetic "maintenance race" placeholder far in the
+future? How does the daily job/UI distinguish "no race" from "maintenance active"?
+
+---
+
 ## Suggested order
 
 1. ~~Athlete/race management UI~~ -- done
 2. ~~Strength UI depth~~ -- done
-3. intervals.icu polish (interval decomposition first, VDOT/​%HR are lower-stakes) -- next up
-4. Visual design overhaul (scope tightly -- e.g. one load chart, not a full redesign)
-5. Hardening items, opportunistically alongside 3-4 rather than as a dedicated pass
+3. ~~intervals.icu polish~~ -- done (repeat-block live-syntax spike still an open follow-up)
+4. Visual design overhaul (scope tightly -- e.g. one load chart, not a full redesign) -- next up
+5. Hardening items, opportunistically alongside 4 rather than as a dedicated pass
+6. Maintenance mode (v2, not yet scoped) -- whenever there's appetite for it

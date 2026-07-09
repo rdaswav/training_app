@@ -7,8 +7,13 @@ from datetime import date
 
 import httpx
 
-from app.engines.running import RunSessionPlan, RunStep
-from app.integrations.intervals_icu import IntervalsIcuClient, session_to_description
+from app.engines.running import RunRepeatStep, RunSessionPlan, RunStep
+from app.integrations.intervals_icu import (
+    REPEAT_BLOCK_SYNTAX_CONFIRMED,
+    IntervalsIcuClient,
+    repeat_step_to_lines,
+    session_to_description,
+)
 
 
 def _sample_session() -> RunSessionPlan:
@@ -77,3 +82,55 @@ def test_get_activities_sends_date_range():
     client = IntervalsIcuClient(api_key="k", athlete_id="i1", transport=httpx.MockTransport(handler))
     activities = client.get_activities(date(2026, 7, 1), date(2026, 7, 8))
     assert activities == [{"id": "a1"}]
+
+
+def test_repeat_step_to_lines_emits_count_then_work_then_recovery():
+    step = RunRepeatStep(
+        label="Cruise interval",
+        repeat_count=3,
+        work=RunStep("Cruise interval", distance_km=1.6, target_pace_sec_per_km=330),
+        recovery=RunStep("Jog", duration_min=1.5),
+    )
+    assert repeat_step_to_lines(step) == ["3x", "- 1.6km 5:30/km Pace", "- 1.5m"]
+
+
+def test_repeat_step_to_lines_omits_recovery_line_when_none():
+    step = RunRepeatStep(
+        label="Race-pace rep",
+        repeat_count=4,
+        work=RunStep("Race-pace rep", distance_km=0.4, target_pace_sec_per_km=300),
+        recovery=None,
+    )
+    lines = repeat_step_to_lines(step)
+    assert len(lines) == 2
+    assert lines[0] == "4x"
+
+
+def test_session_to_description_interleaves_repeat_and_plain_steps():
+    session = RunSessionPlan(
+        date=date(2026, 7, 14),
+        name="Cruise intervals",
+        phase_name="Build 1",
+        role="quality",
+        total_distance_km=8.8,
+        steps=[
+            RunStep("Warmup", duration_min=15, target_pace_sec_per_km=390),
+            RunRepeatStep(
+                "Cruise interval",
+                repeat_count=3,
+                work=RunStep("Cruise interval", distance_km=1.6, target_pace_sec_per_km=330),
+                recovery=RunStep("Jog", duration_min=1.5),
+            ),
+            RunStep("Cooldown", duration_min=10, target_pace_sec_per_km=390),
+        ],
+    )
+    lines = session_to_description(session).split("\n")
+    assert lines[0] == "- 15m 6:30/km Pace"
+    assert lines[1] == "3x"
+    assert lines[2] == "- 1.6km 5:30/km Pace"
+    assert lines[3] == "- 1.5m"
+    assert lines[4] == "- 10m 6:30/km Pace"
+
+
+def test_repeat_block_syntax_flagged_unconfirmed():
+    assert REPEAT_BLOCK_SYNTAX_CONFIRMED is False

@@ -21,16 +21,19 @@ from app.models import (
 )
 
 
-def _fitness_from_athlete(athlete: AthleteProfile) -> running_engine.AthleteFitness:
-    return running_engine.AthleteFitness(
+def _fitness_from_athlete(athlete: AthleteProfile, race_distance_km: float | None = None) -> running_engine.AthleteFitness:
+    kwargs = dict(
         weekly_volume_km=athlete.weekly_volume_km,
         easy_pace_sec_per_km=athlete.easy_pace_sec_per_km,
         threshold_pace_sec_per_km=athlete.threshold_pace_sec_per_km,
         aerobic_hr_ceiling=athlete.aerobic_hr_ceiling,
     )
+    if race_distance_km is not None:
+        kwargs["race_distance_km"] = race_distance_km
+    return running_engine.AthleteFitness(**kwargs)
 
 
-def _run_step_dict(step: running_engine.RunStep) -> dict:
+def _leaf_dict(step: running_engine.RunStep) -> dict:
     return {
         "label": step.label,
         "duration_min": step.duration_min,
@@ -38,6 +41,18 @@ def _run_step_dict(step: running_engine.RunStep) -> dict:
         "target_pace_sec_per_km": step.target_pace_sec_per_km,
         "hr_ceiling": step.hr_ceiling,
     }
+
+
+def _run_step_dict(step: running_engine.RunStep | running_engine.RunRepeatStep) -> dict:
+    if isinstance(step, running_engine.RunRepeatStep):
+        return {
+            "type": "repeat",
+            "label": step.label,
+            "repeat_count": step.repeat_count,
+            "work": _leaf_dict(step.work),
+            "recovery": _leaf_dict(step.recovery) if step.recovery is not None else None,
+        }
+    return {"type": "step", **_leaf_dict(step)}
 
 
 def _select_exercises(db: Session, prescriptions: list[strength_engine.StrengthPrescription], injury_flags: list[str]) -> list[dict]:
@@ -92,7 +107,7 @@ def generate_and_persist_plan(
     if plan_start_date is None:
         plan_start_date = race.macrocycle.start_date if race.macrocycle is not None else today
     regen_from = max(plan_start_date, today)
-    fitness = _fitness_from_athlete(athlete)
+    fitness = _fitness_from_athlete(athlete, race_distance_km=race.distance_km)
 
     phases, weeks = running_engine.generate_run_plan(plan_start_date, race.race_date, fitness)
     total_weeks = len(weeks)

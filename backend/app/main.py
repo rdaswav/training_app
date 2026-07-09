@@ -51,8 +51,19 @@ def format_pace_mmss(sec_per_km: int | None) -> str:
     return f"{m}:{s:02d}"
 
 
+def format_duration(duration_min: float | None) -> str:
+    if not duration_min:
+        return "-"
+    if duration_min < 1:
+        return f"{round(duration_min * 60)}s"
+    if duration_min == int(duration_min):
+        return f"{int(duration_min)} min"
+    return f"{duration_min:g} min"
+
+
 templates.env.filters["pace"] = format_pace
 templates.env.filters["pace_mmss"] = format_pace_mmss
+templates.env.filters["duration"] = format_duration
 templates.env.globals["timedelta"] = timedelta
 
 

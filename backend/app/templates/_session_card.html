@@ -1,3 +1,5 @@
+{% macro _leaf_summary(step) %}{% if step.distance_km %}{{ step.distance_km }} km{% elif step.duration_min %}{{ step.duration_min|duration }}{% endif %}{% if step.target_pace_sec_per_km %} @ {{ step.target_pace_sec_per_km|pace }}{% endif %}{% if step.hr_ceiling %} &middot; HR ceiling {{ step.hr_ceiling }}{% endif %}{% endmacro %}
+
 {% macro session_card(s, show_date=False) %}
 <div class="card" data-session-id="{{ s.id }}">
   <div class="session-type">
@@ -9,15 +11,24 @@
 
   {% if s.type.value == "run" %}
     {% for step in s.content.get("steps", []) %}
-      <div class="step">
-        {{ step.label }}
-        {% if step.distance_km %} &mdash; {{ step.distance_km }} km{% endif %}
-        {% if step.duration_min %} &mdash; {{ step.duration_min }} min{% endif %}
-        <div class="target">
-          {% if step.target_pace_sec_per_km %}Pace {{ step.target_pace_sec_per_km|pace }}{% endif %}
-          {% if step.hr_ceiling %} &middot; HR ceiling {{ step.hr_ceiling }}{% endif %}
+      {% if step.get("type") == "repeat" %}
+        <div class="step step-repeat">
+          {{ step.repeat_count }}x {{ step.work.label }}: {{ _leaf_summary(step.work) }}
+          {% if step.recovery %}
+            <div class="target">then {{ step.recovery.label }} &mdash; {{ _leaf_summary(step.recovery) }}</div>
+          {% endif %}
         </div>
-      </div>
+      {% else %}
+        <div class="step">
+          {{ step.label }}
+          {% if step.distance_km %} &mdash; {{ step.distance_km }} km{% endif %}
+          {% if step.duration_min %} &mdash; {{ step.duration_min|duration }}{% endif %}
+          <div class="target">
+            {% if step.target_pace_sec_per_km %}Pace {{ step.target_pace_sec_per_km|pace }}{% endif %}
+            {% if step.hr_ceiling %} &middot; HR ceiling {{ step.hr_ceiling }}{% endif %}
+          </div>
+        </div>
+      {% endif %}
     {% endfor %}
     {% if s.status.value != "completed" %}
       <form class="log-form" onsubmit="return submitRunComplete(event, {{ s.id }})">

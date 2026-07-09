@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
+from app.engines import vdot as vdot_engine
+
 TAPER_WEEKS = 2
 GROWTH_RATE = 1.09  # ~9%/week, within the 8-10% band
 DOWN_WEEK_FACTOR = 0.75  # ~25% volume cut on down weeks
@@ -33,11 +35,23 @@ class RunStep:
 
 
 @dataclass
+class RunRepeatStep:
+    """A work interval + recovery interval, repeated `repeat_count` times.
+    `work`/`recovery` are ordinary RunSteps -- a repeat block is just two
+    leaves plus a count, not a new kind of leaf."""
+
+    label: str
+    repeat_count: int
+    work: RunStep
+    recovery: RunStep | None = None
+
+
+@dataclass
 class RunSessionPlan:
     date: date
     name: str
     phase_name: str
-    steps: list[RunStep]
+    steps: list[RunStep | RunRepeatStep]
     total_distance_km: float
     role: str  # "easy" | "quality" | "long"
 
@@ -52,19 +66,24 @@ class WeekPlan:
     sessions: list[RunSessionPlan] = field(default_factory=list)
 
 
+HALF_MARATHON_KM = 21.0975
+
+
 @dataclass
 class AthleteFitness:
     weekly_volume_km: float
     easy_pace_sec_per_km: int
     threshold_pace_sec_per_km: int
     aerobic_hr_ceiling: int
+    race_distance_km: float = HALF_MARATHON_KM
 
     @property
     def race_pace_sec_per_km(self) -> int:
-        # Rough half-marathon race pace derived from threshold pace.
-        # TODO(spec 11): replace with VDOT/critical-pace model once the
-        # intervals.icu fitness data source is confirmed.
-        return self.threshold_pace_sec_per_km + 12
+        # Daniels' VDOT model: derive a fitness score from threshold pace
+        # (Daniels' own ~60min calibration for Threshold), then the race pace
+        # for the actual race distance. See engines/vdot.py.
+        vdot = vdot_engine.vdot_from_threshold_pace(self.threshold_pace_sec_per_km)
+        return vdot_engine.race_pace_sec_per_km(vdot, self.race_distance_km)
 
 
 def week_start(d: date) -> date:
@@ -169,24 +188,51 @@ def _quality_session(phase_name: str, fitness: AthleteFitness, quality_date: dat
     if phase_name in ("Base", "Re-base"):
         steps = [
             RunStep("Warmup", duration_min=15, target_pace_sec_per_km=easy),
-            RunStep("6 x 20s strides w/ 60s float", distance_km=1.2, target_pace_sec_per_km=threshold - 20),
+            RunRepeatStep(
+                "Strides",
+                repeat_count=6,
+                work=RunStep("Stride", duration_min=20 / 60, target_pace_sec_per_km=threshold - 20),
+                recovery=RunStep("Float", duration_min=1.0),
+            ),
             RunStep("Cooldown", duration_min=10, target_pace_sec_per_km=easy),
         ]
         name = "Strides"
+        # 1.2km is a fixed approximation of ground covered by the strides+floats
+        # combined, not mechanically derived (the work leg is duration-based, not
+        # distance-based) -- kept as-is from before the repeat-block decomposition.
         total_km = round(3.0 + 1.2, 1)
     elif phase_name == "Build 1":
         steps = [
             RunStep("Warmup", duration_min=15, target_pace_sec_per_km=easy),
-            RunStep("3 x 1.6km cruise interval @ threshold, 90s jog", distance_km=4.8, target_pace_sec_per_km=threshold),
+            RunRepeatStep(
+                "Cruise interval",
+                repeat_count=3,
+                work=RunStep("Cruise interval", distance_km=1.6, target_pace_sec_per_km=threshold),
+                recovery=RunStep("Jog", duration_min=1.5),
+            ),
             RunStep("Cooldown", duration_min=10, target_pace_sec_per_km=easy),
         ]
         name = "Cruise intervals"
-        total_km = 4.8 + 4.0
+        total_km = 4.8 + 4.0  # 3 * 1.6 (mechanically consistent with repeat_count * work.distance_km)
     elif phase_name == "Build 2":
+        # The original composite labels didn't specify a recovery duration for
+        # either block (unlike Re-base/Build 1/Taper, which do) -- these
+        # recovery durations are engine-chosen defaults, not derived from spec
+        # text. Revisit with a coach before treating them as authoritative.
         steps = [
             RunStep("Warmup", duration_min=15, target_pace_sec_per_km=easy),
-            RunStep("2 x 2km @ threshold", distance_km=4.0, target_pace_sec_per_km=threshold),
-            RunStep("2 x 1km @ race pace", distance_km=2.0, target_pace_sec_per_km=race_pace),
+            RunRepeatStep(
+                "Threshold reps",
+                repeat_count=2,
+                work=RunStep("Threshold rep", distance_km=2.0, target_pace_sec_per_km=threshold),
+                recovery=RunStep("Jog recovery", duration_min=2.0),
+            ),
+            RunRepeatStep(
+                "Race-pace reps",
+                repeat_count=2,
+                work=RunStep("Race-pace rep", distance_km=1.0, target_pace_sec_per_km=race_pace),
+                recovery=RunStep("Jog recovery", duration_min=1.5),
+            ),
             RunStep("Cooldown", duration_min=10, target_pace_sec_per_km=easy),
         ]
         name = "Threshold + race-pace reps"
@@ -194,7 +240,12 @@ def _quality_session(phase_name: str, fitness: AthleteFitness, quality_date: dat
     else:  # Taper
         steps = [
             RunStep("Warmup", duration_min=12, target_pace_sec_per_km=easy),
-            RunStep("4 x 400m @ race pace, full recovery", distance_km=1.6, target_pace_sec_per_km=race_pace),
+            RunRepeatStep(
+                "Race-pace rep",
+                repeat_count=4,
+                work=RunStep("Race-pace rep", distance_km=0.4, target_pace_sec_per_km=race_pace),
+                recovery=RunStep("Full recovery", duration_min=3.0),
+            ),
             RunStep("Cooldown", duration_min=8, target_pace_sec_per_km=easy),
         ]
         name = "Race-pace touch"
