@@ -1,6 +1,7 @@
 """Tests the client's request construction and workout formatting against a
-mock transport. The token syntax asserted here (`<mm:ss>/km Pace`, `<pct>% HR`)
-was verified against a live intervals.icu account on 2026-07-09 -- see
+mock transport. The token syntax asserted here (`<mm:ss>/km Pace`, `<pct>% HR`,
+the `Nx` repeat-block structure, and the whole-seconds duration format) was
+verified against a live intervals.icu account on 2026-07-09 -- see
 integrations/intervals_icu.py's module docstring for the full writeup."""
 import json
 from datetime import date
@@ -11,8 +12,10 @@ from app.engines.running import RunRepeatStep, RunSessionPlan, RunStep
 from app.integrations.intervals_icu import (
     REPEAT_BLOCK_SYNTAX_CONFIRMED,
     IntervalsIcuClient,
+    _format_duration,
     repeat_step_to_lines,
     session_to_description,
+    step_to_line,
 )
 
 
@@ -91,7 +94,7 @@ def test_repeat_step_to_lines_emits_count_then_work_then_recovery():
         work=RunStep("Cruise interval", distance_km=1.6, target_pace_sec_per_km=330),
         recovery=RunStep("Jog", duration_min=1.5),
     )
-    assert repeat_step_to_lines(step) == ["3x", "- 1.6km 5:30/km Pace", "- 1.5m"]
+    assert repeat_step_to_lines(step) == ["3x", "- 1.6km 5:30/km Pace", "- 90s"]
 
 
 def test_repeat_step_to_lines_omits_recovery_line_when_none():
@@ -128,9 +131,26 @@ def test_session_to_description_interleaves_repeat_and_plain_steps():
     assert lines[0] == "- 15m 6:30/km Pace"
     assert lines[1] == "3x"
     assert lines[2] == "- 1.6km 5:30/km Pace"
-    assert lines[3] == "- 1.5m"
+    assert lines[3] == "- 90s"
     assert lines[4] == "- 10m 6:30/km Pace"
 
 
-def test_repeat_block_syntax_flagged_unconfirmed():
-    assert REPEAT_BLOCK_SYNTAX_CONFIRMED is False
+def test_repeat_block_syntax_flagged_confirmed():
+    assert REPEAT_BLOCK_SYNTAX_CONFIRMED is True
+
+
+def test_format_duration_whole_minutes():
+    assert _format_duration(15) == "15m"
+    assert _format_duration(1.0) == "1m"
+
+
+def test_format_duration_fractional_minutes_converts_to_seconds():
+    # "1.5m"/"0.333...m" silently failed to parse live on 2026-07-09 --
+    # decimal-minute tokens must be expressed as whole seconds instead.
+    assert _format_duration(1.5) == "90s"
+    assert _format_duration(20 / 60) == "20s"
+
+
+def test_step_to_line_uses_seconds_for_fractional_duration_step():
+    step = RunStep("Stride", duration_min=20 / 60, target_pace_sec_per_km=310)
+    assert step_to_line(step) == "- 20s 5:10/km Pace"

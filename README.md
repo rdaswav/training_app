@@ -197,16 +197,21 @@ The spec's build step 1 spike happened against a real account. Findings, folded 
    intervals.icu. **Not independently confirmed**: whether intervals.icu's "%HR" base is
    %max HR or %LTHR -- spot-check one generated event's target against the athlete's own
    HR zone chart before trusting the exact percentage.
-5. **Known limitation, not yet fixed**: composite steps in this app (e.g. "6 x 20s
-   strides w/ 60s float" as a single `RunStep`) are sent as one aggregate distance+pace
-   line, not decomposed into intervals.icu's native `Nx` repeat-block syntax -- so
-   interval/recovery structure within a quality session won't show on the watch, only
-   the aggregate target will. Follow-up: teach the running engine to emit proper repeat
-   blocks.
-6. **VDOT/critical-pace source still unconfirmed** -- unrelated to the spike above.
-   `AthleteFitness.race_pace_sec_per_km` in `engines/running.py` still derives race pace
-   as `threshold_pace + 12s/km`, a rough placeholder. Replace with either a proper VDOT
-   model or intervals.icu's own derived pace zones (not checked during this spike).
+5. **Repeat-block decomposition -- confirmed 2026-07-09 (follow-up spike).** Composite
+   quality-session steps now decompose into a real `RunRepeatStep` (work + optional
+   recovery, repeated N times) instead of one aggregate line, and the `Nx` wire syntax
+   was verified against a live account: a standalone count line followed by nested
+   dashed work/recovery lines parses as `{"reps": N, "steps": [...]}` with both legs
+   present and distance/duration correctly summed across all N reps. See
+   `app/integrations/intervals_icu.py`'s module docstring for the full writeup.
+   Along the way this surfaced a real bug: a decimal-minute duration token like
+   `"1.5m"` (or `"0.333...m"` for a 20-second stride) silently fails to parse and drops
+   the whole step -- fixed by converting fractional minutes to whole seconds (`"90s"`,
+   `"20s"`) in `_format_duration`.
+6. **VDOT race-pace model -- implemented.** `AthleteFitness.race_pace_sec_per_km` now
+   runs Daniels' VDOT formulas (`engines/vdot.py`) instead of the old
+   `threshold_pace + 12s/km` placeholder, calibrated off the athlete's threshold pace
+   and solved for their actual race distance via fixed-point iteration.
 
 ## Not yet built / hardened
 

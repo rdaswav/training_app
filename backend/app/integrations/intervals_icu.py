@@ -17,7 +17,11 @@ step 1 -- see README "Confirm before relying on this" for the full writeup):
   distance/duration token itself from being parsed as a target in earlier
   testing):
     - distance: "<km>km" (decimals fine, e.g. "4.8km")
-    - duration: "<min>m"
+    - duration: "<min>m" for whole minutes; a decimal-minute value (e.g.
+      "1.5m") silently fails to parse and drops the entire step -- confirmed
+      live 2026-07-09 during the repeat-block spike below. Fractional
+      durations must be converted to whole seconds ("<secs>s") instead; see
+      `_format_duration`.
     - pace target: "<mm:ss>/km Pace" (value THEN the literal word "Pace" --
       the reverse order silently fails to parse)
     - HR target: "<pct>% HR" -- percent only. Raw bpm ("150bpm HR",
@@ -32,15 +36,24 @@ step 1 -- see README "Confirm before relying on this" for the full writeup):
     - Confirmed a single step CAN carry both a pace AND an HR target at once
       (e.g. "8km 6:30/km Pace 75% HR" parsed both fields) -- this resolves
       the previously-open spec section 11 question.
-  Composite multi-part steps (e.g. "6 x 20s strides w/ 60s float") are now
+  Composite multi-part steps (e.g. "6 x 20s strides w/ 60s float") are
   decomposed into a repeat-block form: a standalone count line ("Nx")
   followed by nested dashed work/recovery lines (see `repeat_step_to_lines`).
-  This nested-block syntax itself is UNCONFIRMED -- unlike every token
-  documented above, it has NEVER been tested against the live account, only
-  based on public docs. `REPEAT_BLOCK_SYNTAX_CONFIRMED` stays False until a
-  follow-up live spike (post a repeat-block workout, inspect the parsed
-  structure) confirms or corrects it, the same way the pace/HR-token guesses
-  above were corrected on 2026-07-09.
+
+Repeat-block syntax confirmed 2026-07-09 (follow-up spike, same session as the
+above): posted a real event with a 3x repeat block, inspected the returned
+`workout_doc.steps[0]`, and confirmed intervals.icu correctly parses the
+standalone "Nx" line as a `{"reps": N, "steps": [...]}` group containing every
+subsequent dashed line up to the next non-dashed line, in order -- work leg
+first, then recovery leg. `REPEAT_BLOCK_SYNTAX_CONFIRMED` is now True.
+
+The first attempt at this spike appeared to show the recovery leg silently
+dropped from the group; root cause was the pre-existing decimal-duration bug
+documented above (`"1.5m"` and `"0.3333333333333333m"` both failed to parse),
+not the repeat-block structure itself -- once the recovery/work duration
+tokens were expressed in whole seconds, both legs parsed correctly as sibling
+steps inside the `"reps"` group with distance/duration correctly summed
+across all N reps.
 """
 from __future__ import annotations
 
@@ -52,7 +65,7 @@ import httpx
 from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID, INTERVALS_ICU_BASE_URL
 from app.engines.running import RunRepeatStep, RunSessionPlan, RunStep
 
-REPEAT_BLOCK_SYNTAX_CONFIRMED = False  # flip to True (and update this module's docstring) once spiked live
+REPEAT_BLOCK_SYNTAX_CONFIRMED = True  # confirmed live 2026-07-09 -- see module docstring
 
 
 def _format_pace(sec_per_km: int) -> str:
@@ -60,12 +73,22 @@ def _format_pace(sec_per_km: int) -> str:
     return f"{m}:{s:02d}/km"
 
 
+def _format_duration(duration_min: float) -> str:
+    """Whole minutes as "Nm"; anything fractional (e.g. 20s strides stored as
+    1/3, or a 1.5-minute recovery) as rounded whole seconds -- confirmed live
+    2026-07-09 that a decimal-minute token like "1.5m" silently fails to parse
+    and drops the entire step, while "90s" and "2m" both parse correctly."""
+    if duration_min == int(duration_min):
+        return f"{int(duration_min)}m"
+    return f"{round(duration_min * 60)}s"
+
+
 def step_to_line(step: RunStep, max_hr: int | None = None) -> str:
     tokens = []
     if step.distance_km:
         tokens.append(f"{step.distance_km}km")
     elif step.duration_min:
-        tokens.append(f"{step.duration_min}m")
+        tokens.append(_format_duration(step.duration_min))
     if step.target_pace_sec_per_km:
         tokens.append(f"{_format_pace(step.target_pace_sec_per_km)} Pace")
     if step.hr_ceiling and max_hr:
@@ -75,8 +98,8 @@ def step_to_line(step: RunStep, max_hr: int | None = None) -> str:
 
 
 def repeat_step_to_lines(step: RunRepeatStep, max_hr: int | None = None) -> list[str]:
-    """UNCONFIRMED wire format -- see module docstring. A standalone count
-    line ("Nx") followed by the work leg's dashed line, then (if present) the
+    """Confirmed wire format -- see module docstring. A standalone count line
+    ("Nx") followed by the work leg's dashed line, then (if present) the
     recovery leg's dashed line."""
     lines = [f"{step.repeat_count}x", step_to_line(step.work, max_hr)]
     if step.recovery is not None:
