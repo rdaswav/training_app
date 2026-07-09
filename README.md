@@ -111,6 +111,14 @@ Note `auto_stop_machines = false` in `fly.toml`: the daily autoregulation job ru
 in-process APScheduler cron regardless of HTTP traffic, so the machine must never be
 suspended for being idle, unlike Fly's usual scale-to-zero default.
 
+**Fly dashboard gotcha**: setting secrets via the dashboard's Secrets tab only *stages*
+them -- the banner says so explicitly ("Run `fly deploy` to take them live"). A plain
+"Restart" on the Machines tab does **not** apply staged secrets; only an actual new
+deploy does (`fly deploy` from the CLI, or pushing a commit if GitHub auto-deploy is set
+up). Use `GET /api/config-check` to confirm whether a deployed instance actually sees
+`INTERVALS_ICU_API_KEY`/`INTERVALS_ICU_ATHLETE_ID` as non-empty (never returns the
+values themselves) rather than assuming a restart was enough.
+
 Alternative: any cheap VPS (Hetzner/DigitalOcean) running the same image via
 `docker compose`, with Caddy in front for automatic HTTPS -- more manual setup (your own
 restart/backup story) but full control. Either way, back up the SQLite file
