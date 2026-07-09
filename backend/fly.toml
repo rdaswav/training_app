@@ -1,0 +1,30 @@
+# Fly.io app config. `app` names are globally unique on Fly -- rename this
+# before your first deploy (fly will also reject a name that's taken).
+app = "training-app-CHANGE-ME"
+primary_region = "iad"  # pick whichever `fly platform regions` region is closest to you
+
+[build]
+
+[env]
+  DAILY_JOB_HOUR = "6"
+  ENABLE_SCHEDULER = "true"
+
+# Persists the SQLite file across deploys/restarts -- create this once with
+# `fly volumes create training_app_data --size 1 --region <primary_region>`
+# before the first `fly deploy`.
+[[mounts]]
+  source = "training_app_data"
+  destination = "/app/data"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  # The daily autoregulation job runs in-process (APScheduler) regardless of
+  # HTTP traffic, so the machine must never be suspended for being idle.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
