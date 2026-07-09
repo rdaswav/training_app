@@ -60,11 +60,13 @@ def update_athlete(payload: AthleteUpdate, db: Session = Depends(get_db)):
 @router.post("/races", response_model=RaceOut)
 def create_race(payload: RaceCreate, db: Session = Depends(get_db)):
     athlete = get_or_create_athlete(db)
-    race = Race(athlete_id=athlete.id, **payload.model_dump())
+    fields = payload.model_dump()
+    plan_start_date = fields.pop("plan_start_date")
+    race = Race(athlete_id=athlete.id, **fields)
     db.add(race)
     db.commit()
     db.refresh(race)
-    generate_and_persist_plan(db, athlete, race)
+    generate_and_persist_plan(db, athlete, race, today=plan_start_date)
     sync_upcoming_runs_to_intervals(db, athlete)
     return race
 
@@ -73,6 +75,21 @@ def create_race(payload: RaceCreate, db: Session = Depends(get_db)):
 def list_races(db: Session = Depends(get_db)):
     athlete = get_or_create_athlete(db)
     return db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).all()
+
+
+@router.delete("/races/{race_id}")
+def delete_race(race_id: int, db: Session = Depends(get_db)):
+    athlete = get_or_create_athlete(db)
+    race = db.query(Race).filter(Race.id == race_id, Race.athlete_id == athlete.id).first()
+    if not race:
+        raise HTTPException(404, "Race not found")
+    db.query(PlannedSession).filter(
+        PlannedSession.athlete_id == athlete.id,
+        PlannedSession.status == SessionStatus.PLANNED,
+    ).delete(synchronize_session=False)
+    db.delete(race)
+    db.commit()
+    return {"status": "deleted"}
 
 
 @router.post("/races/{race_id}/regenerate", response_model=RaceOut)
