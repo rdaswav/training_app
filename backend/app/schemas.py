@@ -29,11 +29,17 @@ class AthleteOut(BaseModel):
 
 
 class RaceCreate(BaseModel):
+    """`plan_start_date` anchors the generated plan's week 0 there instead of
+    today (e.g. a block that starts a few weeks out). Sessions are only ever
+    generated from that date forward -- nothing is backfilled for the gap
+    between today and plan_start_date."""
+
     name: str
     race_date: date
     distance_km: float
     goal_time_sec: int | None = None
     priority: RacePriority = RacePriority.A
+    plan_start_date: date | None = None
 
 
 class RaceOut(BaseModel):
