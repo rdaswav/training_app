@@ -15,13 +15,17 @@ DAILY_JOB_HOUR = int(os.environ.get("DAILY_JOB_HOUR", "6"))
 ENABLE_SCHEDULER = os.environ.get("ENABLE_SCHEDULER", "true").lower() not in ("false", "0", "")
 
 # Fixed weekly schedule (day-of-week indices, Monday=0) per spec section 7.
-# Adjustable, but this is the default single-user template.
+# NOTE: this is descriptive metadata stored on AthleteProfile.week_template
+# only -- the engines (engines/running.py's run_days, engines/strength.py's
+# DAY_TEMPLATE) hardcode their own weekday assignments and don't read this
+# dict. Keep the two in sync manually until the engines are made to consult
+# per-athlete schedule preferences.
 DEFAULT_WEEK_TEMPLATE = {
     0: "strength",  # Mon
     1: "run",       # Tue
     2: "strength",  # Wed
     3: "run",       # Thu
     4: "strength",  # Fri
-    5: "run",       # Sat (long run)
-    6: "rest",      # Sun
+    5: "rest",      # Sat
+    6: "run",       # Sun (long run)
 }

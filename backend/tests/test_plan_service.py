@@ -102,6 +102,30 @@ def test_regenerating_plan_preserves_completed_sessions(db_session):
     assert squat_prescription["exercise_name"] == "Front squat"  # knee flag excludes Back squat/Goblet squat
 
 
+def test_future_plan_start_date_is_sticky_across_regeneration(db_session):
+    """Regression test: a race created with plan_start_date in the future must
+    keep that anchor on later regenerations (LLM edits, the daily job) even
+    though those calls don't re-specify it -- otherwise the plan silently
+    snaps to whatever day the regeneration happens to run on."""
+    today = date(2026, 7, 9)
+    start = date(2026, 8, 10)
+    athlete, race = _make_athlete_and_race(db_session, today, race_weeks=13)
+
+    generate_and_persist_plan(db_session, athlete, race, plan_start_date=start, today=today)
+
+    sessions = db_session.query(PlannedSession).filter(PlannedSession.athlete_id == athlete.id).all()
+    assert sessions
+    assert all(s.date >= start for s in sessions), "no sessions should exist before the requested plan start"
+
+    # Regenerate exactly like /api/plan/apply or /api/races/{id}/regenerate do:
+    # no plan_start_date given, "today" has moved forward a day.
+    generate_and_persist_plan(db_session, athlete, race, today=today + timedelta(days=1))
+
+    sessions_after = db_session.query(PlannedSession).filter(PlannedSession.athlete_id == athlete.id).all()
+    assert sessions_after
+    assert all(s.date >= start for s in sessions_after), "regeneration must not pull the plan's start date forward to today"
+
+
 def test_regenerate_does_not_touch_past_dates(db_session):
     today = date(2026, 7, 8)
     athlete, race = _make_athlete_and_race(db_session, today)
