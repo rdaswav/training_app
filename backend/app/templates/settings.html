@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings - Training App</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav><a href="/">Today</a><a href="/plan">Plan</a><a href="/settings" class="active">Settings</a></nav>
+  <h1>Settings</h1>
+
+  <div class="card">
+    <h3>Athlete profile</h3>
+    <form class="settings-form" onsubmit="return submitAthleteProfile(event)">
+      <label>Weekly volume (km)
+        <input name="weekly_volume_km" type="number" step="0.1" value="{{ athlete.weekly_volume_km }}" required>
+      </label>
+      <label>Easy pace (M:SS per km)
+        <input name="easy_pace" type="text" placeholder="6:30" value="{{ athlete.easy_pace_sec_per_km|pace_mmss }}" required>
+      </label>
+      <label>Threshold pace (M:SS per km)
+        <input name="threshold_pace" type="text" placeholder="5:30" value="{{ athlete.threshold_pace_sec_per_km|pace_mmss }}" required>
+      </label>
+      <label>Aerobic HR ceiling (bpm, easy-run cap)
+        <input name="aerobic_hr_ceiling" type="number" value="{{ athlete.aerobic_hr_ceiling }}" required>
+      </label>
+      <label>Max HR (bpm)
+        <input name="max_hr" type="number" value="{{ athlete.max_hr }}" required>
+      </label>
+      <label>Injury flags (comma-separated, e.g. knee, lower_back)
+        <input name="injury_flags" type="text" value="{{ athlete.injury_flags|join(', ') }}">
+      </label>
+      <button type="submit">Save profile</button>
+      <div id="athlete-status" class="form-status"></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>{% if race %}Race{% else %}Create a race{% endif %}</h3>
+    <form class="settings-form" onsubmit="return submitRaceForm(event, {{ race.id if race else 'null' }})">
+      <label>Name
+        <input name="name" type="text" value="{{ race.name if race else '' }}" required>
+      </label>
+      <label>Race date
+        <input name="race_date" type="date" value="{{ race.race_date if race else '' }}" required>
+      </label>
+      <label>Distance (km)
+        <input name="distance_km" type="number" step="0.01" value="{{ race.distance_km if race else 21.1 }}" required list="distance-presets">
+        <datalist id="distance-presets">
+          <option value="5"><option value="10"><option value="21.1"><option value="42.195">
+        </datalist>
+      </label>
+      <label>Priority
+        <select name="priority">
+          <option value="A" {% if race and race.priority.value == 'A' %}selected{% endif %}>A (goal race)</option>
+          <option value="B" {% if race and race.priority.value == 'B' %}selected{% endif %}>B</option>
+          <option value="tune_up" {% if race and race.priority.value == 'tune_up' %}selected{% endif %}>Tune-up</option>
+        </select>
+      </label>
+      <label>Plan start date (leave blank to start today)
+        <input name="plan_start_date" type="date" value="{{ macrocycle_start if macrocycle_start else '' }}">
+      </label>
+      <button type="submit">{% if race %}Save changes{% else %}Create race{% endif %}</button>
+      <div id="race-status" class="form-status"></div>
+    </form>
+    {% if race %}
+      <p class="note">Saving here deletes and recreates the race, regenerating every still-planned
+      session (completed/missed history is preserved). If you don't change "Plan start date" above,
+      the current start date is kept automatically.</p>
+    {% endif %}
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
