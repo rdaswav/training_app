@@ -3,6 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID
 from app.db import get_db
 from app.engines import autoregulation
 from app.intervals_sync import sync_upcoming_runs_to_intervals
@@ -263,3 +264,14 @@ def trigger_daily_job(db: Session = Depends(get_db)):
     """Manual trigger for the daily job (spec section 3) -- useful for ops/testing
     without waiting for the in-process scheduler (see main.py)."""
     return run_daily_job(db)
+
+
+@router.get("/config-check")
+def config_check():
+    """Reports whether the running process sees the intervals.icu credentials as
+    non-empty -- never returns the actual values. Diagnostic-only, for verifying
+    Fly secrets actually reached a deployed instance."""
+    return {
+        "intervals_icu_api_key_set": bool(INTERVALS_ICU_API_KEY),
+        "intervals_icu_athlete_id_set": bool(INTERVALS_ICU_ATHLETE_ID),
+    }
