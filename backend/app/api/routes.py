@@ -11,6 +11,7 @@ from app.jobs.daily_autoregulation import run_daily_job
 from app.models import (
     AthleteProfile,
     CompletedSession,
+    Exercise,
     PlannedSession,
     Race,
     SessionStatus,
@@ -20,6 +21,8 @@ from app.plan_service import generate_and_persist_plan
 from app.schemas import (
     AthleteOut,
     AthleteUpdate,
+    ExerciseOut,
+    ExerciseSwapRequest,
     PlanApplyRequest,
     RaceCreate,
     RaceOut,
@@ -210,6 +213,44 @@ def log_strength_session(session_id: int, payload: StrengthLogRequest, db: Sessi
     db.add(completed)
     db.commit()
     return {"summary": result.summary, "feedback": result.feedback, "next_instruction": result.next_instruction, "action": result.action}
+
+
+@router.get("/exercises", response_model=list[ExerciseOut])
+def list_exercises(pattern: str | None = None, db: Session = Depends(get_db)):
+    query = db.query(Exercise)
+    if pattern:
+        query = query.filter(Exercise.pattern == pattern)
+    return query.order_by(Exercise.name).all()
+
+
+@router.patch("/sessions/{session_id}/exercise")
+def swap_exercise(session_id: int, payload: ExerciseSwapRequest, db: Session = Depends(get_db)):
+    """Manually substitute the exercise for one pattern in a still-planned
+    strength session -- unlike injury-flag substitution, this is a free pick
+    within the pattern (engines/strength.py's select_exercise already supports
+    arbitrary pattern-scoped selection; this just exposes it as an edit)."""
+    session = _get_planned_session(db, session_id)
+    if session.type != SessionType.STRENGTH:
+        raise HTTPException(400, "Not a strength session")
+    if session.status != SessionStatus.PLANNED:
+        raise HTTPException(400, "Only still-planned sessions can be edited")
+
+    prescriptions = session.content.get("prescriptions", [])
+    new_prescriptions = []
+    found = False
+    for p in prescriptions:
+        if p["pattern"] == payload.pattern:
+            new_prescriptions.append({**p, "exercise_name": payload.exercise_name})
+            found = True
+        else:
+            new_prescriptions.append(p)
+    if not found:
+        raise HTTPException(400, f"No prescription for pattern '{payload.pattern}' in this session")
+
+    # Reassign (not mutate in place) so SQLAlchemy detects the JSON column changed.
+    session.content = {**session.content, "prescriptions": new_prescriptions}
+    db.commit()
+    return {"status": "updated"}
 
 
 @router.get("/plan/export")

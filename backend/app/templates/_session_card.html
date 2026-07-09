@@ -1,0 +1,57 @@
+{% macro session_card(s, show_date=False) %}
+<div class="card" data-session-id="{{ s.id }}">
+  <div class="session-type">
+    {{ s.type.value }} &middot; {{ s.phase_name or "" }}
+    {% if show_date %} &middot; {{ s.date.strftime("%a %-d %b") }}{% endif %}
+    {% if s.status.value != "planned" %} &middot; {{ s.status.value }}{% endif %}
+  </div>
+  <h3>{{ s.name }}</h3>
+
+  {% if s.type.value == "run" %}
+    {% for step in s.content.get("steps", []) %}
+      <div class="step">
+        {{ step.label }}
+        {% if step.distance_km %} &mdash; {{ step.distance_km }} km{% endif %}
+        {% if step.duration_min %} &mdash; {{ step.duration_min }} min{% endif %}
+        <div class="target">
+          {% if step.target_pace_sec_per_km %}Pace {{ step.target_pace_sec_per_km|pace }}{% endif %}
+          {% if step.hr_ceiling %} &middot; HR ceiling {{ step.hr_ceiling }}{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+    {% if s.status.value != "completed" %}
+      <form class="log-form" onsubmit="return submitRunComplete(event, {{ s.id }})">
+        <input name="actual_pace_sec_per_km" type="number" placeholder="pace s/km">
+        <input name="actual_hr" type="number" placeholder="avg HR">
+        <button type="submit">Log complete</button>
+      </form>
+    {% else %}
+      <div class="feedback">Completed</div>
+    {% endif %}
+  {% elif s.type.value == "strength" %}
+    {% for p in s.content.get("prescriptions", []) %}
+      <div class="prescription">
+        <div>
+          <strong>{{ p.exercise_name or p.pattern }}</strong>
+          <div class="meta">{{ p.pattern }} &middot; {{ p.sets }} x {{ p.reps }} @ RIR {{ p.rir }}</div>
+        </div>
+        {% if s.status.value != "completed" %}
+          <form class="log-form" onsubmit="return submitStrengthLog(event, {{ s.id }}, '{{ p.pattern }}')">
+            <input name="reps" type="number" placeholder="reps" required>
+            <input name="weight_kg" type="number" step="0.5" placeholder="kg" required>
+            <input name="rir_actual" type="number" step="0.5" placeholder="RIR">
+            <button type="submit">Log</button>
+          </form>
+          <button type="button" class="link-button" onclick="toggleSwap(this, {{ s.id }}, '{{ p.pattern }}')">Swap exercise</button>
+          <div class="swap-picker"></div>
+        {% endif %}
+      </div>
+    {% endfor %}
+    <div id="feedback-{{ s.id }}"></div>
+  {% endif %}
+
+  {% if s.content.get("note") %}
+    <div class="note">{{ s.content.get("note") }}</div>
+  {% endif %}
+</div>
+{% endmacro %}

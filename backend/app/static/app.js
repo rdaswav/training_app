@@ -20,6 +20,15 @@ async function deleteRequest(url) {
   return resp.json();
 }
 
+async function getJSON(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(text);
+  }
+  return resp.json();
+}
+
 function showFormStatus(id, message, ok) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -131,4 +140,39 @@ async function submitStrengthLog(event, sessionId, pattern) {
     alert("Failed to log set: " + e.message);
   }
   return false;
+}
+
+async function toggleSwap(button, sessionId, pattern) {
+  const container = button.nextElementSibling;
+  if (container.childElementCount > 0) {
+    container.innerHTML = "";
+    return;
+  }
+  let exercises;
+  try {
+    exercises = await getJSON(`/api/exercises?pattern=${encodeURIComponent(pattern)}`);
+  } catch (e) {
+    alert("Failed to load exercises: " + e.message);
+    return;
+  }
+  const select = document.createElement("select");
+  for (const ex of exercises) {
+    const opt = document.createElement("option");
+    opt.value = ex.name;
+    opt.textContent = ex.name;
+    select.appendChild(opt);
+  }
+  const confirmBtn = document.createElement("button");
+  confirmBtn.type = "button";
+  confirmBtn.textContent = "Confirm swap";
+  confirmBtn.onclick = async () => {
+    try {
+      await postJSON(`/api/sessions/${sessionId}/exercise`, { pattern, exercise_name: select.value }, "PATCH");
+      window.location.reload();
+    } catch (e) {
+      alert("Failed to swap: " + e.message);
+    }
+  };
+  container.appendChild(select);
+  container.appendChild(confirmBtn);
 }

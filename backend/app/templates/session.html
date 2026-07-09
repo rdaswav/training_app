@@ -3,26 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Today - Training App</title>
+  <title>{{ s.name }} - Training App</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   {% include "_nav.html" %}
   <div class="header">
-    <h1>{{ today.strftime("%A %-d %b") }}</h1>
-    {% if race %}
-      <div class="countdown">{{ race.name }} in {{ days_to_race }} days</div>
-    {% endif %}
+    <h1>{{ s.date.strftime("%A %-d %b") }}</h1>
   </div>
 
-  {% if not sessions %}
-    <p class="empty">No sessions scheduled today.</p>
-  {% endif %}
-
   {% from "_session_card.html" import session_card %}
-  {% for s in sessions %}
-    {{ session_card(s) }}
-  {% endfor %}
+  {{ session_card(s, show_date=False) }}
+
+  <p><a href="/plan">&larr; Back to plan</a></p>
 
   <script src="/static/app.js"></script>
 </body>

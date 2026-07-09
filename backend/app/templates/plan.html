@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <nav><a href="/">Today</a><a href="/plan" class="active">Plan</a><a href="/settings">Settings</a></nav>
+  {% include "_nav.html" %}
 
   {% if race %}
     <div class="header">
@@ -44,10 +44,11 @@
               {% set s = by_date.get(d) %}
               <td>
                 {% if s %}
-                  <strong>{{ s.name }}</strong><br>
+                  <a href="/session/{{ s.id }}"><strong>{{ s.name }}</strong></a><br>
                   <span class="meta">
                     {% if s.type.value == "run" %}{{ s.content.get("total_distance_km", "") }} km
                     {% elif s.type.value == "strength" %}{{ s.content.get("prescriptions", [])|length }} patterns{% endif %}
+                    {% if s.status.value != "planned" %} &middot; {{ s.status.value }}{% endif %}
                   </span>
                   {% if s.content.get("note") %}<div class="note">{{ s.content.get("note") }}</div>{% endif %}
                 {% else %}

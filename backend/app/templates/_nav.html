@@ -1,0 +1,6 @@
+<nav>
+  <a href="/" {% if active == "today" %}class="active"{% endif %}>Today</a>
+  <a href="/plan" {% if active == "plan" %}class="active"{% endif %}>Plan</a>
+  <a href="/strength-history" {% if active == "history" %}class="active"{% endif %}>History</a>
+  <a href="/settings" {% if active == "settings" %}class="active"{% endif %}>Settings</a>
+</nav>

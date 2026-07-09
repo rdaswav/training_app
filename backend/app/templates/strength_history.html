@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Strength History - Training App</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  {% include "_nav.html" %}
+  <h1>Strength history</h1>
+
+  {% if not by_pattern %}
+    <p class="empty">No strength sessions logged yet.</p>
+  {% endif %}
+
+  {% for pattern, entries in by_pattern %}
+    <div class="card">
+      <h3>{{ pattern.replace("_", " ")|title }}</h3>
+      <table class="calendar">
+        <thead>
+          <tr><th>Date</th><th>Exercise</th><th>Sets</th><th>Feedback</th><th>Next</th></tr>
+        </thead>
+        <tbody>
+          {% for entry in entries %}
+            <tr>
+              <td>{{ entry.date.strftime("%-d %b") }}</td>
+              <td>{{ entry.exercise_name or "-" }}</td>
+              <td>
+                {% for set in entry.sets %}
+                  {{ set.reps }}x{{ set.weight_kg }}kg{% if set.rir_actual is not none %} @ RIR {{ set.rir_actual }}{% endif %}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+              </td>
+              <td>{{ entry.feedback }}</td>
+              <td>{{ entry.next_instruction }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endfor %}
+</body>
+</html>
