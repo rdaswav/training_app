@@ -32,12 +32,15 @@ step 1 -- see README "Confirm before relying on this" for the full writeup):
     - Confirmed a single step CAN carry both a pace AND an HR target at once
       (e.g. "8km 6:30/km Pace 75% HR" parsed both fields) -- this resolves
       the previously-open spec section 11 question.
-  Known limitation: composite multi-part steps in this app (e.g. "6 x 20s
-  strides w/ 60s float", one `RunStep` per logical block) are sent as a
-  single aggregate distance+pace line, not decomposed into intervals.icu's
-  native "Nx" repeat-block syntax -- so interval/recovery structure within a
-  quality session isn't represented on the watch yet, only the aggregate
-  target. Follow-up: teach the running engine to emit repeat blocks.
+  Composite multi-part steps (e.g. "6 x 20s strides w/ 60s float") are now
+  decomposed into a repeat-block form: a standalone count line ("Nx")
+  followed by nested dashed work/recovery lines (see `repeat_step_to_lines`).
+  This nested-block syntax itself is UNCONFIRMED -- unlike every token
+  documented above, it has NEVER been tested against the live account, only
+  based on public docs. `REPEAT_BLOCK_SYNTAX_CONFIRMED` stays False until a
+  follow-up live spike (post a repeat-block workout, inspect the parsed
+  structure) confirms or corrects it, the same way the pace/HR-token guesses
+  above were corrected on 2026-07-09.
 """
 from __future__ import annotations
 
@@ -47,7 +50,9 @@ from datetime import date
 import httpx
 
 from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID, INTERVALS_ICU_BASE_URL
-from app.engines.running import RunSessionPlan, RunStep
+from app.engines.running import RunRepeatStep, RunSessionPlan, RunStep
+
+REPEAT_BLOCK_SYNTAX_CONFIRMED = False  # flip to True (and update this module's docstring) once spiked live
 
 
 def _format_pace(sec_per_km: int) -> str:
@@ -69,12 +74,28 @@ def step_to_line(step: RunStep, max_hr: int | None = None) -> str:
     return f"- {' '.join(tokens)}" if tokens else f"- {step.label}"
 
 
+def repeat_step_to_lines(step: RunRepeatStep, max_hr: int | None = None) -> list[str]:
+    """UNCONFIRMED wire format -- see module docstring. A standalone count
+    line ("Nx") followed by the work leg's dashed line, then (if present) the
+    recovery leg's dashed line."""
+    lines = [f"{step.repeat_count}x", step_to_line(step.work, max_hr)]
+    if step.recovery is not None:
+        lines.append(step_to_line(step.recovery, max_hr))
+    return lines
+
+
 def session_to_description(session: RunSessionPlan, max_hr: int | None = None) -> str:
     """`max_hr` is required to express `hr_ceiling` (an absolute bpm value in
     this app's data model) as the %HR token intervals.icu's parser actually
     recognizes -- without it, HR targets are silently omitted rather than
     guessed at."""
-    return "\n".join(step_to_line(step, max_hr) for step in session.steps)
+    lines: list[str] = []
+    for step in session.steps:
+        if isinstance(step, RunRepeatStep):
+            lines.extend(repeat_step_to_lines(step, max_hr))
+        else:
+            lines.append(step_to_line(step, max_hr))
+    return "\n".join(lines)
 
 
 @dataclass

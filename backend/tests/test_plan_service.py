@@ -44,6 +44,31 @@ def test_generate_plan_creates_sessions_from_today_only(db_session):
     assert all(s.date >= today for s in sessions)
 
 
+def test_quality_session_repeat_step_serializes_with_discriminator(db_session):
+    today = date(2026, 7, 8)
+    athlete, race = _make_athlete_and_race(db_session, today)
+    generate_and_persist_plan(db_session, athlete, race, today=today)
+
+    build1_quality = (
+        db_session.query(PlannedSession)
+        .filter(
+            PlannedSession.athlete_id == athlete.id,
+            PlannedSession.type == SessionType.RUN,
+            PlannedSession.phase_name == "Build 1",
+            PlannedSession.name == "Cruise intervals",
+        )
+        .first()
+    )
+    assert build1_quality is not None
+    repeat_steps = [s for s in build1_quality.content["steps"] if s.get("type") == "repeat"]
+    assert len(repeat_steps) == 1
+    repeat = repeat_steps[0]
+    assert repeat["repeat_count"] == 3
+    assert set(repeat["work"].keys()) == {"label", "duration_min", "distance_km", "target_pace_sec_per_km", "hr_ceiling"}
+    assert repeat["work"]["distance_km"] == 1.6
+    assert repeat["recovery"]["duration_min"] == 1.5
+
+
 def test_regenerating_plan_preserves_completed_sessions(db_session):
     today = date(2026, 7, 8)
     athlete, race = _make_athlete_and_race(db_session, today)

@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID
-from app.engines.running import RunSessionPlan, RunStep
+from app.engines.running import RunRepeatStep, RunSessionPlan, RunStep
 from app.integrations.intervals_icu import IntervalsIcuClient
 from app.models import AthleteProfile, PlannedSession, SessionStatus, SessionType
 
@@ -21,17 +21,34 @@ def intervals_icu_configured() -> bool:
     return bool(INTERVALS_ICU_API_KEY and INTERVALS_ICU_ATHLETE_ID)
 
 
-def _to_run_session_plan(session: PlannedSession) -> RunSessionPlan:
-    steps = [
-        RunStep(
-            label=s["label"],
-            duration_min=s.get("duration_min"),
-            distance_km=s.get("distance_km"),
-            target_pace_sec_per_km=s.get("target_pace_sec_per_km"),
-            hr_ceiling=s.get("hr_ceiling"),
+def _leaf_from_dict(d: dict) -> RunStep:
+    return RunStep(
+        label=d["label"],
+        duration_min=d.get("duration_min"),
+        distance_km=d.get("distance_km"),
+        target_pace_sec_per_km=d.get("target_pace_sec_per_km"),
+        hr_ceiling=d.get("hr_ceiling"),
+    )
+
+
+def _step_from_dict(d: dict) -> RunStep | RunRepeatStep:
+    """Dispatches on the "type" discriminator; missing or unrecognized "type"
+    (including every row persisted before repeat-block support existed)
+    defaults to a plain step -- backward compatible with already-persisted
+    rows with the old flat shape."""
+    if d.get("type") == "repeat":
+        recovery = d.get("recovery")
+        return RunRepeatStep(
+            label=d["label"],
+            repeat_count=d["repeat_count"],
+            work=_leaf_from_dict(d["work"]),
+            recovery=_leaf_from_dict(recovery) if recovery else None,
         )
-        for s in session.content.get("steps", [])
-    ]
+    return _leaf_from_dict(d)
+
+
+def _to_run_session_plan(session: PlannedSession) -> RunSessionPlan:
+    steps = [_step_from_dict(s) for s in session.content.get("steps", [])]
     return RunSessionPlan(
         date=session.date,
         name=session.name,

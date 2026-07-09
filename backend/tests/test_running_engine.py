@@ -4,6 +4,7 @@ import pytest
 
 from app.engines.running import (
     AthleteFitness,
+    RunRepeatStep,
     build_phases,
     build_weekly_volumes,
     generate_run_plan,
@@ -114,3 +115,74 @@ def test_build_phases_never_crashes_across_range(total_weeks):
     phases = build_phases(total_weeks)
     assert phases[-1].name == "Taper"
     assert sum(p.end_week - p.start_week + 1 for p in phases) == total_weeks
+
+
+def _quality_session_for_phase(phase_name: str, weeks_out: int, fitness=None):
+    today = date(2026, 7, 8)
+    race = today + timedelta(weeks=weeks_out)
+    fitness = fitness or AthleteFitness(30.0, 390, 330, 150)
+    phases, weeks = generate_run_plan(today, race, fitness)
+    phase_weeks = [w for w in weeks if w.phase_name == phase_name]
+    assert phase_weeks, f"expected at least one {phase_name} week in a {weeks_out}-week block"
+    return next(s for s in phase_weeks[0].sessions if s.role == "quality")
+
+
+def test_rebase_quality_session_emits_repeat_step():
+    fitness = AthleteFitness(30.0, 390, 330, 150)
+    quality = _quality_session_for_phase("Re-base", 14, fitness)
+    repeats = [s for s in quality.steps if isinstance(s, RunRepeatStep)]
+    assert len(repeats) == 1
+    strides = repeats[0]
+    assert strides.repeat_count == 6
+    assert strides.work.target_pace_sec_per_km == fitness.threshold_pace_sec_per_km - 20
+    assert strides.recovery.duration_min == 1.0
+
+
+def test_build1_quality_session_emits_repeat_step():
+    fitness = AthleteFitness(30.0, 390, 330, 150)
+    quality = _quality_session_for_phase("Build 1", 14, fitness)
+    repeats = [s for s in quality.steps if isinstance(s, RunRepeatStep)]
+    assert len(repeats) == 1
+    cruise = repeats[0]
+    assert cruise.repeat_count == 3
+    assert cruise.work.distance_km == 1.6
+    assert cruise.work.target_pace_sec_per_km == fitness.threshold_pace_sec_per_km
+    assert cruise.recovery.duration_min == 1.5
+
+
+def test_build2_quality_session_emits_two_repeat_steps():
+    fitness = AthleteFitness(30.0, 390, 330, 150)
+    quality = _quality_session_for_phase("Build 2", 14, fitness)
+    repeats = [s for s in quality.steps if isinstance(s, RunRepeatStep)]
+    assert len(repeats) == 2
+
+    threshold_reps = next(r for r in repeats if r.work.distance_km == 2.0)
+    assert threshold_reps.repeat_count == 2
+    assert threshold_reps.work.target_pace_sec_per_km == fitness.threshold_pace_sec_per_km
+    assert threshold_reps.recovery is not None
+
+    race_pace_reps = next(r for r in repeats if r.work.distance_km == 1.0)
+    assert race_pace_reps.repeat_count == 2
+    assert race_pace_reps.work.target_pace_sec_per_km == fitness.race_pace_sec_per_km
+    assert race_pace_reps.recovery is not None
+
+
+def test_taper_quality_session_emits_repeat_step():
+    fitness = AthleteFitness(30.0, 390, 330, 150)
+    quality = _quality_session_for_phase("Taper", 12, fitness)
+    repeats = [s for s in quality.steps if isinstance(s, RunRepeatStep)]
+    assert len(repeats) == 1
+    reps = repeats[0]
+    assert reps.repeat_count == 4
+    assert reps.work.distance_km == 0.4
+    assert reps.work.target_pace_sec_per_km == fitness.race_pace_sec_per_km
+    assert reps.recovery.duration_min == 3.0
+
+
+@pytest.mark.parametrize(
+    "phase_name,weeks_out,expected_total_km",
+    [("Re-base", 14, 4.2), ("Build 1", 14, 8.8), ("Build 2", 14, 10.0), ("Taper", 12, 4.6)],
+)
+def test_quality_session_total_distance_km_unchanged_by_decomposition(phase_name, weeks_out, expected_total_km):
+    quality = _quality_session_for_phase(phase_name, weeks_out)
+    assert quality.total_distance_km == expected_total_km
