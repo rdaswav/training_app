@@ -1,8 +1,8 @@
 """Pushes upcoming planned run sessions to intervals.icu so they sync to the
 Fenix (spec section 10, MVP step 4). Guarded by whether credentials are
 configured: with no INTERVALS_ICU_API_KEY / INTERVALS_ICU_ATHLETE_ID set,
-this is a safe no-op -- see integrations/intervals_icu.py for why the wire
-format itself is still unconfirmed against a live account."""
+this is a safe no-op -- see integrations/intervals_icu.py for the confirmed
+wire format (verified against a live account 2026-07-09)."""
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -75,7 +75,9 @@ def sync_upcoming_runs_to_intervals(
     for session in sessions:
         try:
             plan = _to_run_session_plan(session)
-            result = client.upsert_planned_workout(plan, existing_event_id=session.intervals_icu_event_id)
+            result = client.upsert_planned_workout(
+                plan, existing_event_id=session.intervals_icu_event_id, max_hr=athlete.max_hr
+            )
             session.intervals_icu_event_id = str(result.get("id")) if result.get("id") is not None else session.intervals_icu_event_id
             synced += 1
         except Exception as exc:  # noqa: BLE001 -- third-party call, don't let one bad write abort the batch

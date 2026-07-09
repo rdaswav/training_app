@@ -1,23 +1,43 @@
 """intervals.icu API client.
 
-*** UNCONFIRMED WIRE FORMAT -- spike this first (spec section 10, step 1) ***
+Wire format confirmed 2026-07-09 against a live account (spec section 10,
+step 1 -- see README "Confirm before relying on this" for the full writeup):
 
-This client is written against the publicly documented shape of the
-intervals.icu API as of this build (HTTP Basic auth with username "API_KEY"
-and the API key as the password; JSON over /api/v1; calendar entries are
-"events" scoped to an athlete). It has NOT been exercised against a live
-account in this environment (no credentials configured here) -- before
-relying on it:
-  1. Confirm auth works (GET /api/v1/athlete/{id}) with a real API key.
-  2. Confirm the planned-workout "event" schema below (category/type/
-     description fields) actually renders a structured Fenix 8 workout,
-     not just a calendar note.
-  3. Confirm whether a single step can carry both a pace target and an HR
-     ceiling, or whether HR needs a separate alert (spec section 11).
-
-The structured-workout `description` uses intervals.icu's plain-text step
-syntax (one step per line, "- <duration> <target>"). This is the documented
-convention but must be checked against a real render on the watch.
+- Auth: HTTP Basic with username "API_KEY", the API key as the password.
+  Confirmed via GET /api/v1/athlete/{id}.
+- Activities/wellness field names (`start_date_local`, `distance`,
+  `moving_time`, `average_heartrate`; wellness `id` as the ISO date,
+  `readiness`/`sleepScore`) all matched what `jobs/daily_autoregulation.py`
+  already assumed -- no changes needed there.
+- Planned workouts: POST/PUT /api/v1/athlete/{id}/events with
+  category="WORKOUT". The `description` field is parsed into a structured
+  `workout_doc` -- but NOT with the syntax originally guessed here. Confirmed
+  token syntax, one dashed line per step, tokens space-separated (no commas,
+  no free-text label prefix -- a label prefix silently prevented the
+  distance/duration token itself from being parsed as a target in earlier
+  testing):
+    - distance: "<km>km" (decimals fine, e.g. "4.8km")
+    - duration: "<min>m"
+    - pace target: "<mm:ss>/km Pace" (value THEN the literal word "Pace" --
+      the reverse order silently fails to parse)
+    - HR target: "<pct>% HR" -- percent only. Raw bpm ("150bpm HR",
+      "140-150bpm HR") was tested and silently ignored; there is no absolute-
+      bpm syntax. A zone form ("Z2 HR") also works if the athlete has HR
+      zones configured on intervals.icu, but this app only models an
+      absolute bpm ceiling, so bpm is converted to %max_hr instead (see
+      `session_to_description`'s `max_hr` param). NOT independently
+      confirmed whether intervals.icu's "%HR" base is max HR or LTHR --
+      spot-check a generated event's target against the athlete's own HR
+      zone chart once before trusting the exact percentage.
+    - Confirmed a single step CAN carry both a pace AND an HR target at once
+      (e.g. "8km 6:30/km Pace 75% HR" parsed both fields) -- this resolves
+      the previously-open spec section 11 question.
+  Known limitation: composite multi-part steps in this app (e.g. "6 x 20s
+  strides w/ 60s float", one `RunStep` per logical block) are sent as a
+  single aggregate distance+pace line, not decomposed into intervals.icu's
+  native "Nx" repeat-block syntax -- so interval/recovery structure within a
+  quality session isn't represented on the watch yet, only the aggregate
+  target. Follow-up: teach the running engine to emit repeat blocks.
 """
 from __future__ import annotations
 
@@ -35,21 +55,26 @@ def _format_pace(sec_per_km: int) -> str:
     return f"{m}:{s:02d}/km"
 
 
-def step_to_line(step: RunStep) -> str:
-    parts = []
+def step_to_line(step: RunStep, max_hr: int | None = None) -> str:
+    tokens = []
     if step.distance_km:
-        parts.append(f"{step.distance_km}km")
+        tokens.append(f"{step.distance_km}km")
     elif step.duration_min:
-        parts.append(f"{step.duration_min}m")
+        tokens.append(f"{step.duration_min}m")
     if step.target_pace_sec_per_km:
-        parts.append(f"Pace {_format_pace(step.target_pace_sec_per_km)}")
-    if step.hr_ceiling:
-        parts.append(f"HR <= {step.hr_ceiling}")
-    return f"- {step.label}: " + ", ".join(parts) if parts else f"- {step.label}"
+        tokens.append(f"{_format_pace(step.target_pace_sec_per_km)} Pace")
+    if step.hr_ceiling and max_hr:
+        pct = round(step.hr_ceiling / max_hr * 100)
+        tokens.append(f"{pct}% HR")
+    return f"- {' '.join(tokens)}" if tokens else f"- {step.label}"
 
 
-def session_to_description(session: RunSessionPlan) -> str:
-    return "\n".join(step_to_line(step) for step in session.steps)
+def session_to_description(session: RunSessionPlan, max_hr: int | None = None) -> str:
+    """`max_hr` is required to express `hr_ceiling` (an absolute bpm value in
+    this app's data model) as the %HR token intervals.icu's parser actually
+    recognizes -- without it, HR targets are silently omitted rather than
+    guessed at."""
+    return "\n".join(step_to_line(step, max_hr) for step in session.steps)
 
 
 @dataclass
@@ -85,15 +110,19 @@ class IntervalsIcuClient:
             resp.raise_for_status()
             return resp.json()
 
-    def upsert_planned_workout(self, session: RunSessionPlan, existing_event_id: str | None = None) -> dict:
+    def upsert_planned_workout(
+        self, session: RunSessionPlan, existing_event_id: str | None = None, max_hr: int | None = None
+    ) -> dict:
         """Write (or update) a structured run workout onto the intervals.icu
-        calendar so it syncs to the Fenix the morning of the session."""
+        calendar so it syncs to the Fenix the morning of the session. Pass
+        `max_hr` (AthleteProfile.max_hr) so HR-ceiling steps convert to the
+        %HR token intervals.icu's parser recognizes -- see module docstring."""
         payload = {
             "category": "WORKOUT",
             "type": "Run",
             "start_date_local": f"{session.date.isoformat()}T00:00:00",
             "name": session.name,
-            "description": session_to_description(session),
+            "description": session_to_description(session, max_hr),
         }
         with self._client() as client:
             if existing_event_id:

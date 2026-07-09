@@ -1,6 +1,7 @@
 """Tests the client's request construction and workout formatting against a
-mock transport -- NOT a live intervals.icu account (see integrations/intervals_icu.py
-docstring: the real wire format still needs confirming per spec section 11)."""
+mock transport. The token syntax asserted here (`<mm:ss>/km Pace`, `<pct>% HR`)
+was verified against a live intervals.icu account on 2026-07-09 -- see
+integrations/intervals_icu.py's module docstring for the full writeup."""
 import json
 from datetime import date
 
@@ -22,10 +23,17 @@ def _sample_session() -> RunSessionPlan:
 
 
 def test_session_to_description_includes_pace_and_hr():
+    description = session_to_description(_sample_session(), max_hr=185)
+    assert "8.0km" in description
+    assert "6:30/km Pace" in description
+    assert "81% HR" in description  # round(150 / 185 * 100)
+
+
+def test_session_to_description_omits_hr_without_max_hr():
     description = session_to_description(_sample_session())
     assert "8.0km" in description
-    assert "6:30/km" in description
-    assert "HR <= 150" in description
+    assert "6:30/km Pace" in description
+    assert "HR" not in description
 
 
 def test_upsert_planned_workout_posts_expected_payload():
@@ -40,14 +48,14 @@ def test_upsert_planned_workout_posts_expected_payload():
     client = IntervalsIcuClient(
         api_key="test-key", athlete_id="i12345", transport=httpx.MockTransport(handler)
     )
-    result = client.upsert_planned_workout(_sample_session())
+    result = client.upsert_planned_workout(_sample_session(), max_hr=185)
 
     assert result == {"id": "evt_123"}
     assert captured["method"] == "POST"
     assert "/athlete/i12345/events" in captured["url"]
     assert captured["body"]["type"] == "Run"
     assert captured["body"]["name"] == "Easy run"
-    assert "HR <= 150" in captured["body"]["description"]
+    assert "81% HR" in captured["body"]["description"]
 
 
 def test_upsert_planned_workout_puts_when_event_id_given():
