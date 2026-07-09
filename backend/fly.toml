@@ -1,6 +1,6 @@
 # Fly.io app config. `app` names are globally unique on Fly -- rename this
-# before your first deploy (fly will also reject a name that's taken).
-app = "training-app-CHANGE-ME"
+# before your first deploy if "training-app-v1" is already taken.
+app = "training-app-v1"
 primary_region = "iad"  # pick whichever `fly platform regions` region is closest to you
 
 [build]
