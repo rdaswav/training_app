@@ -145,16 +145,20 @@ periodization rules are unit-testable in isolation (`backend/tests/`).
 
 ## A known tension in the fixed weekly template
 
-The default template (spec section 7: Mon strength / Tue run / Wed strength / Thu run /
-Fri strength / Sat long run / Sun rest) has *two* built-in hard-lower-before-key-run
-adjacencies every week: Wed (Lower) before Thu's quality run, and Fri (Hybrid, includes
-posterior-chain work) before Sat's long run. With only one rest day per week, the
-guardrail can resolve one (it moves Lower to Sunday, freeing Wednesday as rest) but must
-flag the other in place, since swapping it would just create a new conflict. This shows
-up as a "Flagged: ..." note on the Friday session every week in the current plan. Worth
-revisiting: either drop the Friday Hybrid day's compound posterior-chain work in favor of
-lighter carries/unilateral-only, or accept the flag as informational and rely on RIR/load
-to keep it light on the day before a long run.
+The default template is Mon strength / Tue run / Wed strength / Thu run / Fri strength /
+Sat rest / Sun long run (`engines/running.py`'s `run_days` and `engines/strength.py`'s
+`DAY_TEMPLATE`; changed from the spec's original Sat-long-run/Sun-rest layout so Saturday
+is the athlete's rest day). This still has one built-in hard-lower-before-key-run
+adjacency every week: Wed (Lower) before Thu's quality run. Previously (with Sunday as
+the rest day) the guardrail could shuffle this to the free rest day; now it can't --
+Saturday's day-after is Sunday's long run, so swapping Wednesday there would just create
+a new conflict, and the guardrail correctly refuses and flags it in place instead. Net
+effect: still exactly one flagged conflict per week (same as before), just consistently
+on Wednesday now rather than occasionally on Friday -- the Fri (Hybrid) -> Sat (long run)
+adjacency the spec's original layout had is fully eliminated by this swap, since Saturday
+is rest now. Worth revisiting if you want zero flags: either drop Wednesday's squat/hinge
+compound work in favor of something lighter, or accept the flag as informational and rely
+on RIR/load to keep it light the day before a quality run.
 
 ## intervals.icu spike -- confirmed 2026-07-09 (spec section 11)
 

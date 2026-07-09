@@ -243,7 +243,7 @@ def generate_week(
     target_volume_km: float,
     phase: PhaseSpec,
     fitness: AthleteFitness,
-    run_days: tuple[int, int, int] = (1, 3, 5),  # Tue, Thu, Sat (Monday=0), per spec section 7
+    run_days: tuple[int, int, int] = (1, 3, 6),  # Tue, Thu, Sun (Monday=0); Sat is the rest day
 ) -> WeekPlan:
     """Build the 3 run sessions for one week: easy, quality, long."""
     long_km = round(target_volume_km * LONG_RUN_SHARE, 1)
@@ -276,7 +276,7 @@ def generate_run_plan(
     today: date,
     race_date: date,
     fitness: AthleteFitness,
-    run_days: tuple[int, int, int] = (1, 3, 5),
+    run_days: tuple[int, int, int] = (1, 3, 6),
 ) -> tuple[list[PhaseSpec], list[WeekPlan]]:
     """Top-level entry point: race date + distance (implicit via fitness/race context) +
     current fitness -> full block of weekly plans."""

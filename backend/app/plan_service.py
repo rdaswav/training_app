@@ -62,17 +62,39 @@ def _select_exercises(db: Session, prescriptions: list[strength_engine.StrengthP
     return result
 
 
-def generate_and_persist_plan(db: Session, athlete: AthleteProfile, race: Race, today: date | None = None) -> Macrocycle:
+def generate_and_persist_plan(
+    db: Session,
+    athlete: AthleteProfile,
+    race: Race,
+    plan_start_date: date | None = None,
+    today: date | None = None,
+) -> Macrocycle:
     """Race date + distance + current fitness -> full block of planned sessions
     (spec section 10, MVP steps 2-4). Regenerates the plan for this race --
     used on creation, on LLM-driven re-plans, and by the daily autoregulation
-    job. Never touches a day that's already completed/missed or before
-    `today`: only still-`planned` sessions from today forward are replaced,
-    so re-running this daily can't erase training history."""
+    job.
+
+    `plan_start_date` anchors the phase/week structure (week 0's Monday) and
+    is *sticky*: if not given explicitly, it defaults to the existing
+    macrocycle's own start date (so a race created with a future
+    plan_start_date -- e.g. "start the block on 10 August" -- keeps that
+    anchor on every later regeneration, rather than silently snapping to
+    whatever day the regeneration happens to run on). Only falls back to
+    `today` when there's no existing macrocycle yet (first-ever generation
+    with no explicit anchor requested).
+
+    `today` is the actual current date -- used only as the cutoff below
+    which a day is never touched, whether or not it's before plan_start_date.
+    Never touches a day that's already completed/missed: only still-`planned`
+    sessions from max(plan_start_date, today) forward are replaced, so
+    re-running this daily can't erase training history."""
     today = today or date.today()
+    if plan_start_date is None:
+        plan_start_date = race.macrocycle.start_date if race.macrocycle is not None else today
+    regen_from = max(plan_start_date, today)
     fitness = _fitness_from_athlete(athlete)
 
-    phases, weeks = running_engine.generate_run_plan(today, race.race_date, fitness)
+    phases, weeks = running_engine.generate_run_plan(plan_start_date, race.race_date, fitness)
     total_weeks = len(weeks)
     macro_start = weeks[0].start_date
     macro_end = weeks[-1].start_date + timedelta(days=6)
@@ -83,20 +105,26 @@ def generate_and_persist_plan(db: Session, athlete: AthleteProfile, race: Race, 
 
     # Regenerating (e.g. after an LLM-driven edit, or the daily job) must not
     # leave stale duplicate sessions for the dates the new plan also covers --
-    # but must also never discard a day that's already been logged.
+    # but must also never discard a day that's already been logged, or one
+    # before the plan's own start date.
+    # synchronize_session="fetch" (not False) so the ORM's identity map
+    # actually drops these rows -- otherwise a later insert whose
+    # autoincrement id happens to reuse one of these just-deleted ids
+    # collides with a stale cached instance still sitting in the identity
+    # map (SAWarning, and a real risk of returning stale data).
     db.query(PlannedSession).filter(
         PlannedSession.athlete_id == athlete.id,
-        PlannedSession.date >= today,
+        PlannedSession.date >= regen_from,
         PlannedSession.date <= macro_end,
         PlannedSession.status == SessionStatus.PLANNED,
-    ).delete(synchronize_session=False)
+    ).delete(synchronize_session="fetch")
 
     preserved_dates = {
         d
         for (d,) in db.query(PlannedSession.date)
         .filter(
             PlannedSession.athlete_id == athlete.id,
-            PlannedSession.date >= today,
+            PlannedSession.date >= regen_from,
             PlannedSession.date <= macro_end,
         )
         .all()
@@ -137,7 +165,7 @@ def generate_and_persist_plan(db: Session, athlete: AthleteProfile, race: Race, 
     unified = calendar_engine.build_unified_calendar(run_session_dicts, strength_session_dicts, macro_start, total_weeks)
 
     for u in unified:
-        if u.session_type == "rest" or u.date < today or u.date in preserved_dates:
+        if u.session_type == "rest" or u.date < regen_from or u.date in preserved_dates:
             continue
         week_index = min(max((u.date - macro_start).days // 7, 0), total_weeks - 1)
         content = {k: v for k, v in u.content.items() if k not in ("date", "name")}

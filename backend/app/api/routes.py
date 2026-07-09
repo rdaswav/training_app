@@ -66,7 +66,7 @@ def create_race(payload: RaceCreate, db: Session = Depends(get_db)):
     db.add(race)
     db.commit()
     db.refresh(race)
-    generate_and_persist_plan(db, athlete, race, today=plan_start_date)
+    generate_and_persist_plan(db, athlete, race, plan_start_date=plan_start_date)
     sync_upcoming_runs_to_intervals(db, athlete)
     return race
 
@@ -86,7 +86,7 @@ def delete_race(race_id: int, db: Session = Depends(get_db)):
     db.query(PlannedSession).filter(
         PlannedSession.athlete_id == athlete.id,
         PlannedSession.status == SessionStatus.PLANNED,
-    ).delete(synchronize_session=False)
+    ).delete(synchronize_session="fetch")
     db.delete(race)
     db.commit()
     return {"status": "deleted"}
