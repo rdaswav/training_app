@@ -22,6 +22,46 @@
         </div>
       {% endfor %}
     </div>
+
+    {% if load_series %}
+      <div class="card load-summary">
+        <h3>Weekly Load</h3>
+        <div class="load-chart">
+          <div class="load-chart-title">Run volume (km)</div>
+          <div class="load-chart-scroll">
+            <div class="load-chart-row">
+              {% for pt in load_series %}
+                <div class="load-col" title="{{ pt.week_start.strftime('%-d %b') }}: {{ pt.run_km|round(1) }} km">
+                  <div class="load-col-bars">
+                    <div class="load-bar run-bar" style="height: {{ pt.run_pct }}%;"></div>
+                  </div>
+                  <div class="load-col-label">{{ pt.week_start.strftime('%-d %b') }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="load-chart">
+          <div class="load-chart-title">Strength tonnage (kg)</div>
+          <div class="load-chart-scroll">
+            <div class="load-chart-row">
+              {% for pt in load_series %}
+                <div class="load-col" title="{{ pt.week_start.strftime('%-d %b') }}: {% if pt.tonnage_kg is none %}not yet logged{% else %}{{ pt.tonnage_kg|round|int }} kg{% endif %}">
+                  <div class="load-col-bars">
+                    {% if pt.tonnage_kg is none %}
+                      <div class="load-bar-empty"></div>
+                    {% else %}
+                      <div class="load-bar tonnage-bar" style="height: {{ pt.tonnage_pct }}%;"></div>
+                    {% endif %}
+                  </div>
+                  <div class="load-col-label">{{ pt.week_start.strftime('%-d %b') }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
   {% else %}
     <p class="empty">No race configured yet. POST to /api/races to generate a plan.</p>
   {% endif %}
@@ -29,36 +69,38 @@
   {% for week_start, sessions in weeks %}
     <div class="card">
       <h3>Week of {{ week_start.strftime("%-d %b") }}</h3>
-      <table class="calendar">
-        <thead>
-          <tr>
-            {% for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}<th>{{ d }}</th>{% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            {% set by_date = {} %}
-            {% for s in sessions %}{% set _ = by_date.update({s.date: s}) %}{% endfor %}
-            {% for i in range(7) %}
-              {% set d = week_start + timedelta(days=i) %}
-              {% set s = by_date.get(d) %}
-              <td>
-                {% if s %}
-                  <a href="/session/{{ s.id }}"><strong>{{ s.name }}</strong></a><br>
-                  <span class="meta">
-                    {% if s.type.value == "run" %}{{ s.content.get("total_distance_km", "") }} km
-                    {% elif s.type.value == "strength" %}{{ s.content.get("prescriptions", [])|length }} patterns{% endif %}
-                    {% if s.status.value != "planned" %} &middot; {{ s.status.value }}{% endif %}
-                  </span>
-                  {% if s.content.get("note") %}<div class="note">{{ s.content.get("note") }}</div>{% endif %}
-                {% else %}
-                  <span class="empty">Rest</span>
-                {% endif %}
-              </td>
-            {% endfor %}
-          </tr>
-        </tbody>
-      </table>
+      <div class="calendar-scroll">
+        <table class="calendar">
+          <thead>
+            <tr>
+              {% for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}<th>{{ d }}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {% set by_date = {} %}
+              {% for s in sessions %}{% set _ = by_date.update({s.date: s}) %}{% endfor %}
+              {% for i in range(7) %}
+                {% set d = week_start + timedelta(days=i) %}
+                {% set s = by_date.get(d) %}
+                <td>
+                  {% if s %}
+                    <a href="/session/{{ s.id }}"><strong>{{ s.name }}</strong></a><br>
+                    <span class="meta">
+                      {% if s.type.value == "run" %}{{ s.content.get("total_distance_km", "") }} km
+                      {% elif s.type.value == "strength" %}{{ s.content.get("prescriptions", [])|length }} patterns{% endif %}
+                      {% if s.status.value != "planned" %} &middot; {{ s.status.value }}{% endif %}
+                    </span>
+                    {% if s.content.get("note") %}<div class="note">{{ s.content.get("note") }}</div>{% endif %}
+                  {% else %}
+                    <span class="empty">Rest</span>
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   {% endfor %}
 </body>
