@@ -51,26 +51,35 @@ session-detail page to avoid duplicating the run/strength rendering logic.
 
 ---
 
-## 3. Visual design overhaul
+## 3. Visual design overhaul -- v1 DONE
 
-**Problem**: current UI is functional CSS variables + Jinja templates, no charts, no
-real visual system. Spec section 7 explicitly wants a "weekly dashboard: run
-volume, strength tonnage, combined load trend" and section 9 wants richer phase
-timeline/calendar/countdown treatment on the desktop planning view -- none of that
-exists yet.
+Shipped (scoped tightly per this doc's own suggestion, as v1 rather than a full
+redesign):
+- **Weekly load dashboard** (`/plan`): two hand-rolled inline-SVG-free bar charts
+  (no charting dependency, consistent with the existing no-build-step stack) --
+  run volume (km, known for the whole block since the periodization engine
+  generates future weeks' distances up front) and strength tonnage (kg, only
+  knowable for weeks that have actually been logged). Future weeks render as a
+  dashed placeholder on the tonnage chart rather than a fabricated zero, so
+  "hasn't happened yet" is never confused with "happened, nothing logged."
+  Aggregation lives in a new pure-function module, `engines/load_summary.py`
+  (`sum_run_km_by_week`, `sum_strength_tonnage_by_week`, `build_weekly_load_series`),
+  unit-tested directly with no DB/TestClient, following the existing `engines/*.py`
+  convention. Tonnage is computed via a direct query (mirroring the existing
+  `strength_history_view` join) rather than `PlannedSession.completed`, since that
+  relationship is unsafe for strength sessions specifically (multiple prescriptions
+  logged separately create multiple `CompletedSession` rows per planned session).
+- **Mobile polish**: a single `@media (max-width: 600px)` CSS pass -- 44px-minimum
+  touch targets on form inputs/buttons (shared by the today view and session-detail
+  page via `_session_card.html`), and both the weekly calendar table and the new
+  load charts scroll horizontally inside their card rather than squeezing columns
+  unreadably on a phone.
 
-**Scope**:
-- Pick a charting approach (spec leaves this open -- a lightweight canvas/SVG
-  approach with no dependency, or a small charting lib via CDN, fits this
-  no-build-step stack best).
-- Weekly load dashboard: run volume (km) and strength tonnage (sum of sets x reps x
-  weight, or just sets, depending on how meaningful raw tonnage is without knowing
-  actual logged loads yet) trended across the block, probably on `/plan`.
-- A genuine design pass: typography, spacing, color use beyond "make it not look
-  broken," and mobile-specific polish on the today view (it's the one meant to be
-  used one-handed on a phone).
-- This is the most open-ended item on this list -- worth scoping tightly (e.g. "one
-  load chart on /plan" as v1) rather than treating it as one big redesign.
+**Not done / deferred**: a fuller typography/spacing-token system (the app still
+has no `--space-*`/`--font-*` scale, just hardcoded per-rule values) and richer
+phase-timeline/calendar/countdown treatment (spec section 9) beyond the existing
+`.phase-bar`. Worth a v2 pass if there's appetite, but v1 intentionally stopped at
+"the one load chart + mobile polish" scope.
 
 ---
 
@@ -143,6 +152,6 @@ future? How does the daily job/UI distinguish "no race" from "maintenance active
 1. ~~Athlete/race management UI~~ -- done
 2. ~~Strength UI depth~~ -- done
 3. ~~intervals.icu polish~~ -- done, including the live repeat-block syntax spike
-4. Visual design overhaul (scope tightly -- e.g. one load chart, not a full redesign) -- next up
-5. Hardening items, opportunistically alongside 4 rather than as a dedicated pass
+4. ~~Visual design overhaul~~ -- v1 done (load dashboard + mobile polish)
+5. Hardening items -- next up
 6. Maintenance mode (v2, not yet scoped) -- whenever there's appetite for it

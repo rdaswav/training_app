@@ -190,3 +190,75 @@ form.settings-form button {
 .form-status { font-size: 0.85rem; min-height: 1.2em; }
 .form-status.success { color: var(--good); }
 .form-status.error { color: #d9534f; }
+
+.calendar-scroll { overflow-x: auto; }
+
+.load-chart { margin-bottom: 1rem; }
+.load-chart:last-child { margin-bottom: 0; }
+.load-chart-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+.load-chart-scroll { overflow-x: auto; }
+.load-chart-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: min-content;
+}
+.load-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 28px;
+  flex: none;
+}
+.load-col-bars {
+  display: flex;
+  align-items: flex-end;
+  height: 64px;
+  width: 100%;
+}
+.load-bar {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+}
+.load-bar.run-bar { background: var(--accent); }
+.load-bar.tonnage-bar { background: var(--good); }
+.load-bar-empty {
+  width: 100%;
+  height: 100%;
+  border: 1px dashed var(--border);
+  border-radius: 3px 3px 0 0;
+  box-sizing: border-box;
+}
+.load-col-label {
+  font-size: 0.6rem;
+  color: var(--muted);
+  margin-top: 0.3rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  body { padding: 0.75rem; }
+  .header { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+  nav a { margin-right: 0.75rem; padding: 0.25rem 0; display: inline-block; }
+
+  form.log-form { gap: 0.5rem; }
+  form.log-form input {
+    flex: 1 1 40%;
+    min-width: 0;
+    padding: 0.6rem;
+    font-size: 1rem;
+    min-height: 44px;
+  }
+  button { padding: 0.6rem 1rem; min-height: 44px; font-size: 0.95rem; }
+  .swap-picker select { min-height: 44px; }
+  .prescription { flex-direction: column; align-items: flex-start; }
+
+  table.calendar { min-width: 480px; }
+}

@@ -10,6 +10,8 @@ from fastapi.templating import Jinja2Templates
 from app.api.routes import get_or_create_athlete, router
 from app.config import DAILY_JOB_HOUR, ENABLE_SCHEDULER
 from app.db import SessionLocal, init_db
+from app.engines import load_summary
+from app.engines.running import week_start
 from app.jobs.daily_autoregulation import run_daily_job
 from app.models import CompletedSession, PlannedSession, Race, SessionType
 from app.seed import seed_exercise_library
@@ -148,9 +150,43 @@ def plan_view(request: Request):
         for s in sessions:
             week_monday = s.date - timedelta(days=s.date.weekday())
             weeks.setdefault(week_monday, []).append(s)
+
+        run_rows = [
+            {"week_start": wk, "distance_km": s.content.get("total_distance_km") or 0.0}
+            for wk, sess_list in weeks.items()
+            for s in sess_list
+            if s.type == SessionType.RUN
+        ]
+        completed_strength = (
+            db.query(CompletedSession)
+            .join(PlannedSession, CompletedSession.planned_session_id == PlannedSession.id)
+            .filter(
+                PlannedSession.athlete_id == athlete.id,
+                PlannedSession.type == SessionType.STRENGTH,
+                PlannedSession.date >= start,
+                PlannedSession.date <= end,
+            )
+            .all()
+        )
+        completed_rows = [
+            {"week_start": week_start(c.date), "actual": c.actual} for c in completed_strength
+        ]
+        load_series = load_summary.build_weekly_load_series(
+            week_starts=list(weeks.keys()),
+            run_km_by_week=load_summary.sum_run_km_by_week(run_rows),
+            tonnage_by_week=load_summary.sum_strength_tonnage_by_week(completed_rows),
+            current_week_start=week_start(date.today()),
+        )
         return templates.TemplateResponse(
             "plan.html",
-            {"request": request, "race": race, "phase_segments": phase_segments, "weeks": sorted(weeks.items()), "active": "plan"},
+            {
+                "request": request,
+                "race": race,
+                "phase_segments": phase_segments,
+                "weeks": sorted(weeks.items()),
+                "load_series": load_series,
+                "active": "plan",
+            },
         )
     finally:
         db.close()
