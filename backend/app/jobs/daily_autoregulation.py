@@ -1,8 +1,10 @@
-"""The daily scheduled job (spec section 3 & 10 step 8): pull yesterday's
-completed activities/wellness from intervals.icu, autoregulate, then refresh
-and re-sync the next 7-10 days. Assumes it runs daily without gaps; a
-multi-day backlog will mark unmatched older sessions missed rather than
-retroactively fetching a wider activity window.
+"""The daily scheduled job (spec section 3 & 10 step 8): pull completed
+activities/wellness from intervals.icu since the oldest unmatched planned
+session, autoregulate, then refresh and re-sync the next 7-10 days. If the job
+runs daily without gaps this is just yesterday; if it missed a few days (e.g.
+the server was down), the fetch window widens to cover the whole backlog
+instead of just yesterday, so those days get properly matched rather than
+marked missed.
 
 Field names used to read intervals.icu activities/wellness (`start_date_local`,
 `distance`, `moving_time`, `average_heartrate`, `readiness`) are best-effort
@@ -66,27 +68,6 @@ def run_daily_job_for_athlete(
     yesterday = today - timedelta(days=1)
     summary = {"athlete_id": athlete.id, "matched": 0, "missed_marked": 0, "regenerated": False, "sync": None}
 
-    activities_by_date: dict[date, dict] = {}
-    wellness_by_date: dict[date, dict] = {}
-    if intervals_icu_configured():
-        client = client or IntervalsIcuClient()
-        try:
-            for activity in client.get_activities(yesterday, yesterday):
-                d = _parse_date(activity.get("start_date_local") or activity.get("start_date"))
-                if d:
-                    activities_by_date[d] = activity
-        except Exception:  # noqa: BLE001 -- third-party call must not abort the job
-            pass
-        try:
-            for record in client.get_wellness(yesterday, yesterday):
-                d = _parse_date(record.get("id") or record.get("date"))
-                if d:
-                    wellness_by_date[d] = record
-        except Exception:  # noqa: BLE001
-            pass
-
-    yesterday_wellness_ok = _wellness_ok(wellness_by_date.get(yesterday))
-
     stale_sessions = (
         db.query(PlannedSession)
         .filter(
@@ -96,11 +77,32 @@ def run_daily_job_for_athlete(
         )
         .all()
     )
+    fetch_start = min([s.date for s in stale_sessions] + [yesterday])
+
+    activities_by_date: dict[date, dict] = {}
+    wellness_by_date: dict[date, dict] = {}
+    if intervals_icu_configured():
+        client = client or IntervalsIcuClient()
+        try:
+            for activity in client.get_activities(fetch_start, yesterday):
+                d = _parse_date(activity.get("start_date_local") or activity.get("start_date"))
+                if d:
+                    activities_by_date[d] = activity
+        except Exception:  # noqa: BLE001 -- third-party call must not abort the job
+            pass
+        try:
+            for record in client.get_wellness(fetch_start, yesterday):
+                d = _parse_date(record.get("id") or record.get("date"))
+                if d:
+                    wellness_by_date[d] = record
+        except Exception:  # noqa: BLE001
+            pass
 
     for session in stale_sessions:
         activity = activities_by_date.get(session.date)
         if session.type == SessionType.RUN and activity:
             actuals = _extract_run_actuals(activity)
+            session_wellness_ok = _wellness_ok(wellness_by_date.get(session.date))
             role = session.content.get("role")
             steps = session.content.get("steps", [])
             prescribed_pace = next((s["target_pace_sec_per_km"] for s in steps if s.get("target_pace_sec_per_km")), None)
@@ -109,7 +111,7 @@ def run_daily_job_for_athlete(
                     prescribed_pace or athlete.threshold_pace_sec_per_km,
                     actuals["actual_pace_sec_per_km"],
                     True,
-                    yesterday_wellness_ok,
+                    session_wellness_ok,
                 )
             else:
                 result = autoregulation.evaluate_easy_or_long_run(
@@ -117,7 +119,7 @@ def run_daily_job_for_athlete(
                     actuals["actual_pace_sec_per_km"],
                     actuals["actual_hr"],
                     athlete.aerobic_hr_ceiling,
-                    yesterday_wellness_ok,
+                    session_wellness_ok,
                 )
             if result.action == "progress":
                 athlete.threshold_pace_sec_per_km += result.pace_adjustment_sec_per_km

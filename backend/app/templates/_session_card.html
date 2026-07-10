@@ -53,12 +53,22 @@
           <span class="stat st-done">Logged</span>
         {% else %}
           <form class="log-form" onsubmit="return submitStrengthLog(event, {{ s.id }}, '{{ p.pattern }}')">
-            <input name="reps" type="number" placeholder="reps" required>
-            <input name="weight_kg" type="number" step="0.5" placeholder="kg" required>
-            <input name="rir_actual" type="number" step="0.5" placeholder="RIR">
-            <button type="submit">Log</button>
+            <div class="set-rows">
+              {% for i in range(p.sets) %}
+                <div class="set-row">
+                  <input class="set-reps" type="number" placeholder="reps" required>
+                  <input class="set-weight" type="number" step="0.5" placeholder="kg" required>
+                  <input class="set-rir" type="number" step="0.5" placeholder="RIR">
+                  <button type="button" class="set-remove" onclick="removeSetRow(this)">&times;</button>
+                </div>
+              {% endfor %}
+            </div>
+            <div class="set-actions">
+              <button type="button" class="link-button" onclick="addSetRow(this)">+ Add set</button>
+              <button type="submit">Log sets</button>
+            </div>
           </form>
-          <button type="button" class="link-button" onclick="toggleSwap(this, {{ s.id }}, '{{ p.pattern }}')">Swap exercise</button>
+          <button type="button" class="link-button swap-toggle" onclick="toggleSwap(this, {{ s.id }}, '{{ p.pattern }}')">Swap exercise</button>
           <div class="swap-picker"></div>
         {% endif %}
       </div>

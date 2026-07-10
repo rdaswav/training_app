@@ -109,6 +109,12 @@ async function submitAthleteProfile(event) {
 
 async function submitRaceForm(event, existingRaceId) {
   event.preventDefault();
+  if (existingRaceId) {
+    const confirmed = window.confirm(
+      "Saving deletes and regenerates every still-planned session for this race. Continue?"
+    );
+    if (!confirmed) return false;
+  }
   const form = event.target;
   const body = {
     name: form.name.value,
@@ -157,23 +163,36 @@ async function submitRunComplete(event, sessionId) {
   return false;
 }
 
+function addSetRow(button) {
+  const setRows = button.closest("form").querySelector(".set-rows");
+  const lastRow = setRows.querySelector(".set-row:last-child");
+  const newRow = lastRow.cloneNode(true);
+  newRow.querySelectorAll("input").forEach((input) => (input.value = ""));
+  setRows.appendChild(newRow);
+}
+
+function removeSetRow(button) {
+  const row = button.closest(".set-row");
+  const setRows = row.parentElement;
+  if (setRows.querySelectorAll(".set-row").length > 1) {
+    row.remove();
+  }
+}
+
 async function submitStrengthLog(event, sessionId, pattern) {
   event.preventDefault();
   const form = event.target;
-  const body = {
-    pattern,
-    sets: [
-      {
-        reps: Number(form.reps.value),
-        weight_kg: Number(form.weight_kg.value),
-        rir_actual: form.rir_actual.value ? Number(form.rir_actual.value) : null,
-      },
-    ],
-  };
+  const rows = form.querySelectorAll(".set-row");
+  const sets = Array.from(rows).map((row) => ({
+    reps: Number(row.querySelector(".set-reps").value),
+    weight_kg: Number(row.querySelector(".set-weight").value),
+    rir_actual: row.querySelector(".set-rir").value ? Number(row.querySelector(".set-rir").value) : null,
+  }));
+  const body = { pattern, sets };
   try {
     const result = await postJSON(`/api/sessions/${sessionId}/log`, body);
     const prescription = form.closest(".prescription");
-    const swapBtn = prescription.querySelector(".link-button");
+    const swapBtn = prescription.querySelector(".swap-toggle");
     const swapPicker = prescription.querySelector(".swap-picker");
     form.remove();
     if (swapBtn) swapBtn.remove();
