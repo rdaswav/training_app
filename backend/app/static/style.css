@@ -1,47 +1,57 @@
 :root {
-  color-scheme: light dark;
-  --bg: #0e0f12;
-  --card: #1a1c20;
-  --text: #e8e8ea;
-  --muted: #9a9ea6;
-  --accent: #5b9dff;
-  --border: #2a2d33;
-  --good: #4caf7d;
-  --warn: #d9a441;
-}
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f6f7f9;
-    --card: #ffffff;
-    --text: #1c1e21;
-    --muted: #5a5f68;
-    --accent: #2f6fed;
-    --border: #e2e4e8;
-  }
+  color-scheme: dark;
+  --ink: #0e1522;
+  --slate: #16202f;
+  --slate2: #1e2a3b;
+  --raised: #22303f;
+  --line: #2a3a4d;
+  --line-soft: #223141;
+  --text: #e7edf3;
+  --muted: #8da0b6;
+  --dim: #5e7085;
+  --amber: #f5a623;
+  --amber-hi: #ffc470;
+  --teal: #35c4ae;
+  --teal-hi: #5fe0cc;
+  --teal-dim: #1f6e64;
+  --red: #ff6b6b;
+  --violet: #8b7fe8;
+
+  --bg: var(--ink);
+  --card: var(--slate);
+  --accent: var(--teal);
+  --border: var(--line-soft);
+  --good: var(--teal);
+  --warn: var(--amber);
+
+  --disp: 'Archivo', sans-serif;
+  --body: 'Inter', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--body);
   background: var(--bg);
   color: var(--text);
   padding: 1rem;
   max-width: 900px;
   margin-inline: auto;
 }
-h1, h2, h3 { margin: 0 0 0.5rem; }
+h1, h2, h3 { margin: 0 0 0.5rem; font-family: var(--disp); font-weight: 700; }
 .header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   margin-bottom: 1rem;
 }
-.countdown { color: var(--muted); font-size: 0.9rem; }
+.countdown { color: var(--muted); font-size: 0.9rem; font-family: var(--mono); }
 nav a {
   color: var(--muted);
   text-decoration: none;
   margin-right: 1rem;
   font-size: 0.9rem;
+  font-family: var(--mono);
 }
 nav a.active { color: var(--accent); font-weight: 600; }
 .card {
@@ -58,6 +68,7 @@ nav a.active { color: var(--accent); font-weight: 600; }
   letter-spacing: 0.05em;
   color: var(--accent);
   margin-bottom: 0.25rem;
+  font-family: var(--mono);
 }
 .step {
   padding: 0.4rem 0;
@@ -65,7 +76,18 @@ nav a.active { color: var(--accent); font-weight: 600; }
   font-size: 0.95rem;
 }
 .step:last-child { border-bottom: none; }
-.step .target { color: var(--muted); font-size: 0.85rem; }
+.step .target { color: var(--muted); font-size: 0.85rem; font-family: var(--mono); }
+.sync-status { color: var(--muted); font-size: 0.8rem; margin-top: 0.5rem; font-family: var(--mono); }
+.stat {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.stat.st-done { background: rgba(76, 175, 125, 0.14); color: var(--good); }
 .prescription {
   display: flex;
   justify-content: space-between;
@@ -128,6 +150,38 @@ button {
   font-size: 0.85rem;
   color: var(--good);
 }
+.coach {
+  margin-top: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(53, 196, 174, 0.05), rgba(245, 166, 35, 0.03));
+}
+.coach .hd {
+  padding: 0.5rem 0.75rem 0.4rem;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.crow { display: flex; gap: 0.6rem; padding: 0.5rem 0.75rem; }
+.crow + .crow { border-top: 1px solid var(--line-soft); }
+.clab {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 5px;
+  height: fit-content;
+  white-space: nowrap;
+}
+.clab.cl-log { background: rgba(94, 112, 133, 0.16); color: var(--muted); }
+.clab.cl-read { background: rgba(53, 196, 174, 0.14); color: var(--teal-hi); }
+.clab.cl-next { background: rgba(245, 166, 35, 0.14); color: var(--amber-hi); }
+.ctxt { font-size: 0.85rem; color: var(--text); line-height: 1.4; }
 .note {
   font-size: 0.8rem;
   color: var(--warn);
@@ -196,6 +250,7 @@ form.settings-form button {
 .load-chart { margin-bottom: 1rem; }
 .load-chart:last-child { margin-bottom: 0; }
 .load-chart-title {
+  font-family: var(--mono);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -237,6 +292,7 @@ form.settings-form button {
   box-sizing: border-box;
 }
 .load-col-label {
+  font-family: var(--mono);
   font-size: 0.6rem;
   color: var(--muted);
   margin-top: 0.3rem;

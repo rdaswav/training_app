@@ -42,6 +42,42 @@ function paceToSeconds(str) {
   return parts[0] * 60 + parts[1];
 }
 
+function formatPaceSec(sec) {
+  if (!sec) return null;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}/km`;
+}
+
+function buildCoachCard(rows) {
+  const coach = document.createElement("div");
+  coach.className = "coach";
+  const hd = document.createElement("div");
+  hd.className = "hd";
+  hd.textContent = "Coach";
+  coach.appendChild(hd);
+  for (const row of rows) {
+    const crow = document.createElement("div");
+    crow.className = "crow";
+    const lab = document.createElement("span");
+    lab.className = `clab ${row.cls}`;
+    lab.textContent = row.label;
+    const ctxt = document.createElement("span");
+    ctxt.className = "ctxt";
+    ctxt.textContent = row.text;
+    crow.appendChild(lab);
+    crow.appendChild(ctxt);
+    coach.appendChild(crow);
+  }
+  return coach;
+}
+
+const RUN_ACTION_LABELS = {
+  progress: "Progress pace next session",
+  hold: "Hold your current paces",
+  soften: "Ease off next time",
+};
+
 async function submitAthleteProfile(event) {
   event.preventDefault();
   const form = event.target;
@@ -105,10 +141,16 @@ async function submitRunComplete(event, sessionId) {
     const result = await postJSON(`/api/sessions/${sessionId}/complete`, body);
     const card = form.closest(".card");
     form.remove();
-    const div = document.createElement("div");
-    div.className = "feedback";
-    div.textContent = `${result.action}: ${result.note}`;
-    card.appendChild(div);
+    const didParts = [];
+    const pace = formatPaceSec(body.actual_pace_sec_per_km);
+    if (pace) didParts.push(pace);
+    if (body.actual_hr) didParts.push(`${body.actual_hr} bpm avg`);
+    const coach = buildCoachCard([
+      { label: "Did", cls: "cl-log", text: didParts.length ? didParts.join(" · ") : "Logged, no pace/HR entered" },
+      { label: "Read", cls: "cl-read", text: result.note },
+      { label: "Next", cls: "cl-next", text: RUN_ACTION_LABELS[result.action] || result.action },
+    ]);
+    card.appendChild(coach);
   } catch (e) {
     alert("Failed to log session: " + e.message);
   }
@@ -130,12 +172,23 @@ async function submitStrengthLog(event, sessionId, pattern) {
   };
   try {
     const result = await postJSON(`/api/sessions/${sessionId}/log`, body);
+    const prescription = form.closest(".prescription");
+    const swapBtn = prescription.querySelector(".link-button");
+    const swapPicker = prescription.querySelector(".swap-picker");
     form.remove();
+    if (swapBtn) swapBtn.remove();
+    if (swapPicker) swapPicker.remove();
+    const badge = document.createElement("span");
+    badge.className = "stat st-done";
+    badge.textContent = "Logged";
+    prescription.appendChild(badge);
     const target = document.getElementById(`feedback-${sessionId}`);
-    const div = document.createElement("div");
-    div.className = "feedback";
-    div.textContent = `${pattern}: ${result.feedback} -- ${result.next_instruction}`;
-    target.appendChild(div);
+    const coach = buildCoachCard([
+      { label: "Did", cls: "cl-log", text: result.summary },
+      { label: "Read", cls: "cl-read", text: result.feedback },
+      { label: "Next", cls: "cl-next", text: result.next_instruction },
+    ]);
+    target.appendChild(coach);
   } catch (e) {
     alert("Failed to log set: " + e.message);
   }

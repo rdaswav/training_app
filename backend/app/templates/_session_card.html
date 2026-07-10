@@ -39,6 +39,9 @@
     {% else %}
       <div class="feedback">Completed</div>
     {% endif %}
+    <div class="sync-status">
+      {% if s.intervals_icu_event_id %}Synced to intervals.icu &#10003;{% else %}Syncs to intervals.icu ~10 days before session{% endif %}
+    </div>
   {% elif s.type.value == "strength" %}
     {% for p in s.content.get("prescriptions", []) %}
       <div class="prescription">
@@ -46,7 +49,9 @@
           <strong>{{ p.exercise_name or p.pattern }}</strong>
           <div class="meta">{{ p.pattern }} &middot; {{ p.sets }} x {{ p.reps }} @ RIR {{ p.rir }}</div>
         </div>
-        {% if s.status.value != "completed" %}
+        {% if p.pattern in s.logged_patterns %}
+          <span class="stat st-done">Logged</span>
+        {% else %}
           <form class="log-form" onsubmit="return submitStrengthLog(event, {{ s.id }}, '{{ p.pattern }}')">
             <input name="reps" type="number" placeholder="reps" required>
             <input name="weight_kg" type="number" step="0.5" placeholder="kg" required>
