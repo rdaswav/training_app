@@ -2,6 +2,7 @@ from datetime import date
 
 from app.engines.strength import (
     ACCUMULATION_WEEKS,
+    all_prescriptions_logged,
     generate_strength_session,
     is_deload_week,
     prescribe,
@@ -90,3 +91,22 @@ def test_select_exercise_respects_injury_flags():
 
     pick_none = select_exercise("hinge", exercises, injury_flags=[])
     assert pick_none is None
+
+
+def test_all_prescriptions_logged_true_when_every_pattern_logged():
+    prescriptions = [{"pattern": "squat"}, {"pattern": "hinge"}]
+    assert all_prescriptions_logged(prescriptions, {"squat", "hinge"}) is True
+
+
+def test_all_prescriptions_logged_false_when_some_still_missing():
+    prescriptions = [{"pattern": "squat"}, {"pattern": "hinge"}, {"pattern": "carry"}]
+    assert all_prescriptions_logged(prescriptions, {"squat"}) is False
+
+
+def test_all_prescriptions_logged_ignores_unrelated_extra_patterns():
+    prescriptions = [{"pattern": "squat"}]
+    assert all_prescriptions_logged(prescriptions, {"squat", "some_other_pattern"}) is True
+
+
+def test_all_prescriptions_logged_true_for_empty_prescriptions():
+    assert all_prescriptions_logged([], set()) is True

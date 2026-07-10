@@ -160,6 +160,10 @@ def generate_strength_session(
     return StrengthSessionPlan(date=session_date, name=names.get(weekday, "Strength"), prescriptions=prescriptions)
 
 
+def all_prescriptions_logged(prescriptions: list[dict], logged_patterns: set[str]) -> bool:
+    return {p["pattern"] for p in prescriptions} <= logged_patterns
+
+
 def generate_strength_plan(
     start_date: date,
     total_weeks: int,

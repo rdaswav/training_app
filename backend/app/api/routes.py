@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID
 from app.db import get_db
 from app.engines import autoregulation
+from app.engines.strength import all_prescriptions_logged
 from app.intervals_sync import sync_upcoming_runs_to_intervals
 from app.jobs.daily_autoregulation import run_daily_job
 from app.models import (
@@ -202,7 +203,12 @@ def log_strength_session(session_id: int, payload: StrengthLogRequest, db: Sessi
     logged_sets = [autoregulation.StrengthLogSet(**s.model_dump()) for s in payload.sets]
     result = autoregulation.evaluate_strength_log(prescription, logged_sets)
 
-    session.status = SessionStatus.COMPLETED
+    already_logged = {
+        c.actual.get("pattern")
+        for c in db.query(CompletedSession).filter(CompletedSession.planned_session_id == session.id).all()
+    }
+    if all_prescriptions_logged(prescriptions, already_logged | {payload.pattern}):
+        session.status = SessionStatus.COMPLETED
     completed = CompletedSession(
         planned_session_id=session.id,
         date=session.date,

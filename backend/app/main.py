@@ -66,6 +66,29 @@ def format_duration(duration_min: float | None) -> str:
 templates.env.filters["pace"] = format_pace
 templates.env.filters["pace_mmss"] = format_pace_mmss
 templates.env.filters["duration"] = format_duration
+
+
+def _attach_logged_patterns(db, sessions: list[PlannedSession]) -> None:
+    """For each strength session, attach a `logged_patterns` set (which
+    prescriptions already have a CompletedSession row) so the template can
+    show per-prescription completion state -- a session's multiple
+    prescriptions are logged independently, so session.status alone can't
+    tell you which ones are done."""
+    strength_ids = [s.id for s in sessions if s.type == SessionType.STRENGTH]
+    if not strength_ids:
+        for s in sessions:
+            if s.type == SessionType.STRENGTH:
+                s.logged_patterns = set()
+        return
+    completed = (
+        db.query(CompletedSession).filter(CompletedSession.planned_session_id.in_(strength_ids)).all()
+    )
+    by_session: dict[int, set[str]] = {}
+    for c in completed:
+        by_session.setdefault(c.planned_session_id, set()).add(c.actual.get("pattern"))
+    for s in sessions:
+        if s.type == SessionType.STRENGTH:
+            s.logged_patterns = by_session.get(s.id, set())
 templates.env.globals["timedelta"] = timedelta
 
 
@@ -106,6 +129,7 @@ def today_view(request: Request):
             .filter(PlannedSession.athlete_id == athlete.id, PlannedSession.date == today)
             .all()
         )
+        _attach_logged_patterns(db, sessions)
         race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
         days_to_race = (race.race_date - today).days if race else None
         return templates.TemplateResponse(
@@ -214,6 +238,7 @@ def session_view(session_id: int, request: Request):
         session = db.query(PlannedSession).filter(PlannedSession.id == session_id).first()
         if not session:
             raise HTTPException(404, "Session not found")
+        _attach_logged_patterns(db, [session])
         return templates.TemplateResponse("session.html", {"request": request, "s": session, "active": None})
     finally:
         db.close()
