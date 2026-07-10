@@ -91,12 +91,14 @@ Shipped:
   flat-shape rows (`intervals_sync.py` defaults missing/unrecognized `type` to a
   plain step). `integrations/intervals_icu.py` emits the corresponding `Nx`
   repeat-block wire syntax.
-  - **Caveat**: the `Nx` repeat-block syntax itself is UNCONFIRMED against a live
-    intervals.icu account (unlike the pace/HR tokens, which were confirmed
-    2026-07-09) -- tracked via `REPEAT_BLOCK_SYNTAX_CONFIRMED = False` in that
-    module. A follow-up live spike (post a repeat-block workout, inspect the parsed
-    `workout_doc`, correct the syntax if needed) is a separate future step, not
-    bundled into this one.
+  - **Confirmed 2026-07-09 (follow-up live spike)**: posted a real repeat-block
+    workout and inspected the returned `workout_doc` -- the `Nx` count line plus
+    nested dashed work/recovery lines parses correctly as a `{"reps": N, "steps":
+    [...]}` group with both legs present. `REPEAT_BLOCK_SYNTAX_CONFIRMED = True` in
+    that module now. The spike also caught a real bug along the way: a
+    decimal-minute duration token (e.g. `"1.5m"`, or `"0.333...m"` for a 20-second
+    stride) silently fails to parse and drops the whole step -- fixed by converting
+    fractional minutes to whole seconds (`"90s"`, `"20s"`) in `_format_duration`.
 - **%HR basis spot-check**: still an open manual follow-up, not code -- once real
   syncing runs against the live account, compare a synced event's `%HR` value
   against the athlete's own HR zone chart to confirm whether it's %max HR or %LTHR.
@@ -140,7 +142,7 @@ future? How does the daily job/UI distinguish "no race" from "maintenance active
 
 1. ~~Athlete/race management UI~~ -- done
 2. ~~Strength UI depth~~ -- done
-3. ~~intervals.icu polish~~ -- done (repeat-block live-syntax spike still an open follow-up)
+3. ~~intervals.icu polish~~ -- done, including the live repeat-block syntax spike
 4. Visual design overhaul (scope tightly -- e.g. one load chart, not a full redesign) -- next up
 5. Hardening items, opportunistically alongside 4 rather than as a dedicated pass
 6. Maintenance mode (v2, not yet scoped) -- whenever there's appetite for it
