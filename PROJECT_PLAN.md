@@ -95,12 +95,63 @@ Adopted the color palette + typography from two mockups the user provided
   completion. Reskinned `.phase-bar` and the load-dashboard bars for free
   (they already themed off `var()` tokens from Tier 1).
 
-**Tier 3 -- full fidelity (v2, not yet scoped)**: staggered CSS entrance
-animations, radial gradient background glows, phone-mockup marketing chrome,
-sparkline SVG generation. Deliberately deprioritized -- this reads as
-marketing-site polish for a tool meant to be checked solo, daily, functionally,
-not a functional improvement. Flagged here for a future pass if there's
-specific appetite for it later, same as "Maintenance mode (v2)" below.
+**Tier 3, narrowed after a brainstorm pass -- functional elements only, no
+animation/gradient polish -- DONE**:
+- Replaced `/plan`'s `.phase-bar` in place with the richer ribbon: per-phase
+  blocks (date range + focus text, active phase highlighted), a week-tick bar
+  with a "NOW" marker, and race-date flag pins (red "target" for priority-A
+  races, muted "tune-up" styling for others) -- all races within the
+  macrocycle's date range get a flag, not just the nearest one. New pure
+  module `engines/dashboard_summary.py` (`active_phase`, `global_week_index`,
+  `week_ticks`, `timeline_pct`, `race_flags`) computes all of this from data
+  already available (`phase_segments`, `Race` rows, today) -- no new data
+  source needed.
+- Hero/countdown card: race name, distance, goal time (when set), current
+  phase's focus text, and a big days-to-race countdown card, replacing the
+  old flat header line.
+- Status pills: current phase + week number ("RE-BASE · WEEK 1 OF 14"),
+  race priority.
+- Stat cards: the existing weekly-load chart gained a "▲/▼ N% vs last week"
+  delta on the run-volume title; a new "Strength Mesocycle" card shows block
+  position, mode (accumulate/maintenance/minimal), and effort target (RIR) --
+  computed via `dashboard_summary.strength_mesocycle_status`, which reuses
+  `engines/strength.py`'s own `prescribe()` as the single source of truth for
+  the RIR/note text rather than re-deriving that math. The VO2max sparkline
+  from the mockup stayed out, since nothing in this app estimates/tracks
+  VO2max over time (the chart is easy; the data source doesn't exist).
+
+Did not do entrance animations, gradient background glows, or phone-mockup
+marketing chrome -- user leans functional over decorative (per the
+adjacency-flag feedback below), and the phone mockup is a marketing
+illustration device in the source mockups, not a real screen to port.
+
+---
+
+## 6. Near-term feature requests (not yet scoped)
+
+- **Goal race time -> pace targets**: `Race.goal_time_sec` already exists as a
+  stored field (`models.py:68`, accepted via `RaceCreate`/returned via
+  `RaceOut`, `schemas.py:40,50`) but is pure passthrough today -- nothing in
+  `engines/running.py`/`engines/vdot.py` reads it. Race pace (and the
+  threshold/easy pace derivations that feed quality/long-run targets) is
+  currently derived only from the athlete's *current fitness*
+  (`AthleteFitness.threshold_pace_sec_per_km` -> VDOT -> race pace), with no
+  way to target a specific goal time. Open design question when this gets
+  picked up: should a set `goal_time_sec` simply override the VDOT-derived
+  race pace directly (`goal_time_sec / distance_km`), or should it feed back
+  into an "implied VDOT" that also reshapes threshold/quality-session pacing
+  consistently with that goal (more physiologically correct, more engine
+  work)?
+- **Simplify the adjacency-conflict flag**: `engines/calendar.py`'s
+  `auto_resolve_conflicts` (~line 56-59) writes a full-sentence warning into a
+  flagged session's `content["note"]` ("Flagged: hard lower-body work falls
+  the day before the {role} run on {date}; no free rest day to swap this
+  week. Consider lightening load."), rendered as a prominent `.note` div
+  (amber text, always visible) on both `/plan` and the session-detail card.
+  User is already familiar with what this means and wants a small flag/badge
+  instead of the paragraph -- e.g. a compact `.stat`-style pill (matching the
+  existing badge visual language) with the detail available on hover/tap
+  rather than an always-visible warning block.
 
 ---
 
@@ -191,3 +242,8 @@ Shipped:
 4. ~~Visual design overhaul~~ -- v1 done (load dashboard + mobile polish)
 5. ~~Hardening items~~ -- done (API-level TestClient tests, Docker build
    verification, daily-job backlog handling)
+6. ~~Meridian UX build-out~~ -- done (phase ribbon, hero/countdown, status
+   pills, stat cards -- animations/gradients/phone-mockup chrome deliberately
+   skipped)
+7. Goal race time -> pace targets -- not yet scoped, next up
+8. Simplify the adjacency-conflict flag -- not yet scoped, small

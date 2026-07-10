@@ -13,24 +13,65 @@
   {% include "_nav.html" %}
 
   {% if race %}
-    <div class="header">
-      <h1>{{ race.name }}</h1>
-      <div class="countdown">{{ race.race_date }} &middot; {{ race.distance_km }} km</div>
-    </div>
-
-    <div class="phase-bar">
-      {% for seg in phase_segments %}
-        <div style="width: {{ seg.pct }}%; background: {{ seg.color }};" title="{{ seg.name }}: {{ seg.focus }}">
-          {{ seg.name }}
+    <div class="hero">
+      <div>
+        <div class="status-line">
+          {% if current_phase %}<span class="pill live">{{ current_phase.name|upper }} &middot; WEEK {{ week_idx + 1 }} OF {{ total_weeks_count }}</span>{% endif %}
+          <span class="pill">PRIORITY {{ race.priority.value|upper }}</span>
         </div>
-      {% endfor %}
+        <h1>{{ race.name }}</h1>
+        <p class="goal">
+          {{ race.distance_km }} km
+          {% if race.goal_time_sec %} &middot; Goal {{ race.goal_time_sec|goal_time }}{% endif %}
+          {% if current_phase %} &middot; {{ current_phase.focus }}{% endif %}
+        </p>
+      </div>
+      <div class="countdown-card">
+        <div class="lab"><span class="eyebrow">Race day</span></div>
+        <div class="num">{{ days_to_race }}<small>days</small></div>
+        <div class="race">{{ race.name }}</div>
+        <div class="date">{{ race.race_date.strftime("%a %-d %b %Y") }}</div>
+      </div>
     </div>
 
-    {% if load_series %}
+    <div class="ribbon">
+      <div class="phases">
+        {% for seg in phase_segments %}
+          <div class="phase-block{% if current_phase and seg.name == current_phase.name %} active{% endif %}" style="flex: {{ seg.pct }};" title="{{ seg.name }}: {{ seg.focus }}">
+            <span class="ph-top" style="background: {{ seg.color }};"></span>
+            <div class="wk">{{ seg.start_date.strftime("%-d %b") }}&ndash;{{ seg.end_date.strftime("%-d %b") }}</div>
+            <h3>{{ seg.name }}</h3>
+            <div class="foc">{{ seg.focus }}</div>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="track">
+        <div class="weeks">
+          {% for tick in ticks %}<i class="{{ tick.status }}"></i>{% endfor %}
+        </div>
+        <div class="nowmark" style="left: {{ now_pct }}%;"></div>
+        {% for flag in flags %}
+          <div class="flag{% if flag.tag == 'target' %} race{% endif %}" style="left: {{ flag.pct }}%;">
+            <span class="pin"></span><b>{{ flag.label }}</b>{{ flag.tag }}
+          </div>
+        {% endfor %}
+        <div class="wklabels">
+          {% for tick in ticks %}<i{% if tick.status == 'now' %} class="hl"{% endif %}>{{ tick.week_num }}</i>{% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="stats">
+      {% if load_series %}
       <div class="card load-summary">
         <h3>Weekly Load</h3>
         <div class="load-chart">
-          <div class="load-chart-title">Run volume (km)</div>
+          <div class="load-chart-title">
+            Run volume (km)
+            {% if volume_delta_pct is not none %}
+              <span class="delta {{ 'up' if volume_delta_pct >= 0 else 'down' }}">{{ '▲' if volume_delta_pct >= 0 else '▼' }} {{ volume_delta_pct|abs }}% vs last week</span>
+            {% endif %}
+          </div>
           <div class="load-chart-scroll">
             <div class="load-chart-row">
               {% for pt in load_series %}
@@ -64,7 +105,19 @@
           </div>
         </div>
       </div>
-    {% endif %}
+      {% endif %}
+
+      {% if mesocycle_status %}
+      <div class="card">
+        <h3>Strength Mesocycle</h3>
+        <div class="mrow"><span class="l">Block position</span><span class="v">Week {{ mesocycle_status.local_week + 1 }} / {{ mesocycle_status.mesocycle_length }}</span></div>
+        <div class="mrow"><span class="l">Mode</span><span class="v">{{ mesocycle_status.mode }}</span></div>
+        <div class="mrow"><span class="l">Effort target</span><span class="v">RIR {{ mesocycle_status.current_rir }}</span></div>
+        <div class="rirbar"><i style="width: {{ mesocycle_status.effort_pct }}%;"></i></div>
+        <p class="note">{{ mesocycle_status.note }}</p>
+      </div>
+      {% endif %}
+    </div>
   {% else %}
     <p class="empty">No race configured yet. POST to /api/races to generate a plan.</p>
   {% endif %}
