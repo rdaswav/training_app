@@ -3,6 +3,7 @@ from datetime import date, timedelta
 import pytest
 
 from app.engines.running import (
+    HALF_MARATHON_KM,
     AthleteFitness,
     RunRepeatStep,
     build_phases,
@@ -186,3 +187,31 @@ def test_taper_quality_session_emits_repeat_step():
 def test_quality_session_total_distance_km_unchanged_by_decomposition(phase_name, weeks_out, expected_total_km):
     quality = _quality_session_for_phase(phase_name, weeks_out)
     assert quality.total_distance_km == expected_total_km
+
+
+def test_race_pace_falls_back_to_vdot_model_without_a_goal_time():
+    fitness = AthleteFitness(30.0, 390, 330, 150, race_distance_km=21.0975)
+    # No goal_time_sec set -- unchanged from the existing VDOT-derived behavior.
+    assert fitness.race_pace_sec_per_km != round(21.0975 * 1000 / 1)  # sanity: not a degenerate value
+    assert 300 <= fitness.race_pace_sec_per_km <= 400
+
+
+def test_race_pace_uses_goal_time_when_set():
+    fitness = AthleteFitness(30.0, 390, 330, 150, race_distance_km=21.0975, goal_time_sec=6300)  # 1:45:00 half
+    assert fitness.race_pace_sec_per_km == round(6300 / 21.0975)
+
+
+def test_race_pace_goal_time_overrides_regardless_of_current_fitness():
+    # Even a very slow current threshold pace shouldn't change the goal-time-derived race pace.
+    fitness = AthleteFitness(20.0, 500, 450, 150, race_distance_km=21.0975, goal_time_sec=6300)
+    assert fitness.race_pace_sec_per_km == round(6300 / 21.0975)
+
+
+def test_build2_quality_session_uses_goal_time_race_pace_when_set():
+    fitness = AthleteFitness(30.0, 390, 330, 150, goal_time_sec=6300)
+    quality = _quality_session_for_phase("Build 2", 14, fitness)
+    race_pace_reps = next(
+        s for s in quality.steps if isinstance(s, RunRepeatStep) and s.work.distance_km == 1.0
+    )
+    assert race_pace_reps.work.target_pace_sec_per_km == fitness.race_pace_sec_per_km
+    assert race_pace_reps.work.target_pace_sec_per_km == round(6300 / HALF_MARATHON_KM)

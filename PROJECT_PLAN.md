@@ -127,31 +127,24 @@ illustration device in the source mockups, not a real screen to port.
 
 ---
 
-## 6. Near-term feature requests (not yet scoped)
+## 6. Near-term feature requests -- DONE
 
-- **Goal race time -> pace targets**: `Race.goal_time_sec` already exists as a
-  stored field (`models.py:68`, accepted via `RaceCreate`/returned via
-  `RaceOut`, `schemas.py:40,50`) but is pure passthrough today -- nothing in
-  `engines/running.py`/`engines/vdot.py` reads it. Race pace (and the
-  threshold/easy pace derivations that feed quality/long-run targets) is
-  currently derived only from the athlete's *current fitness*
-  (`AthleteFitness.threshold_pace_sec_per_km` -> VDOT -> race pace), with no
-  way to target a specific goal time. Open design question when this gets
-  picked up: should a set `goal_time_sec` simply override the VDOT-derived
-  race pace directly (`goal_time_sec / distance_km`), or should it feed back
-  into an "implied VDOT" that also reshapes threshold/quality-session pacing
-  consistently with that goal (more physiologically correct, more engine
-  work)?
-- **Simplify the adjacency-conflict flag**: `engines/calendar.py`'s
-  `auto_resolve_conflicts` (~line 56-59) writes a full-sentence warning into a
-  flagged session's `content["note"]` ("Flagged: hard lower-body work falls
-  the day before the {role} run on {date}; no free rest day to swap this
-  week. Consider lightening load."), rendered as a prominent `.note` div
-  (amber text, always visible) on both `/plan` and the session-detail card.
-  User is already familiar with what this means and wants a small flag/badge
-  instead of the paragraph -- e.g. a compact `.stat`-style pill (matching the
-  existing badge visual language) with the detail available on hover/tap
-  rather than an always-visible warning block.
+- ~~**Goal race time -> pace targets**~~ -- done. A set `Race.goal_time_sec`
+  now overrides `AthleteFitness.race_pace_sec_per_km` directly
+  (`goal_time_sec / race_distance_km`), affecting only race-pace segments
+  (Build 2's race-pace reps, Taper's race-pace touch). Threshold/easy paces
+  stay derived from the athlete's actual current fitness via the VDOT model,
+  untouched by the goal time -- a deliberate choice confirmed with the user to
+  preserve autoregulation (not prescribing paces harder than current fitness
+  has earned). Settable via the `/settings` race-edit form ("Goal time
+  (H:MM:SS)", optional).
+- ~~**Simplify the adjacency-conflict flag**~~ -- done. `UnifiedSession` now
+  carries a `flagged: bool` field; an unresolved adjacency conflict renders as
+  a compact `.stat.st-flag` pill ("Conflict") with the full detail sentence
+  available via a hover tooltip, instead of an always-visible `.note`
+  paragraph, on both `/plan` and the session-detail card. Auto-shuffled
+  conflicts (the resolved case) are unaffected -- still a plain informational
+  note.
 
 ---
 
@@ -245,5 +238,6 @@ Shipped:
 6. ~~Meridian UX build-out~~ -- done (phase ribbon, hero/countdown, status
    pills, stat cards -- animations/gradients/phone-mockup chrome deliberately
    skipped)
-7. Goal race time -> pace targets -- not yet scoped, next up
-8. Simplify the adjacency-conflict flag -- not yet scoped, small
+7. ~~Goal race time -> pace targets~~ -- done (race-pace segments only, per
+   user decision)
+8. ~~Simplify the adjacency-conflict flag~~ -- done (compact badge + tooltip)

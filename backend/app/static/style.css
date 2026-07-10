@@ -88,6 +88,7 @@ nav a.active { color: var(--accent); font-weight: 600; }
   white-space: nowrap;
 }
 .stat.st-done { background: rgba(76, 175, 125, 0.14); color: var(--good); }
+.stat.st-flag { background: rgba(245, 166, 35, 0.14); color: var(--warn); cursor: help; }
 .prescription {
   display: flex;
   justify-content: space-between;

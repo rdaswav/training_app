@@ -42,6 +42,15 @@ function paceToSeconds(str) {
   return parts[0] * 60 + parts[1];
 }
 
+function goalTimeToSeconds(str) {
+  if (!str) return null;
+  const parts = String(str).split(":").map(Number);
+  if (parts.some((n) => Number.isNaN(n))) return null;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return null;
+}
+
 function formatPaceSec(sec) {
   if (!sec) return null;
   const m = Math.floor(sec / 60);
@@ -109,17 +118,26 @@ async function submitAthleteProfile(event) {
 
 async function submitRaceForm(event, existingRaceId) {
   event.preventDefault();
+  const form = event.target;
+  let goalTimeSec = null;
+  if (form.goal_time.value.trim()) {
+    goalTimeSec = goalTimeToSeconds(form.goal_time.value.trim());
+    if (goalTimeSec === null) {
+      showFormStatus("race-status", "Enter goal time as H:MM:SS or MM:SS, e.g. 1:45:00", false);
+      return false;
+    }
+  }
   if (existingRaceId) {
     const confirmed = window.confirm(
       "Saving deletes and regenerates every still-planned session for this race. Continue?"
     );
     if (!confirmed) return false;
   }
-  const form = event.target;
   const body = {
     name: form.name.value,
     race_date: form.race_date.value,
     distance_km: Number(form.distance_km.value),
+    goal_time_sec: goalTimeSec,
     priority: form.priority.value,
     plan_start_date: form.plan_start_date.value || null,
   };

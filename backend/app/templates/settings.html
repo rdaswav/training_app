@@ -54,6 +54,9 @@
           <option value="5"><option value="10"><option value="21.1"><option value="42.195">
         </datalist>
       </label>
+      <label>Goal time (H:MM:SS, optional -- overrides race-pace targets in training)
+        <input name="goal_time" type="text" placeholder="e.g. 1:45:00" value="{{ race.goal_time_sec|goal_time if race and race.goal_time_sec else '' }}">
+      </label>
       <label>Priority
         <select name="priority">
           <option value="A" {% if race and race.priority.value == 'A' %}selected{% endif %}>A (goal race)</option>
