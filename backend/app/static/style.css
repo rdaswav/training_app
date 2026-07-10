@@ -214,22 +214,83 @@ table.calendar th, table.calendar td {
   text-align: left;
   vertical-align: top;
 }
-.phase-bar {
+/* hero + countdown */
+.hero {
   display: flex;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 1rem;
-  height: 28px;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
 }
-.phase-bar div {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.status-line { display: flex; gap: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+.pill {
+  font-family: var(--mono);
   font-size: 0.7rem;
-  color: white;
-  white-space: nowrap;
-  overflow: hidden;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
 }
+.pill.live { color: var(--amber-hi); border-color: rgba(245, 166, 35, 0.45); background: rgba(245, 166, 35, 0.08); }
+.goal { color: var(--muted); font-size: 0.9rem; margin-top: 0.4rem; }
+.countdown-card {
+  background: var(--slate2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem 1.2rem;
+  min-width: 190px;
+}
+.countdown-card .lab { display: flex; }
+.countdown-card .eyebrow {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.countdown-card .num { font-family: var(--disp); font-weight: 800; font-size: 2.2rem; line-height: 1; margin: 0.3rem 0 0.1rem; }
+.countdown-card .num small { font-size: 0.9rem; color: var(--muted); font-weight: 600; margin-left: 0.3rem; }
+.countdown-card .race { font-size: 0.9rem; font-weight: 600; }
+.countdown-card .date { font-family: var(--mono); font-size: 0.75rem; color: var(--dim); margin-top: 0.1rem; }
+
+/* phase-timeline ribbon */
+.ribbon { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.1rem 1.1rem 0.8rem; margin-bottom: 1rem; }
+.phases { display: flex; gap: 6px; }
+.phase-block { position: relative; border-radius: 9px; padding: 0.7rem 0.75rem 0.8rem; min-height: 74px; border: 1px solid var(--border); overflow: hidden; }
+.phase-block .ph-top { height: 3px; border-radius: 3px; position: absolute; left: 0; right: 0; top: 0; }
+.phase-block h3 { font-size: 0.85rem; margin: 0.15rem 0 0; }
+.phase-block .wk { font-family: var(--mono); font-size: 0.6rem; color: var(--dim); letter-spacing: 0.04em; }
+.phase-block .foc { font-size: 0.7rem; color: var(--muted); margin-top: 0.4rem; line-height: 1.35; }
+.phase-block.active { border-color: rgba(245, 166, 35, 0.5); box-shadow: 0 0 0 1px rgba(245, 166, 35, 0.25) inset; }
+.track { margin-top: 2rem; position: relative; height: 34px; }
+.weeks { display: flex; height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+.weeks i { flex: 1; border-right: 1px solid var(--ink); }
+.weeks i:last-child { border-right: 0; }
+.weeks i.done { background: var(--teal-dim); }
+.weeks i.now { background: var(--amber); }
+.wklabels { display: flex; margin-top: 0.45rem; }
+.wklabels i { flex: 1; text-align: center; font-family: var(--mono); font-size: 0.6rem; color: var(--dim); font-style: normal; }
+.wklabels i.hl { color: var(--amber-hi); }
+.nowmark { position: absolute; top: -6px; width: 2px; height: 20px; background: var(--amber); box-shadow: 0 0 10px rgba(245, 166, 35, 0.8); }
+.flag { position: absolute; top: -1.9rem; transform: translateX(-50%); font-family: var(--mono); font-size: 0.6rem; color: var(--muted); white-space: nowrap; text-align: center; }
+.flag b { display: block; color: var(--text); font-size: 0.6rem; }
+.flag .pin { width: 7px; height: 7px; border-radius: 50%; margin: 0.15rem auto 0; background: var(--muted); }
+.flag.race .pin { background: var(--red); }
+.flag.race b { color: var(--red); }
+
+/* stat cards row */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.stats .card { margin-bottom: 0; }
+.mrow { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.5rem; }
+.mrow .l { color: var(--muted); }
+.mrow .v { font-family: var(--mono); color: var(--text); }
+.rirbar { height: 7px; border-radius: 4px; background: var(--slate2); overflow: hidden; margin-top: 0.2rem; }
+.rirbar i { display: block; height: 100%; background: linear-gradient(90deg, var(--teal), var(--amber)); }
+.delta { font-family: var(--mono); font-size: 0.7rem; margin-left: 0.4rem; }
+.delta.up { color: var(--teal-hi); }
+.delta.down { color: var(--muted); }
 form.settings-form {
   display: flex;
   flex-direction: column;
@@ -332,4 +393,11 @@ form.settings-form button {
   .prescription { flex-direction: column; align-items: flex-start; }
 
   table.calendar { min-width: 480px; }
+
+  .hero { flex-direction: column; align-items: stretch; }
+  .countdown-card { min-width: 0; }
+  .phases { flex-wrap: wrap; }
+  .phase-block { flex: 1 1 calc(50% - 6px) !important; }
+  .flag, .nowmark { display: none; }
+  .stats { grid-template-columns: 1fr; }
 }

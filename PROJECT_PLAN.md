@@ -96,23 +96,33 @@ Adopted the color palette + typography from two mockups the user provided
   (they already themed off `var()` tokens from Tier 1).
 
 **Tier 3, narrowed after a brainstorm pass -- functional elements only, no
-animation/gradient polish**:
-- Replace `/plan`'s existing `.phase-bar` in place with the mockups' richer
-  ribbon: per-phase gradient blocks, a "NOW" marker line, race-date flag pins
-  with labels, week-number ticks below. Same data already available
-  (`phase_segments`, race date, today) -- a template/CSS upgrade, not a new
-  data source.
-- Hero/countdown card treatment (big countdown number + race name + date in
-  its own card, replacing the current flat header line).
-- Status pills (e.g. "BUILD 1 · WEEK 5 OF 13", "MESOCYCLE 2 · ACCUMULATION").
-- Stat cards with trend deltas (weekly volume, strength mesocycle position) --
-  the VO2max sparkline from the mockup is explicitly OUT, since nothing in
-  this app currently estimates/tracks VO2max over time (the chart is easy;
-  the data source doesn't exist).
+animation/gradient polish -- DONE**:
+- Replaced `/plan`'s `.phase-bar` in place with the richer ribbon: per-phase
+  blocks (date range + focus text, active phase highlighted), a week-tick bar
+  with a "NOW" marker, and race-date flag pins (red "target" for priority-A
+  races, muted "tune-up" styling for others) -- all races within the
+  macrocycle's date range get a flag, not just the nearest one. New pure
+  module `engines/dashboard_summary.py` (`active_phase`, `global_week_index`,
+  `week_ticks`, `timeline_pct`, `race_flags`) computes all of this from data
+  already available (`phase_segments`, `Race` rows, today) -- no new data
+  source needed.
+- Hero/countdown card: race name, distance, goal time (when set), current
+  phase's focus text, and a big days-to-race countdown card, replacing the
+  old flat header line.
+- Status pills: current phase + week number ("RE-BASE · WEEK 1 OF 14"),
+  race priority.
+- Stat cards: the existing weekly-load chart gained a "▲/▼ N% vs last week"
+  delta on the run-volume title; a new "Strength Mesocycle" card shows block
+  position, mode (accumulate/maintenance/minimal), and effort target (RIR) --
+  computed via `dashboard_summary.strength_mesocycle_status`, which reuses
+  `engines/strength.py`'s own `prescribe()` as the single source of truth for
+  the RIR/note text rather than re-deriving that math. The VO2max sparkline
+  from the mockup stayed out, since nothing in this app estimates/tracks
+  VO2max over time (the chart is easy; the data source doesn't exist).
 
-Explicitly **not** doing entrance animations, gradient background glows, or
-phone-mockup marketing chrome -- user leans functional over decorative (per
-the adjacency-flag feedback below), and the phone mockup is a marketing
+Did not do entrance animations, gradient background glows, or phone-mockup
+marketing chrome -- user leans functional over decorative (per the
+adjacency-flag feedback below), and the phone mockup is a marketing
 illustration device in the source mockups, not a real screen to port.
 
 ---
@@ -232,6 +242,8 @@ Shipped:
 4. ~~Visual design overhaul~~ -- v1 done (load dashboard + mobile polish)
 5. ~~Hardening items~~ -- done (API-level TestClient tests, Docker build
    verification, daily-job backlog handling)
-6. Meridian UX build-out (Tier 3 + beyond) -- next up, currently brainstorming scope
-7. Goal race time -> pace targets -- not yet scoped
+6. ~~Meridian UX build-out~~ -- done (phase ribbon, hero/countdown, status
+   pills, stat cards -- animations/gradients/phone-mockup chrome deliberately
+   skipped)
+7. Goal race time -> pace targets -- not yet scoped, next up
 8. Simplify the adjacency-conflict flag -- not yet scoped, small
