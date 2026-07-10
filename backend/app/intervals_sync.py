@@ -102,3 +102,23 @@ def sync_upcoming_runs_to_intervals(
 
     db.commit()
     return {"synced": synced, "failed": len(failures), "failures": failures}
+
+
+def delete_synced_events(sessions: list[PlannedSession], client: IntervalsIcuClient | None = None) -> None:
+    """Best-effort delete of already-synced intervals.icu events for sessions
+    that are about to be removed locally (plan regeneration, race deletion).
+    Must be called -- with the still-populated rows in hand -- before any bulk
+    PlannedSession delete, otherwise a synced event is orphaned on
+    intervals.icu: the regenerated session later syncs as a brand-new event,
+    and the original is left behind looking like a duplicate. Never raises --
+    a failed cleanup shouldn't block the local plan change."""
+    if not intervals_icu_configured():
+        return
+    client = client or IntervalsIcuClient()
+    for session in sessions:
+        if not session.intervals_icu_event_id:
+            continue
+        try:
+            client.delete_planned_workout(session.intervals_icu_event_id)
+        except Exception:  # noqa: BLE001 -- third-party call, best-effort cleanup only
+            pass

@@ -7,7 +7,7 @@ from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID
 from app.db import get_db
 from app.engines import autoregulation
 from app.engines.strength import all_prescriptions_logged
-from app.intervals_sync import sync_upcoming_runs_to_intervals
+from app.intervals_sync import delete_synced_events, sync_upcoming_runs_to_intervals
 from app.jobs.daily_autoregulation import run_daily_job
 from app.models import (
     AthleteProfile,
@@ -88,6 +88,12 @@ def delete_race(race_id: int, db: Session = Depends(get_db)):
     race = db.query(Race).filter(Race.id == race_id, Race.athlete_id == athlete.id).first()
     if not race:
         raise HTTPException(404, "Race not found")
+    sessions_to_remove = (
+        db.query(PlannedSession)
+        .filter(PlannedSession.athlete_id == athlete.id, PlannedSession.status == SessionStatus.PLANNED)
+        .all()
+    )
+    delete_synced_events(sessions_to_remove)
     db.query(PlannedSession).filter(
         PlannedSession.athlete_id == athlete.id,
         PlannedSession.status == SessionStatus.PLANNED,

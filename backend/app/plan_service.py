@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.engines import calendar as calendar_engine
 from app.engines import running as running_engine
 from app.engines import strength as strength_engine
+from app.intervals_sync import delete_synced_events
 from app.models import (
     AthleteProfile,
     Exercise,
@@ -131,6 +132,17 @@ def generate_and_persist_plan(
     # autoincrement id happens to reuse one of these just-deleted ids
     # collides with a stale cached instance still sitting in the identity
     # map (SAWarning, and a real risk of returning stale data).
+    sessions_to_replace = (
+        db.query(PlannedSession)
+        .filter(
+            PlannedSession.athlete_id == athlete.id,
+            PlannedSession.date >= regen_from,
+            PlannedSession.date <= macro_end,
+            PlannedSession.status == SessionStatus.PLANNED,
+        )
+        .all()
+    )
+    delete_synced_events(sessions_to_replace)
     db.query(PlannedSession).filter(
         PlannedSession.athlete_id == athlete.id,
         PlannedSession.date >= regen_from,
