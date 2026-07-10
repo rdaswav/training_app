@@ -9,6 +9,11 @@ INTERVALS_ICU_API_KEY = os.environ.get("INTERVALS_ICU_API_KEY", "")
 INTERVALS_ICU_ATHLETE_ID = os.environ.get("INTERVALS_ICU_ATHLETE_ID", "")
 INTERVALS_ICU_BASE_URL = os.environ.get("INTERVALS_ICU_BASE_URL", "https://intervals.icu/api/v1")
 
+# HTTP Basic Auth in front of the whole app. Disabled (no auth) unless both
+# are set -- keeps local dev/tests working with zero setup.
+AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "")
+AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "")
+
 # Local hour the daily autoregulation job runs at (spec section 3: pull
 # yesterday's sessions, autoregulate, refresh the next 7-10 days).
 DAILY_JOB_HOUR = int(os.environ.get("DAILY_JOB_HOUR", "6"))

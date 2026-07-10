@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.api.routes import get_or_create_athlete, router
+from app.auth_middleware import BasicAuthMiddleware
 from app.config import DAILY_JOB_HOUR, ENABLE_SCHEDULER
 from app.db import SessionLocal, init_db
 from app.engines import dashboard_summary, load_summary
@@ -19,6 +20,7 @@ from app.seed import seed_exercise_library
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Training App")
+app.add_middleware(BasicAuthMiddleware)
 app.include_router(router)
 
 scheduler = BackgroundScheduler()

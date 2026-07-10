@@ -80,6 +80,12 @@ Environment variables (see `app/config.py`):
   job (default `6`).
 - `ENABLE_SCHEDULER` -- set to `false` to disable the in-process APScheduler entirely
   (e.g. if you'd rather trigger `POST /api/jobs/daily-autoregulation` from an external cron).
+- `AUTH_USERNAME`, `AUTH_PASSWORD` -- if both are set, every route (pages and API) is
+  gated behind HTTP Basic Auth (`app/auth_middleware.py`). Unset by default -- no auth,
+  matching the rest of this project's "opt-in via env var" pattern. Basic Auth sends
+  credentials base64-encoded, not encrypted, on every request -- fine on a LAN-only
+  deployment, but put a reverse proxy with HTTPS in front before exposing this to the
+  internet.
 
 ### Docker
 
