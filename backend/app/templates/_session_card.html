@@ -76,7 +76,9 @@
     <div id="feedback-{{ s.id }}"></div>
   {% endif %}
 
-  {% if s.content.get("note") %}
+  {% if s.content.get("flagged") %}
+    <span class="stat st-flag" title="{{ s.content.get('note') }}">Conflict</span>
+  {% elif s.content.get("note") %}
     <div class="note">{{ s.content.get("note") }}</div>
   {% endif %}
 </div>

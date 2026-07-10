@@ -69,6 +69,54 @@ def test_quality_session_repeat_step_serializes_with_discriminator(db_session):
     assert repeat["recovery"]["duration_min"] == 1.5
 
 
+def test_goal_race_time_overrides_race_pace_segments_only(db_session):
+    """Race.goal_time_sec flows through to race-pace segments (Build 2's
+    race-pace reps, Taper's race-pace touch) but must not change threshold-
+    pace segments (Build 1's cruise intervals, which key off the athlete's
+    actual current threshold pace, not the goal)."""
+    today = date(2026, 7, 8)
+    seed_exercise_library(db_session)
+    athlete = AthleteProfile(injury_flags=[])
+    db_session.add(athlete)
+    db_session.commit()
+    db_session.refresh(athlete)
+
+    goal_time_sec = 6300  # 1:45:00 half marathon
+    race = Race(
+        athlete_id=athlete.id,
+        name="Goal Half",
+        race_date=today + timedelta(weeks=14),
+        distance_km=21.1,
+        goal_time_sec=goal_time_sec,
+        priority=RacePriority.A,
+    )
+    db_session.add(race)
+    db_session.commit()
+    db_session.refresh(race)
+
+    generate_and_persist_plan(db_session, athlete, race, today=today)
+
+    build2_quality = (
+        db_session.query(PlannedSession)
+        .filter(
+            PlannedSession.athlete_id == athlete.id,
+            PlannedSession.type == SessionType.RUN,
+            PlannedSession.phase_name == "Build 2",
+            PlannedSession.name == "Threshold + race-pace reps",
+        )
+        .first()
+    )
+    assert build2_quality is not None
+    repeats = [s for s in build2_quality.content["steps"] if s.get("type") == "repeat"]
+    race_pace_reps = next(r for r in repeats if r["work"]["distance_km"] == 1.0)
+    threshold_reps = next(r for r in repeats if r["work"]["distance_km"] == 2.0)
+
+    assert race_pace_reps["work"]["target_pace_sec_per_km"] == round(goal_time_sec / race.distance_km)
+    # Threshold-pace segment must stay tied to the athlete's actual current
+    # threshold pace, unaffected by the goal time override.
+    assert threshold_reps["work"]["target_pace_sec_per_km"] == athlete.threshold_pace_sec_per_km
+
+
 def test_regenerating_plan_preserves_completed_sessions(db_session):
     today = date(2026, 7, 8)
     athlete, race = _make_athlete_and_race(db_session, today)

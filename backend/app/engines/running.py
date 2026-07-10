@@ -76,9 +76,19 @@ class AthleteFitness:
     threshold_pace_sec_per_km: int
     aerobic_hr_ceiling: int
     race_distance_km: float = HALF_MARATHON_KM
+    goal_time_sec: int | None = None
 
     @property
     def race_pace_sec_per_km(self) -> int:
+        # A set goal time overrides the derived race pace directly -- it only
+        # affects race-pace segments (Build 2/Taper touches rehearsing goal
+        # effort). Threshold/easy paces stay autoregulated from actual current
+        # fitness (below), by deliberate choice: reshaping those toward an
+        # "implied VDOT" for the goal time risks prescribing paces harder than
+        # current fitness has earned, working against the app's autoregulation
+        # design.
+        if self.goal_time_sec:
+            return round(self.goal_time_sec / self.race_distance_km)
         # Daniels' VDOT model: derive a fitness score from threshold pace
         # (Daniels' own ~60min calibration for Threshold), then the race pace
         # for the actual race distance. See engines/vdot.py.

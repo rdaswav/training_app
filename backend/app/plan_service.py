@@ -21,7 +21,9 @@ from app.models import (
 )
 
 
-def _fitness_from_athlete(athlete: AthleteProfile, race_distance_km: float | None = None) -> running_engine.AthleteFitness:
+def _fitness_from_athlete(
+    athlete: AthleteProfile, race_distance_km: float | None = None, goal_time_sec: int | None = None
+) -> running_engine.AthleteFitness:
     kwargs = dict(
         weekly_volume_km=athlete.weekly_volume_km,
         easy_pace_sec_per_km=athlete.easy_pace_sec_per_km,
@@ -30,6 +32,8 @@ def _fitness_from_athlete(athlete: AthleteProfile, race_distance_km: float | Non
     )
     if race_distance_km is not None:
         kwargs["race_distance_km"] = race_distance_km
+    if goal_time_sec is not None:
+        kwargs["goal_time_sec"] = goal_time_sec
     return running_engine.AthleteFitness(**kwargs)
 
 
@@ -107,7 +111,7 @@ def generate_and_persist_plan(
     if plan_start_date is None:
         plan_start_date = race.macrocycle.start_date if race.macrocycle is not None else today
     regen_from = max(plan_start_date, today)
-    fitness = _fitness_from_athlete(athlete, race_distance_km=race.distance_km)
+    fitness = _fitness_from_athlete(athlete, race_distance_km=race.distance_km, goal_time_sec=race.goal_time_sec)
 
     phases, weeks = running_engine.generate_run_plan(plan_start_date, race.race_date, fitness)
     total_weeks = len(weeks)
@@ -185,6 +189,7 @@ def generate_and_persist_plan(
         week_index = min(max((u.date - macro_start).days // 7, 0), total_weeks - 1)
         content = {k: v for k, v in u.content.items() if k not in ("date", "name")}
         content["note"] = u.note
+        content["flagged"] = u.flagged
         db.add(
             PlannedSession(
                 athlete_id=athlete.id,

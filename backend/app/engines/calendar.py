@@ -19,6 +19,7 @@ class UnifiedSession:
     patterns: list[str] = field(default_factory=list)  # strength patterns present this session
     content: dict = field(default_factory=dict)
     note: str = ""
+    flagged: bool = False  # unresolved adjacency conflict -- render as a compact badge, not a note paragraph
 
 
 def find_adjacency_conflicts(week_sessions: list[UnifiedSession]) -> list[tuple[UnifiedSession, UnifiedSession]]:
@@ -53,8 +54,9 @@ def auto_resolve_conflicts(week_sessions: list[UnifiedSession]) -> list[UnifiedS
             swapped = True
             break
         if not swapped:
+            strength_session.flagged = True
             strength_session.note = (
-                f"Flagged: hard lower-body work falls the day before the {run_session.role} run on "
+                f"Hard lower-body work falls the day before the {run_session.role} run on "
                 f"{run_session.date.isoformat()}; no free rest day to swap this week. Consider lightening load."
             )
     return sorted(week_sessions, key=lambda s: s.date)

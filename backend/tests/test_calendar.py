@@ -39,6 +39,7 @@ def test_default_template_resolves_one_conflict_and_flags_the_other():
     # The Fri/Sat conflict has no remaining free rest day, so it's flagged in place.
     assert friday.session_type == "strength"
     assert friday.note != ""
+    assert friday.flagged is True
 
 
 def test_no_conflict_when_no_hard_lower_pattern_precedes_key_run():
@@ -53,6 +54,7 @@ def test_no_conflict_when_no_hard_lower_pattern_precedes_key_run():
     friday = next(s for s in week if s.date == monday + timedelta(days=4))
     assert friday.session_type == "strength"
     assert friday.note == ""
+    assert friday.flagged is False
 
 
 def test_find_adjacency_conflicts_detects_easy_run_as_non_key():
