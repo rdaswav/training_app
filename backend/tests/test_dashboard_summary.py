@@ -94,3 +94,16 @@ def test_strength_mesocycle_status_maintenance_mode_for_build2():
 def test_strength_mesocycle_status_minimal_mode_for_taper():
     status = strength_mesocycle_status(week_idx=0, current_phase_name="Taper")
     assert status.mode == "minimal"
+
+
+def test_strength_mesocycle_status_respects_a_nonzero_offset():
+    """Regression test for #31: the displayed mesocycle status must use the
+    same mesocycle_start_week the persisted strength sessions were actually
+    generated with, or the two can silently disagree about which week is
+    the deload week."""
+    default_status = strength_mesocycle_status(week_idx=4, current_phase_name="Re-base", mesocycle_start_week=0)
+    shifted_status = strength_mesocycle_status(week_idx=4, current_phase_name="Re-base", mesocycle_start_week=1)
+    assert default_status.local_week == 4
+    assert shifted_status.local_week == 3
+    assert "deload" in default_status.note.lower()
+    assert "deload" not in shifted_status.note.lower()

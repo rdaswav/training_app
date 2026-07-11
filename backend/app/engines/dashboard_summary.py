@@ -79,13 +79,17 @@ def race_flags(races: list[dict], macrocycle_start: date, macrocycle_end: date) 
     return flags
 
 
-def strength_mesocycle_status(week_idx: int, current_phase_name: str) -> MesocycleStatus:
+def strength_mesocycle_status(week_idx: int, current_phase_name: str, mesocycle_start_week: int = 0) -> MesocycleStatus:
     """Reuses engines/strength.py's own prescribe() as the single source of
-    truth for the current RIR/note, rather than re-deriving that math here."""
+    truth for the current RIR/note, rather than re-deriving that math here.
+    `mesocycle_start_week` must be the same offset used to actually generate
+    the persisted strength sessions (Macrocycle.mesocycle_start_week, see
+    #31) -- otherwise this status can drift from what the athlete is really
+    prescribed that week."""
     from app.engines.strength import MESOCYCLE_LENGTH, mesocycle_week_local, prescribe, race_proximity_mode
 
     mode = race_proximity_mode(current_phase_name)
-    local_week = mesocycle_week_local(week_idx)
+    local_week = mesocycle_week_local(week_idx, mesocycle_start_week)
     sample = prescribe("squat", "compound", local_week, mode)
     effort_pct = round(max(0.0, min(100.0, (4.0 - sample.rir) / 3.0 * 100)), 1)
     return MesocycleStatus(

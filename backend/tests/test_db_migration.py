@@ -8,7 +8,7 @@ import tempfile
 
 from sqlalchemy import create_engine, inspect, text
 
-from app.db import _migrate_athlete_profiles
+from app.db import _migrate_athlete_profiles, _migrate_macrocycles
 
 
 def test_migrate_adds_missing_columns_and_backfills_baseline_from_current_pace():
@@ -82,5 +82,49 @@ def test_migrate_is_idempotent_when_columns_already_exist():
             ))
         _migrate_athlete_profiles(engine)  # first run
         _migrate_athlete_profiles(engine)  # must not raise on a second run
+    finally:
+        os.remove(path)
+
+
+def test_migrate_macrocycles_adds_offset_column_defaulting_to_the_old_zero_behavior():
+    """Regression test for #31: an already-deployed macrocycles table
+    predates mesocycle_start_week. Existing rows must come back 0 -- exactly
+    the old always-phase-unaware behavior -- not NULL, since (unlike the
+    athlete_profiles baselines) there's no distinct backfill step needed."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        engine = create_engine(f"sqlite:///{path}")
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE TABLE macrocycles (id INTEGER PRIMARY KEY, race_id INTEGER, "
+                "start_date DATE, end_date DATE)"
+            ))
+            conn.execute(text(
+                "INSERT INTO macrocycles (id, race_id, start_date, end_date) "
+                "VALUES (1, 1, '2026-07-06', '2026-10-11')"
+            ))
+
+        _migrate_macrocycles(engine)
+
+        inspector = inspect(engine)
+        columns = {col["name"] for col in inspector.get_columns("macrocycles")}
+        assert "mesocycle_start_week" in columns
+
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT mesocycle_start_week FROM macrocycles WHERE id = 1")).fetchone()
+        assert row[0] == 0
+    finally:
+        os.remove(path)
+
+
+def test_migrate_macrocycles_is_a_noop_on_a_fresh_db():
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        engine = create_engine(f"sqlite:///{path}")
+        _migrate_macrocycles(engine)  # must not raise -- nothing to migrate yet
+        inspector = inspect(engine)
+        assert "macrocycles" not in inspector.get_table_names()
     finally:
         os.remove(path)

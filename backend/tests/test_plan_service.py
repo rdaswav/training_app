@@ -44,6 +44,51 @@ def test_generate_plan_creates_sessions_from_today_only(db_session):
     assert all(s.date >= today for s in sessions)
 
 
+def test_macrocycle_persists_a_mesocycle_offset_consistent_with_generated_sessions(db_session):
+    """Regression test for #31: the strength mesocycle used to always start
+    at offset 0 regardless of the running plan's down-weeks/taper. Confirm
+    generate_and_persist_plan computes and stores a real offset on the
+    Macrocycle, and that the persisted strength sessions actually reflect
+    that same offset (not the old hardcoded 0)."""
+    from app.engines.strength import ACCUMULATION_WEEKS, best_mesocycle_offset, mesocycle_week_local
+
+    today = date(2026, 7, 6)  # Monday -- a clean week-aligned start
+    athlete, race = _make_athlete_and_race(db_session, today, race_weeks=16)
+
+    macrocycle = generate_and_persist_plan(db_session, athlete, race, today=today)
+
+    from app.models import Phase
+
+    phase_rows = db_session.query(Phase).filter(Phase.macrocycle_id == macrocycle.id).all()
+    total_weeks = (macrocycle.end_date - macrocycle.start_date).days // 7 + 1
+    taper_phase = next(p for p in phase_rows if p.name == "Taper")
+    taper_start_week = (taper_phase.start_date - macrocycle.start_date).days // 7
+
+    expected_offset = best_mesocycle_offset(total_weeks, taper_start_week)
+    assert macrocycle.mesocycle_start_week == expected_offset
+
+    # Find a strength session on a deload week per the persisted offset, and
+    # confirm its content actually says "Deload" -- proof the offset was
+    # really threaded into generation, not just stored decoratively.
+    deload_week_indices = [
+        w for w in range(total_weeks)
+        if mesocycle_week_local(w, expected_offset) == ACCUMULATION_WEEKS
+    ]
+    strength_sessions = (
+        db_session.query(PlannedSession)
+        .filter(PlannedSession.athlete_id == athlete.id, PlannedSession.type == SessionType.STRENGTH)
+        .all()
+    )
+    deload_dates = {macrocycle.start_date + timedelta(weeks=w) for w in deload_week_indices}
+    deload_week_sessions = [s for s in strength_sessions if any(abs((s.date - d).days) < 7 for d in deload_dates)]
+    assert deload_week_sessions
+    assert any(
+        "deload" in p.get("note", "").lower()
+        for s in deload_week_sessions
+        for p in s.content.get("prescriptions", [])
+    )
+
+
 def test_quality_session_repeat_step_serializes_with_discriminator(db_session):
     today = date(2026, 7, 8)
     athlete, race = _make_athlete_and_race(db_session, today)

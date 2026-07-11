@@ -2,9 +2,12 @@ from datetime import date
 
 from app.engines.strength import (
     ACCUMULATION_WEEKS,
+    MESOCYCLE_LENGTH,
     all_prescriptions_logged,
+    best_mesocycle_offset,
     generate_strength_session,
     is_deload_week,
+    mesocycle_week_local,
     prescribe,
     race_proximity_mode,
     select_exercise,
@@ -110,3 +113,51 @@ def test_all_prescriptions_logged_ignores_unrelated_extra_patterns():
 
 def test_all_prescriptions_logged_true_for_empty_prescriptions():
     assert all_prescriptions_logged([], set()) is True
+
+
+def test_best_mesocycle_offset_minimizes_distance_to_running_recovery_weeks():
+    """A 16-week block with a 2-week taper (weeks 14-15) has running
+    down-weeks at 3, 7, 11 (every 4th week, engines/running.py's
+    is_down_week) plus the taper itself -- targets {3, 7, 11, 14, 15}.
+    Checked by hand: offset 3 puts deload weeks at {2, 7, 12}, landing
+    exactly on week 7 and only 1 week off from 3 and 12 -- the minimum
+    total distance (2) of any of the 5 possible offsets."""
+    assert best_mesocycle_offset(total_weeks=16, taper_start=14) == 3
+
+
+def test_best_mesocycle_offset_deload_weeks_actually_move_closer_than_the_old_default():
+    """Regression test for #31: the mesocycle used to always start at
+    offset 0 regardless of the running plan. Confirm the chosen offset's
+    deload weeks land strictly closer to the running plan's down-weeks/
+    taper, in aggregate, than the old hardcoded offset 0 would have."""
+    total_weeks, taper_start = 16, 14
+    targets = sorted({i for i in range(total_weeks) if (i > 0 and i < taper_start and (i + 1) % 4 == 0) or i >= taper_start})
+
+    def _total_distance(offset: int) -> int:
+        deload_weeks = [i for i in range(total_weeks) if (i - offset) % MESOCYCLE_LENGTH == ACCUMULATION_WEEKS]
+        return sum(min(abs(w - t) for t in targets) for w in deload_weeks)
+
+    chosen = best_mesocycle_offset(total_weeks, taper_start)
+    assert _total_distance(chosen) < _total_distance(0)
+
+
+def test_best_mesocycle_offset_defaults_to_zero_with_no_recovery_weeks():
+    # A block too short to have any down-week or taper-only week (degenerate
+    # edge case) -- must not crash, and 0 is as good an offset as any other.
+    assert best_mesocycle_offset(total_weeks=0, taper_start=0) == 0
+
+
+def test_generate_strength_session_honors_a_nonzero_mesocycle_offset():
+    """generate_strength_session's mesocycle_start_week must actually shift
+    which week is the deload week -- confirms the plumbing, not just the
+    offset-selection math above."""
+    default_offset = generate_strength_session(2, date(2026, 7, 8), 4, "Re-base", mesocycle_start_week=0)
+    shifted_offset = generate_strength_session(2, date(2026, 7, 8), 4, "Re-base", mesocycle_start_week=1)
+    # local_week=4 with offset 0 is the deload week (light); with offset 1,
+    # local_week=(4-1)%5=3, the last accumulation week (heaviest working set).
+    assert mesocycle_week_local(4, 0) == ACCUMULATION_WEEKS
+    assert mesocycle_week_local(4, 1) == ACCUMULATION_WEEKS - 1
+    default_squat = next(p for p in default_offset.prescriptions if p.pattern == "squat")
+    shifted_squat = next(p for p in shifted_offset.prescriptions if p.pattern == "squat")
+    assert "Deload" in default_squat.note
+    assert "Deload" not in shifted_squat.note
