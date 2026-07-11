@@ -10,6 +10,9 @@ from app.engines.strength import prescribe
 def test_easy_run_softens_on_hr_drift():
     result = evaluate_easy_or_long_run(390, actual_pace_sec_per_km=395, actual_hr=165, hr_ceiling=150)
     assert result.action == "soften"
+    # Regression test for #23: soften must actually slow the prescribed pace
+    # going forward, not just hold it in place with a 0 adjustment.
+    assert result.pace_adjustment_sec_per_km > 0
 
 
 def test_easy_run_holds_on_poor_wellness():
