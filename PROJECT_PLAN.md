@@ -1,22 +1,27 @@
 # Project Plan: MVP -> Full
 
-Status snapshot and the prioritized remaining work. See `SPEC.md` for the original
-build spec and `README.md` for what's already built/confirmed. This file tracks
-what's left and in what order.
+Status snapshot and history of prioritized work beyond the original build spec. See
+`SPEC.md` for the original build spec and `README.md` for what's already
+built/confirmed. Everything this file once tracked as "left to do" is now done --
+it's kept as the historical record of what shipped and why, in the order it shipped.
 
 ## Where things stand
 
 All ten of the spec's build-sequence steps (section 10) are implemented and tested
-(57 passing tests): data model, running periodization engine, RP-style strength
+(175 passing tests): data model, running periodization engine, RP-style strength
 engine, exercise library + substitution, unified calendar with the adjacency
 guardrail, run/strength autoregulation, a confirmed-working intervals.icu
 integration, the daily autoregulation job, a FastAPI backend, and a web UI covering
-today/plan/settings/history/session-detail views. It's deployed and live at
-`training-app-v1.fly.dev`.
+today/plan/settings/history/session-detail views.
 
-What's below is genuinely unbuilt or thin -- not spec gaps exactly, but the gap
-between "MVP works end to end" and "pleasant, complete to actually live with day to
-day."
+Every item below (1-8) is done, and every issue raised after that -- filed and
+tracked directly as GitHub issues (#21-#35) rather than in this file -- is closed
+too (see section 11 near the end). This file is now a complete record of what
+shipped, not a queue of what's left; there is currently nothing open.
+
+**Deployment**: self-hosted via Docker on a home NAS. The original Fly.io deployment
+(`training-app-v1.fly.dev`) was decommissioned once the self-hosted instance was
+confirmed working -- see `README.md`'s "Hosting" section.
 
 ---
 
@@ -214,16 +219,97 @@ Shipped:
   `[earliest stale session's date, yesterday]`, and looks up each stale
   session's wellness by its own date rather than reusing "yesterday's" score
   for every backlog day.
-- **Docker build verification -- confirmed the daemon runs, build blocked by
-  this sandbox's network only**: `docker build` on `backend/Dockerfile` pulls
-  the base image and builds every layer correctly up through `pip install`,
-  which fails here specifically because this sandboxed environment's outbound
-  HTTPS goes through an intercepting proxy the container doesn't trust (a
-  network/CA-trust limitation of this dev sandbox, confirmed by testing both
-  the default bridge network and `--network=host` -- both hit the same
-  self-signed-cert SSL error against pypi.org). The Dockerfile itself is
-  structurally valid; this would build cleanly in a normal (non-proxied)
-  Docker environment such as a developer machine or CI.
+- **Docker build verification -- since fully confirmed on real hardware**: at the time
+  this bullet was first written, `docker build` couldn't complete in this dev sandbox
+  specifically (an intercepting proxy without a trusted CA broke `pip install`'s HTTPS
+  calls) -- the Dockerfile itself was already structurally valid. It has since been
+  built and run for real on the athlete's home NAS (self-hosted deployment, see
+  `README.md`'s "Hosting" section) -- fully confirmed working, no longer a caveat.
+
+---
+
+## 9. Self-hosting: HTTP Basic Auth -- DONE
+
+Once the app moved from Fly.io to self-hosted on a home NAS, there was no access
+control in front of it at all. Added `app/auth_middleware.py`'s `BasicAuthMiddleware`,
+gating every route (pages, API, static assets alike) behind HTTP Basic Auth --
+opt-in via `AUTH_USERNAME`/`AUTH_PASSWORD` env vars, unset by default so existing
+tests/local dev are unaffected. Documented in `README.md`'s Configuration section,
+including the caveat that Basic Auth is unencrypted in transit (fine on a LAN, put
+HTTPS in front before exposing beyond one).
+
+---
+
+## 10. Fix duplicate intervals.icu events on plan regeneration -- DONE
+
+Reported live: shifting a race's plan start date by a single day created duplicate
+workouts on the intervals.icu calendar. Root cause: two bulk-delete call sites
+(`plan_service.py`'s regeneration, and `delete_race`) removed `PlannedSession` rows --
+including their `intervals_icu_event_id` -- without ever telling intervals.icu to
+delete the corresponding event; the regenerated sessions then synced as brand-new
+events, leaving the originals orphaned. Fixed with `intervals_sync.py`'s new
+`delete_synced_events()`, called with the about-to-be-removed rows in hand before
+each bulk delete.
+
+---
+
+## 11. Post-roadmap bug/feature batch (GitHub issues #21-#35) -- DONE
+
+A code-review pass surfaced 14 issues (bugs, enhancements, design questions, and
+features), logged directly to GitHub rather than this file. Every design question was
+resolved with the user before its dependent work was built; every issue is closed.
+
+**Autoregulation correctness (tier 1 -- small, high-impact fixes):**
+- **#21**: easy/long run "progress"/"soften" no longer bleeds pace adjustments into
+  `threshold_pace_sec_per_km`, and quality-session results no longer bleed into
+  `easy_pace_sec_per_km` -- each session role only ever moves its own pace.
+- **#35**: the daily job no longer hardcodes `hit_reps=True` for quality-session
+  progression. Automated matching can still hold/soften a quality session, but never
+  auto-progresses one without a manual confirmation (decided direction, closed #26).
+- **#22**: a transient intervals.icu activity-fetch failure now leaves stale RUN
+  sessions `PLANNED` (retried on the next successful run) instead of marking a
+  phantom `MISSED`. Strength sessions (never dependent on that fetch) are unaffected.
+
+**Autoregulation guardrails (tier 2):**
+- **#23**: "soften" on easy/long runs now actually eases the prescribed pace (`+5s/km`)
+  instead of behaving identically to "hold" (`0` adjustment).
+- **#24**: a hard cap (`MAX_PACE_DRIFT_SEC_PER_KM = 20`) bounds cumulative
+  autoregulated drift from the athlete's profile-set baseline pace, in both directions
+  (decided direction, closed #25 -- a hard cap, not decay-to-baseline or a per-week
+  rate cap). Manually editing paces in Settings re-baselines the clamp. Required a new
+  `AthleteProfile.easy_pace_baseline_sec_per_km`/`threshold_pace_baseline_sec_per_km`
+  pair of columns, added via `db.py`'s additive-migration path (see `README.md`).
+
+**Observability and matching (tier 3):**
+- **#33**: the daily job now records `last_job_run_at`/`last_job_error` on the
+  athlete profile, surfaced as a "Daily job health" card in Settings.
+- **#34**: same-day activity matching now prefers the activity closest in distance to
+  the planned session instead of last-write-wins by fetch order (decided direction,
+  closed #27).
+
+**Strength (tier 4 -- larger features, built last so the data pipeline above was
+trustworthy first):**
+- **#31**: the strength mesocycle's deload week used to tick on its own independent
+  5-week clock regardless of the running plan. `engines/strength.py`'s new
+  `best_mesocycle_offset` nudges the deload week toward the running plan's own
+  down-weeks/taper without forcing exact alignment (decided direction, closed #32 --
+  the two clocks have different periods and can't coincide every cycle). The chosen
+  offset is persisted on a new `Macrocycle.mesocycle_start_week` column so the
+  `/plan` dashboard's mesocycle status can never drift from what was actually used to
+  generate the persisted strength sessions.
+- **#28**: a real strength load/progression model. `engines/strength.py` adds
+  `estimate_e1rm` (Epley formula, decided in closed #29) and `prescribe_next_load`,
+  tracked per movement pattern rather than per specific exercise (also decided in
+  #29, since exercise selection is flexible/self-directed). `evaluate_strength_log`
+  now embeds a concrete kg target into "progress"/"back_off" feedback instead of
+  prose-only guidance, and the log form itself suggests/prefills a weight before the
+  athlete starts a session, based on their most recent log for that pattern. #30
+  (weight/reps/RIR already captured on every log) confirmed no new data-capture work
+  was needed first.
+
+Every dependent design question above was resolved via `AskUserQuestion` before its
+implementation started, following the same pattern as items 6-8's goal-time and
+adjacency-flag decisions.
 
 ---
 
@@ -241,3 +327,11 @@ Shipped:
 7. ~~Goal race time -> pace targets~~ -- done (race-pace segments only, per
    user decision)
 8. ~~Simplify the adjacency-conflict flag~~ -- done (compact badge + tooltip)
+9. ~~Self-hosting: HTTP Basic Auth~~ -- done
+10. ~~Fix duplicate intervals.icu events on plan regeneration~~ -- done
+11. ~~Post-roadmap bug/feature batch (GitHub issues #21-#35)~~ -- done, including
+    #31 (strength mesocycle/running-phase coupling) and #28 (strength
+    load/progression model)
+
+**Nothing is currently open.** Further work would start as a new GitHub issue or a
+new section here, not a resumption of this list.
