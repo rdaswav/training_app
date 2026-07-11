@@ -61,6 +61,9 @@ nav a.active { color: var(--accent); font-weight: 600; }
   padding: 1rem;
   margin-bottom: 1rem;
 }
+.card.session-easy { border-left: 4px solid var(--teal); }
+.card.session-hard { border-left: 4px solid var(--amber); }
+.card.session-strength { border-left: 4px solid var(--violet); }
 .session-type {
   display: inline-block;
   font-size: 0.7rem;
@@ -203,6 +206,9 @@ button {
 .clab.cl-log { background: rgba(94, 112, 133, 0.16); color: var(--muted); }
 .clab.cl-read { background: rgba(53, 196, 174, 0.14); color: var(--teal-hi); }
 .clab.cl-next { background: rgba(245, 166, 35, 0.14); color: var(--amber-hi); }
+.clab.cl-next.dir-up { background: rgba(53, 196, 174, 0.14); color: var(--teal-hi); }
+.clab.cl-next.dir-steady { background: rgba(245, 166, 35, 0.14); color: var(--amber-hi); }
+.clab.cl-next.dir-down { background: rgba(255, 107, 107, 0.14); color: var(--red); }
 .ctxt { font-size: 0.85rem; color: var(--text); line-height: 1.4; }
 .note {
   font-size: 0.8rem;

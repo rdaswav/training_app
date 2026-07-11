@@ -1,9 +1,10 @@
 {% macro _leaf_summary(step) %}{% if step.distance_km %}{{ step.distance_km }} km{% elif step.duration_min %}{{ step.duration_min|duration }}{% endif %}{% if step.target_pace_sec_per_km %} @ <span class="value">{{ step.target_pace_sec_per_km|pace }}</span>{% endif %}{% if step.hr_ceiling %} &middot; HR ceiling <span class="value">{{ step.hr_ceiling }}</span>{% endif %}{% endmacro %}
 
 {% macro session_card(s, show_date=False) %}
-<div class="card" data-session-id="{{ s.id }}">
+{% set intensity = "session-strength" if s.type.value == "strength" else ("session-hard" if s.content.get("role") == "quality" else "session-easy") %}
+<div class="card {{ intensity }}" data-session-id="{{ s.id }}">
   <div class="session-type">
-    {{ s.type.value }} &middot; {{ s.phase_name or "" }}
+    <span class="type-icon">{{ "▸" if s.type.value == "run" else "■" }}</span> {{ s.type.value }} &middot; {{ s.phase_name or "" }}
     {% if show_date %} &middot; {{ s.date.strftime("%a %-d %b") }}{% endif %}
     {% if s.status.value != "planned" %} &middot; {{ s.status.value }}{% endif %}
   </div>
@@ -40,7 +41,7 @@
       <div class="feedback">Completed</div>
     {% endif %}
     <div class="sync-status">
-      {% if s.intervals_icu_event_id %}Synced to intervals.icu &#10003;{% else %}Syncs to intervals.icu ~10 days before session{% endif %}
+      {% if s.intervals_icu_event_id %}&#10003; Synced to intervals.icu{% else %}&#8635; Syncs to intervals.icu ~10 days before session{% endif %}
     </div>
   {% elif s.type.value == "strength" %}
     {% for p in s.content.get("prescriptions", []) %}
@@ -52,7 +53,7 @@
           </div>
         </div>
         {% if p.pattern in s.logged_patterns %}
-          <span class="stat st-done">Logged</span>
+          <span class="stat st-done">&#10003; Logged</span>
         {% else %}
           <form class="log-form" onsubmit="return submitStrengthLog(event, {{ s.id }}, '{{ p.pattern }}')">
             <div class="set-rows">
@@ -79,7 +80,7 @@
   {% endif %}
 
   {% if s.content.get("flagged") %}
-    <span class="stat st-flag" title="{{ s.content.get('note') }}">Conflict</span>
+    <span class="stat st-flag" title="{{ s.content.get('note') }}">&#9888; Conflict</span>
   {% elif s.content.get("note") %}
     <div class="note">{{ s.content.get("note") }}</div>
   {% endif %}

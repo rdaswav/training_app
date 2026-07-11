@@ -58,6 +58,17 @@ function formatPaceSec(sec) {
   return `${m}:${String(s).padStart(2, "0")}/km`;
 }
 
+// Direction the autoregulation loop is nudging next -- shared across run
+// actions (progress/hold/soften) and strength actions (progress/hold/back_off),
+// so the coach card's "Next" row reads at a glance without parsing the text.
+const ACTION_DIRECTION = {
+  progress: "up",
+  hold: "steady",
+  soften: "down",
+  back_off: "down",
+};
+const DIRECTION_ARROW = { up: "▲", steady: "●", down: "▼" };
+
 function buildCoachCard(rows) {
   const coach = document.createElement("div");
   coach.className = "coach";
@@ -69,8 +80,15 @@ function buildCoachCard(rows) {
     const crow = document.createElement("div");
     crow.className = "crow";
     const lab = document.createElement("span");
-    lab.className = `clab ${row.cls}`;
-    lab.textContent = row.label;
+    let cls = row.cls;
+    let labelText = row.label;
+    if (row.action) {
+      const dir = ACTION_DIRECTION[row.action] || "steady";
+      cls += ` dir-${dir}`;
+      labelText = `${DIRECTION_ARROW[dir]} ${labelText}`;
+    }
+    lab.className = `clab ${cls}`;
+    lab.textContent = labelText;
     const ctxt = document.createElement("span");
     ctxt.className = "ctxt";
     ctxt.textContent = row.text;
@@ -172,7 +190,7 @@ async function submitRunComplete(event, sessionId) {
     const coach = buildCoachCard([
       { label: "Did", cls: "cl-log", text: didParts.length ? didParts.join(" · ") : "Logged, no pace/HR entered" },
       { label: "Read", cls: "cl-read", text: result.note },
-      { label: "Next", cls: "cl-next", text: RUN_ACTION_LABELS[result.action] || result.action },
+      { label: "Next", cls: "cl-next", text: RUN_ACTION_LABELS[result.action] || result.action, action: result.action },
     ]);
     card.appendChild(coach);
   } catch (e) {
@@ -217,13 +235,13 @@ async function submitStrengthLog(event, sessionId, pattern) {
     if (swapPicker) swapPicker.remove();
     const badge = document.createElement("span");
     badge.className = "stat st-done";
-    badge.textContent = "Logged";
+    badge.textContent = "✓ Logged";
     prescription.appendChild(badge);
     const target = document.getElementById(`feedback-${sessionId}`);
     const coach = buildCoachCard([
       { label: "Did", cls: "cl-log", text: result.summary },
       { label: "Read", cls: "cl-read", text: result.feedback },
-      { label: "Next", cls: "cl-next", text: result.next_instruction },
+      { label: "Next", cls: "cl-next", text: result.next_instruction, action: result.action },
     ]);
     target.appendChild(coach);
   } catch (e) {
