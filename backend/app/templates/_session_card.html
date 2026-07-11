@@ -1,4 +1,4 @@
-{% macro _leaf_summary(step) %}{% if step.distance_km %}{{ step.distance_km }} km{% elif step.duration_min %}{{ step.duration_min|duration }}{% endif %}{% if step.target_pace_sec_per_km %} @ {{ step.target_pace_sec_per_km|pace }}{% endif %}{% if step.hr_ceiling %} &middot; HR ceiling {{ step.hr_ceiling }}{% endif %}{% endmacro %}
+{% macro _leaf_summary(step) %}{% if step.distance_km %}{{ step.distance_km }} km{% elif step.duration_min %}{{ step.duration_min|duration }}{% endif %}{% if step.target_pace_sec_per_km %} @ <span class="value">{{ step.target_pace_sec_per_km|pace }}</span>{% endif %}{% if step.hr_ceiling %} &middot; HR ceiling <span class="value">{{ step.hr_ceiling }}</span>{% endif %}{% endmacro %}
 
 {% macro session_card(s, show_date=False) %}
 <div class="card" data-session-id="{{ s.id }}">
@@ -24,8 +24,8 @@
           {% if step.distance_km %} &mdash; {{ step.distance_km }} km{% endif %}
           {% if step.duration_min %} &mdash; {{ step.duration_min|duration }}{% endif %}
           <div class="target">
-            {% if step.target_pace_sec_per_km %}Pace {{ step.target_pace_sec_per_km|pace }}{% endif %}
-            {% if step.hr_ceiling %} &middot; HR ceiling {{ step.hr_ceiling }}{% endif %}
+            {% if step.target_pace_sec_per_km %}Pace <span class="value">{{ step.target_pace_sec_per_km|pace }}</span>{% endif %}
+            {% if step.hr_ceiling %} &middot; HR ceiling <span class="value">{{ step.hr_ceiling }}</span>{% endif %}
           </div>
         </div>
       {% endif %}
@@ -47,8 +47,8 @@
       <div class="prescription">
         <div>
           <strong>{{ p.exercise_name or p.pattern }}</strong>
-          <div class="meta">{{ p.pattern }} &middot; {{ p.sets }} x {{ p.reps }} @ RIR {{ p.rir }}
-            {% if s.suggested_loads and s.suggested_loads.get(p.pattern) %} &middot; suggested {{ s.suggested_loads.get(p.pattern) }}kg{% endif %}
+          <div class="meta">{{ p.pattern }} &middot; {{ p.sets }} x {{ p.reps }} @ RIR <span class="value">{{ p.rir }}</span>
+            {% if s.suggested_loads and s.suggested_loads.get(p.pattern) %} &middot; suggested <span class="value">{{ s.suggested_loads.get(p.pattern) }}kg</span>{% endif %}
           </div>
         </div>
         {% if p.pattern in s.logged_patterns %}
