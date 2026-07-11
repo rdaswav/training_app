@@ -206,6 +206,9 @@ button {
 .clab.cl-log { background: rgba(94, 112, 133, 0.16); color: var(--muted); }
 .clab.cl-read { background: rgba(53, 196, 174, 0.14); color: var(--teal-hi); }
 .clab.cl-next { background: rgba(245, 166, 35, 0.14); color: var(--amber-hi); }
+.clab.cl-next.dir-up { background: rgba(53, 196, 174, 0.14); color: var(--teal-hi); }
+.clab.cl-next.dir-steady { background: rgba(245, 166, 35, 0.14); color: var(--amber-hi); }
+.clab.cl-next.dir-down { background: rgba(255, 107, 107, 0.14); color: var(--red); }
 .ctxt { font-size: 0.85rem; color: var(--text); line-height: 1.4; }
 .note {
   font-size: 0.8rem;

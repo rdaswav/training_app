@@ -147,7 +147,7 @@
                       {% elif s.type.value == "strength" %}{{ s.content.get("prescriptions", [])|length }} patterns{% endif %}
                       {% if s.status.value != "planned" %} &middot; {{ s.status.value }}{% endif %}
                     </span>
-                    {% if s.content.get("flagged") %}<span class="stat st-flag" title="{{ s.content.get('note') }}">Conflict</span>
+                    {% if s.content.get("flagged") %}<span class="stat st-flag" title="{{ s.content.get('note') }}">&#9888; Conflict</span>
                     {% elif s.content.get("note") %}<div class="note">{{ s.content.get("note") }}</div>{% endif %}
                   {% else %}
                     <span class="empty">Rest</span>

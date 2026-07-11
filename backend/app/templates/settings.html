@@ -82,9 +82,9 @@
     {% if athlete.last_job_run_at %}
       <p class="meta">Last run: {{ athlete.last_job_run_at.strftime("%Y-%m-%d %H:%M UTC") }}</p>
       {% if athlete.last_job_error %}
-        <span class="stat st-flag" title="{{ athlete.last_job_error }}">Last run failed</span>
+        <span class="stat st-flag" title="{{ athlete.last_job_error }}">&#9888; Last run failed</span>
       {% else %}
-        <span class="stat st-done">Last run OK</span>
+        <span class="stat st-done">&#10003; Last run OK</span>
       {% endif %}
     {% else %}
       <p class="meta">The daily autoregulation job hasn't run yet.</p>
