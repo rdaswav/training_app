@@ -4,7 +4,7 @@ from app.engines.autoregulation import (
     evaluate_quality_session,
     evaluate_strength_log,
 )
-from app.engines.strength import prescribe
+from app.engines.strength import best_e1rm_from_sets, prescribe, prescribe_next_load
 
 
 def test_easy_run_softens_on_hr_drift():
@@ -61,3 +61,47 @@ def test_strength_log_no_sets_logged():
     prescription = prescribe("squat", "compound", local_week=0, mode="accumulate")
     result = evaluate_strength_log(prescription, [])
     assert result.action == "hold"
+
+
+def test_strength_log_back_off_includes_a_reduced_kg_target():
+    """Regression test for #28: 'back_off' must include an actual kg target
+    (~7.5% below the recomputed load, per the note's own '5-10%' guidance),
+    not just the prose label."""
+    prescription = prescribe("squat", "compound", local_week=2, mode="accumulate")
+    logged = [StrengthLogSet(reps=2, weight_kg=80, rir_actual=0.5)]
+    result = evaluate_strength_log(prescription, logged)
+
+    e1rm = best_e1rm_from_sets(logged)
+    expected_load = round(prescribe_next_load(e1rm, prescription.reps, prescription.rir) * 0.925, 1)
+    assert result.action == "back_off"
+    assert f"{expected_load}kg" in result.next_instruction
+
+
+def test_strength_log_progress_includes_a_kg_target_for_next_session():
+    """Regression test for #28: 'progress' must include an actual kg target
+    for the next session, not just 'add load or a rep'."""
+    prescription = prescribe("squat", "compound", local_week=0, mode="accumulate")
+    logged = [StrengthLogSet(reps=5, weight_kg=80, rir_actual=5.0)]
+    result = evaluate_strength_log(prescription, logged)
+
+    e1rm = best_e1rm_from_sets(logged)
+    expected_load = prescribe_next_load(e1rm, prescription.reps, prescription.rir)
+    assert result.action == "progress"
+    assert f"{expected_load}kg" in result.next_instruction
+
+
+def test_strength_log_hold_keeps_plain_prose_without_a_recomputed_number():
+    """'Hold' means repeat exactly what was just done -- a recomputed
+    e1RM-based number could contradict that (e.g. suggest less than what was
+    actually lifted while grinding at low RIR), so it stays plain prose."""
+    prescription = prescribe("squat", "compound", local_week=0, mode="accumulate")
+    logged = [StrengthLogSet(reps=5, weight_kg=80, rir_actual=0.5)]
+    result = evaluate_strength_log(prescription, logged)
+    assert result.action == "hold"
+    assert "same load" in result.next_instruction.lower()
+
+
+def test_strength_log_no_sets_logged_has_no_kg_target():
+    prescription = prescribe("squat", "compound", local_week=0, mode="accumulate")
+    result = evaluate_strength_log(prescription, [])
+    assert "kg" not in result.next_instruction

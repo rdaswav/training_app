@@ -47,7 +47,9 @@
       <div class="prescription">
         <div>
           <strong>{{ p.exercise_name or p.pattern }}</strong>
-          <div class="meta">{{ p.pattern }} &middot; {{ p.sets }} x {{ p.reps }} @ RIR {{ p.rir }}</div>
+          <div class="meta">{{ p.pattern }} &middot; {{ p.sets }} x {{ p.reps }} @ RIR {{ p.rir }}
+            {% if s.suggested_loads and s.suggested_loads.get(p.pattern) %} &middot; suggested {{ s.suggested_loads.get(p.pattern) }}kg{% endif %}
+          </div>
         </div>
         {% if p.pattern in s.logged_patterns %}
           <span class="stat st-done">Logged</span>
@@ -57,7 +59,7 @@
               {% for i in range(p.sets) %}
                 <div class="set-row">
                   <input class="set-reps" type="number" placeholder="reps" required>
-                  <input class="set-weight" type="number" step="0.5" placeholder="kg" required>
+                  <input class="set-weight" type="number" step="0.5" placeholder="kg" value="{{ s.suggested_loads.get(p.pattern) if s.suggested_loads and s.suggested_loads.get(p.pattern) else '' }}" required>
                   <input class="set-rir" type="number" step="0.5" placeholder="RIR">
                   <button type="button" class="set-remove" onclick="removeSetRow(this)">&times;</button>
                 </div>

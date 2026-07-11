@@ -12,6 +12,7 @@ from app.auth_middleware import BasicAuthMiddleware
 from app.config import DAILY_JOB_HOUR, ENABLE_SCHEDULER
 from app.db import SessionLocal, init_db
 from app.engines import dashboard_summary, load_summary
+from app.engines import strength as strength_engine
 from app.engines.running import week_start
 from app.jobs.daily_autoregulation import run_daily_job
 from app.models import CompletedSession, PlannedSession, Race, SessionType
@@ -100,6 +101,35 @@ def _attach_logged_patterns(db, sessions: list[PlannedSession]) -> None:
     for s in sessions:
         if s.type == SessionType.STRENGTH:
             s.logged_patterns = by_session.get(s.id, set())
+
+
+def _attach_suggested_loads(db, athlete, sessions: list[PlannedSession]) -> None:
+    """For each strength session, attach a `suggested_loads` dict (pattern ->
+    kg) computed from the athlete's most recent logged session for that
+    movement pattern (see #28) -- a concrete weight to load before starting,
+    not just a progress/hold/back-off label after the fact."""
+    strength_sessions = [s for s in sessions if s.type == SessionType.STRENGTH]
+    if not strength_sessions:
+        return
+    completed = (
+        db.query(CompletedSession)
+        .join(PlannedSession, CompletedSession.planned_session_id == PlannedSession.id)
+        .filter(PlannedSession.athlete_id == athlete.id, PlannedSession.type == SessionType.STRENGTH)
+        .order_by(CompletedSession.date.desc())
+        .limit(200)
+        .all()
+    )
+    completed_rows = [{"pattern": c.actual.get("pattern"), "sets": c.actual.get("sets", [])} for c in completed]
+    e1rm_by_pattern = strength_engine.latest_e1rm_by_pattern(completed_rows)
+    for s in strength_sessions:
+        suggested = {}
+        for p in s.content.get("prescriptions", []):
+            e1rm = e1rm_by_pattern.get(p["pattern"])
+            if e1rm:
+                suggested[p["pattern"]] = strength_engine.prescribe_next_load(e1rm, p["reps"], p["rir"])
+        s.suggested_loads = suggested
+
+
 templates.env.globals["timedelta"] = timedelta
 
 
@@ -141,6 +171,7 @@ def today_view(request: Request):
             .all()
         )
         _attach_logged_patterns(db, sessions)
+        _attach_suggested_loads(db, athlete, sessions)
         race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
         days_to_race = (race.race_date - today).days if race else None
         return templates.TemplateResponse(
@@ -290,7 +321,9 @@ def session_view(session_id: int, request: Request):
         session = db.query(PlannedSession).filter(PlannedSession.id == session_id).first()
         if not session:
             raise HTTPException(404, "Session not found")
+        athlete = get_or_create_athlete(db)
         _attach_logged_patterns(db, [session])
+        _attach_suggested_loads(db, athlete, [session])
         return templates.TemplateResponse("session.html", {"request": request, "s": session, "active": None})
     finally:
         db.close()
