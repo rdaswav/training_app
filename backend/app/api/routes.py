@@ -55,8 +55,16 @@ def get_athlete(db: Session = Depends(get_db)):
 @router.put("/athlete", response_model=AthleteOut)
 def update_athlete(payload: AthleteUpdate, db: Session = Depends(get_db)):
     athlete = get_or_create_athlete(db)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    fields = payload.model_dump(exclude_unset=True)
+    for field, value in fields.items():
         setattr(athlete, field, value)
+    # A manually-edited pace re-baselines the daily job's drift clamp (#24) --
+    # the athlete is confirming this is their actual current fitness, not an
+    # autoregulated adjustment to be bounded against the old baseline.
+    if "easy_pace_sec_per_km" in fields:
+        athlete.easy_pace_baseline_sec_per_km = fields["easy_pace_sec_per_km"]
+    if "threshold_pace_sec_per_km" in fields:
+        athlete.threshold_pace_baseline_sec_per_km = fields["threshold_pace_sec_per_km"]
     db.commit()
     db.refresh(athlete)
     return athlete

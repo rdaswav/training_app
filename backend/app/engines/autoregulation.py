@@ -29,7 +29,7 @@ def evaluate_easy_or_long_run(
     wellness_ok: bool = True,
 ) -> RunAutoregResult:
     if actual_hr is not None and actual_hr > hr_ceiling + 5:
-        return RunAutoregResult("soften", 0, "HR drifted above the aerobic ceiling -- hold volume, soften next quality session.")
+        return RunAutoregResult("soften", 5, "HR drifted above the aerobic ceiling -- ease prescribed pace, soften next quality session.")
     if not wellness_ok:
         return RunAutoregResult("hold", 0, "Wellness flagged (poor sleep/HRV) -- hold current paces and volume.")
     if (

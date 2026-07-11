@@ -77,6 +77,20 @@
     {% endif %}
   </div>
 
+  <div class="card">
+    <h3>Daily job health</h3>
+    {% if athlete.last_job_run_at %}
+      <p class="meta">Last run: {{ athlete.last_job_run_at.strftime("%Y-%m-%d %H:%M UTC") }}</p>
+      {% if athlete.last_job_error %}
+        <span class="stat st-flag" title="{{ athlete.last_job_error }}">Last run failed</span>
+      {% else %}
+        <span class="stat st-done">Last run OK</span>
+      {% endif %}
+    {% else %}
+      <p class="meta">The daily autoregulation job hasn't run yet.</p>
+    {% endif %}
+  </div>
+
   <script src="/static/app.js"></script>
 </body>
 </html>

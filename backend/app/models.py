@@ -48,6 +48,18 @@ class AthleteProfile(Base):
     aerobic_hr_ceiling: Mapped[int] = mapped_column(Integer, default=150)
     max_hr: Mapped[int] = mapped_column(Integer, default=185)
 
+    # The athlete's last manually-set (profile-edit) paces -- the reference point
+    # the daily job's cumulative autoregulated drift is bounded against (see
+    # engines/autoregulation.py's drift clamp). Re-baselined whenever the
+    # athlete edits paces directly in Settings.
+    easy_pace_baseline_sec_per_km: Mapped[int] = mapped_column(Integer, default=390)
+    threshold_pace_baseline_sec_per_km: Mapped[int] = mapped_column(Integer, default=330)
+
+    # Daily autoregulation job health, surfaced in Settings so a silent failure
+    # shows up immediately rather than only as gaps in training history.
+    last_job_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
+    last_job_error: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+
     # Available days: fixed defaults (3 run, 3 strength, 1 rest) but stored so it's editable.
     week_template: Mapped[dict] = mapped_column(JSON, default=dict)
 

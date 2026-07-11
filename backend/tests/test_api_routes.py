@@ -13,6 +13,33 @@ def test_get_athlete_creates_default_on_first_call(client):
     assert body["injury_flags"] == []
 
 
+def test_manually_editing_paces_rebaselines_the_drift_clamp(client):
+    """Regression test for #24: a manual pace edit in Settings is the athlete
+    confirming this is their real current fitness, so it must reset the
+    baseline the daily job's drift clamp is bounded against -- not just move
+    the current pace while leaving the old baseline in place."""
+    client.get("/api/athlete")  # create the default athlete row
+
+    resp = client.put(
+        "/api/athlete",
+        json={"easy_pace_sec_per_km": 360, "threshold_pace_sec_per_km": 300},
+    )
+    assert resp.status_code == 200
+
+    from app.db import SessionLocal
+    from app.models import AthleteProfile
+
+    db = SessionLocal()
+    try:
+        athlete = db.query(AthleteProfile).first()
+        assert athlete.easy_pace_sec_per_km == 360
+        assert athlete.easy_pace_baseline_sec_per_km == 360
+        assert athlete.threshold_pace_sec_per_km == 300
+        assert athlete.threshold_pace_baseline_sec_per_km == 300
+    finally:
+        db.close()
+
+
 def test_create_race_returns_race_and_generates_plan(client):
     payload = {
         "name": "Test Half",
