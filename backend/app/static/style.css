@@ -77,6 +77,12 @@ nav a.active { color: var(--accent); font-weight: 600; }
 }
 .step:last-child { border-bottom: none; }
 .step .target { color: var(--muted); font-size: 0.85rem; font-family: var(--mono); }
+.step .value, .prescription .meta .value {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 1.15rem;
+  font-family: var(--mono);
+}
 .sync-status { color: var(--muted); font-size: 0.8rem; margin-top: 0.5rem; font-family: var(--mono); }
 .stat {
   font-family: var(--mono);
