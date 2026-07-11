@@ -90,6 +90,41 @@ def is_deload_week(local_week: int) -> bool:
     return local_week >= ACCUMULATION_WEEKS
 
 
+def _running_recovery_weeks(total_weeks: int, taper_start: int) -> set[int]:
+    """Weeks the running plan already treats as lower-load: its down-weeks
+    (engines/running.py's is_down_week -- every 4th week) plus every Taper
+    week (see #31)."""
+    from app.engines.running import is_down_week
+
+    return {i for i in range(total_weeks) if is_down_week(i, taper_start) or i >= taper_start}
+
+
+def best_mesocycle_offset(total_weeks: int, taper_start: int) -> int:
+    """Nudges the strength mesocycle's deload week toward the running plan's
+    down-weeks/taper without forcing exact alignment every cycle -- the two
+    clocks have different periods (4 vs 5 weeks), so they can't coincide on
+    every repeat; forcing it would mean stretching/compressing the strength
+    mesocycle's length instead (rejected -- see #31's decision).
+
+    Picks whichever of the MESOCYCLE_LENGTH possible start offsets minimizes
+    the total distance from each deload week to its nearest running
+    down-week/taper week across the whole macrocycle."""
+    targets = sorted(_running_recovery_weeks(total_weeks, taper_start))
+    if not targets:
+        return 0
+
+    def _nearest_distance(week: int) -> int:
+        return min(abs(week - t) for t in targets)
+
+    best_offset, best_total = 0, None
+    for offset in range(MESOCYCLE_LENGTH):
+        deload_weeks = [i for i in range(total_weeks) if (i - offset) % MESOCYCLE_LENGTH == ACCUMULATION_WEEKS]
+        total_distance = sum(_nearest_distance(w) for w in deload_weeks)
+        if best_total is None or total_distance < best_total:
+            best_offset, best_total = offset, total_distance
+    return best_offset
+
+
 def _reps_for(category: str) -> str:
     # Compounds stay in the 3-5 rep strength range; accessories/core higher-rep (spec section 6).
     return "3-5" if category == "compound" else "8-12"
@@ -168,9 +203,13 @@ def generate_strength_plan(
     start_date: date,
     total_weeks: int,
     phase_for_week_index,  # callable: int -> phase name, from the running engine
+    mesocycle_start_week: int = 0,
 ) -> list[StrengthSessionPlan]:
     """Generate strength sessions for every week of the macrocycle, on the fixed
-    Mon/Wed/Fri template, modulated by race proximity."""
+    Mon/Wed/Fri template, modulated by race proximity. `mesocycle_start_week`
+    should be best_mesocycle_offset's output, computed by the caller once
+    against the same running plan (see #31) -- defaults to 0 (the old,
+    phase-unaware behavior) for callers that don't care."""
     from app.engines.running import week_start
 
     base_monday = week_start(start_date)
@@ -180,7 +219,7 @@ def generate_strength_plan(
         phase_name = phase_for_week_index(week_index)
         for weekday in DAY_TEMPLATE:
             session_date = week_monday + timedelta(days=weekday)
-            session = generate_strength_session(weekday, session_date, week_index, phase_name)
+            session = generate_strength_session(weekday, session_date, week_index, phase_name, mesocycle_start_week)
             if session:
                 sessions.append(session)
     return sessions

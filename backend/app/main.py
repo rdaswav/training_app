@@ -233,8 +233,9 @@ def plan_view(request: Request):
             all_races = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).all()
             race_dicts = [{"name": r.name, "race_date": r.race_date, "priority": r.priority.value} for r in all_races]
             flags = dashboard_summary.race_flags(race_dicts, start, end)
+            mesocycle_start_week = (race.macrocycle.mesocycle_start_week or 0) if race.macrocycle else 0
             mesocycle_status = dashboard_summary.strength_mesocycle_status(
-                week_idx, current_phase["name"] if current_phase else "Re-base"
+                week_idx, current_phase["name"] if current_phase else "Re-base", mesocycle_start_week
             )
 
         volume_delta_pct = None

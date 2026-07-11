@@ -161,7 +161,12 @@ def generate_and_persist_plan(
         .all()
     }
 
-    macrocycle = Macrocycle(race_id=race.id, start_date=macro_start, end_date=macro_end)
+    taper_start = next(p.start_week for p in phases if p.name == "Taper")
+    mesocycle_start_week = strength_engine.best_mesocycle_offset(total_weeks, taper_start)
+
+    macrocycle = Macrocycle(
+        race_id=race.id, start_date=macro_start, end_date=macro_end, mesocycle_start_week=mesocycle_start_week
+    )
     db.add(macrocycle)
     db.flush()
 
@@ -187,7 +192,9 @@ def generate_and_persist_plan(
     def phase_name_for_week(week_index: int) -> str:
         return running_engine.phase_for_week(phases, week_index).name
 
-    strength_sessions = strength_engine.generate_strength_plan(macro_start, total_weeks, phase_name_for_week)
+    strength_sessions = strength_engine.generate_strength_plan(
+        macro_start, total_weeks, phase_name_for_week, mesocycle_start_week=mesocycle_start_week
+    )
     strength_session_dicts = []
     for s in strength_sessions:
         prescriptions = _select_exercises(db, s.prescriptions, athlete.injury_flags or [])

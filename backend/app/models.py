@@ -94,6 +94,14 @@ class Macrocycle(Base):
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
 
+    # The strength mesocycle clock's start-week offset, chosen at generation
+    # time to nudge its deload week toward the running plan's down-weeks/
+    # taper (see engines/strength.py's best_mesocycle_offset, #31). Stored
+    # here rather than recomputed on every view so the displayed mesocycle
+    # status can never drift from what was actually used to generate the
+    # persisted strength sessions.
+    mesocycle_start_week: Mapped[int] = mapped_column(Integer, default=0)
+
     race: Mapped["Race"] = relationship(back_populates="macrocycle")
     phases: Mapped[list["Phase"]] = relationship(
         back_populates="macrocycle", cascade="all, delete-orphan", order_by="Phase.start_date"
