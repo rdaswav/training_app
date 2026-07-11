@@ -61,6 +61,9 @@ nav a.active { color: var(--accent); font-weight: 600; }
   padding: 1rem;
   margin-bottom: 1rem;
 }
+.card.session-easy { border-left: 4px solid var(--teal); }
+.card.session-hard { border-left: 4px solid var(--amber); }
+.card.session-strength { border-left: 4px solid var(--violet); }
 .session-type {
   display: inline-block;
   font-size: 0.7rem;
