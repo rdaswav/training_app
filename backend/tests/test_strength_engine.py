@@ -4,14 +4,19 @@ from app.engines.strength import (
     ACCUMULATION_WEEKS,
     MESOCYCLE_LENGTH,
     all_prescriptions_logged,
+    best_e1rm_from_sets,
     best_mesocycle_offset,
+    estimate_e1rm,
     generate_strength_session,
     is_deload_week,
+    latest_e1rm_by_pattern,
     mesocycle_week_local,
     prescribe,
+    prescribe_next_load,
     race_proximity_mode,
     select_exercise,
 )
+from app.engines.autoregulation import StrengthLogSet
 
 
 def test_race_proximity_mode_table():
@@ -161,3 +166,59 @@ def test_generate_strength_session_honors_a_nonzero_mesocycle_offset():
     shifted_squat = next(p for p in shifted_offset.prescriptions if p.pattern == "squat")
     assert "Deload" in default_squat.note
     assert "Deload" not in shifted_squat.note
+
+
+def test_estimate_e1rm_uses_epley_formula():
+    # Epley: 1RM = weight * (1 + reps/30) -- decided formula, see #29.
+    assert estimate_e1rm(100, 5) == 100 * (1 + 5 / 30)
+
+
+def test_estimate_e1rm_single_rep_is_just_the_weight():
+    assert estimate_e1rm(100, 1) == 100
+    assert estimate_e1rm(100, 0) == 100  # guarded degenerate case
+
+
+def test_best_e1rm_from_sets_takes_the_highest_implied_1rm_not_the_average():
+    sets = [StrengthLogSet(reps=5, weight_kg=100), StrengthLogSet(reps=3, weight_kg=110)]
+    # 5x100 implies e1rm 116.7; 3x110 implies e1rm 121.0 -- the later, heavier
+    # set is the better estimate even though it's fewer reps.
+    assert best_e1rm_from_sets(sets) == estimate_e1rm(110, 3)
+
+
+def test_best_e1rm_from_sets_returns_none_for_no_sets():
+    assert best_e1rm_from_sets([]) is None
+
+
+def test_latest_e1rm_by_pattern_takes_the_first_row_per_pattern():
+    """Rows are expected latest-first (as strength_history_view's own query
+    already returns them) -- a pattern's SECOND row (older) must be ignored,
+    not averaged in."""
+    rows = [
+        {"pattern": "squat", "sets": [{"reps": 5, "weight_kg": 100}]},
+        {"pattern": "squat", "sets": [{"reps": 5, "weight_kg": 90}]},  # older -- must be ignored
+        {"pattern": "hinge", "sets": [{"reps": 5, "weight_kg": 80}]},
+    ]
+    result = latest_e1rm_by_pattern(rows)
+    assert result["squat"] == estimate_e1rm(100, 5)
+    assert result["hinge"] == estimate_e1rm(80, 5)
+
+
+def test_latest_e1rm_by_pattern_skips_rows_with_no_sets_or_no_pattern():
+    rows = [{"pattern": None, "sets": [{"reps": 5, "weight_kg": 100}]}, {"pattern": "squat", "sets": []}]
+    assert latest_e1rm_by_pattern(rows) == {}
+
+
+def test_prescribe_next_load_projects_e1rm_at_the_target_rep_rir():
+    e1rm = estimate_e1rm(100, 5)  # 116.67
+    # target_reps = midpoint of "3-5" = 4; effective_reps = 4 + rir(2) = 6.
+    expected = round(e1rm / (1 + 6 / 30), 1)
+    assert prescribe_next_load(e1rm, "3-5", 2) == expected
+
+
+def test_prescribe_next_load_lower_rir_target_prescribes_more_weight():
+    # A harder (lower RIR) target implies fewer effective reps-to-failure,
+    # so the same e1RM should prescribe *more* weight, not less.
+    e1rm = estimate_e1rm(100, 5)
+    easier = prescribe_next_load(e1rm, "3-5", rir=3)
+    harder = prescribe_next_load(e1rm, "3-5", rir=1)
+    assert harder > easier

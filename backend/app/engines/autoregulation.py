@@ -84,30 +84,41 @@ def evaluate_strength_log(prescription, logged_sets: list[StrengthLogSet]) -> St
     if not logged_sets:
         return StrengthAutoregResult("No sets logged.", "Nothing to evaluate.", "Log sets next session.", "hold")
 
+    from app.engines.strength import best_e1rm_from_sets, prescribe_next_load
+
     lo, _hi = _parse_rep_range(prescription.reps)
     hit_reps = all(s.reps >= lo for s in logged_sets)
     rir_values = [s.rir_actual for s in logged_sets if s.rir_actual is not None]
     avg_rir = sum(rir_values) / len(rir_values) if rir_values else None
+    e1rm = best_e1rm_from_sets(logged_sets)
+    # Project today's e1RM forward at this same prescription's rep/RIR target
+    # -- a concrete kg number for "next session," not just a progress/hold/
+    # back-off label (see #28).
+    next_load = prescribe_next_load(e1rm, prescription.reps, prescription.rir) if e1rm else None
 
     first = logged_sets[0]
     summary = f"{len(logged_sets)}x{first.reps}x{first.weight_kg}kg logged for {prescription.pattern} (target {prescription.sets}x{prescription.reps} @ RIR {prescription.rir})"
 
     if not hit_reps:
+        back_off_load = round(next_load * 0.925, 1) if next_load else None  # ~7.5%, midpoint of "5-10%"
+        instruction = (
+            f"Back off: aim for ~{back_off_load}kg next session (reduce load ~7.5%)."
+            if back_off_load is not None
+            else "Back off: reduce load 5-10% or drop a set next session."
+        )
         return StrengthAutoregResult(
-            summary, "Missed target reps -- fatigue outpaced the prescription.",
-            "Back off: reduce load 5-10% or drop a set next session.", "back_off",
+            summary, "Missed target reps -- fatigue outpaced the prescription.", instruction, "back_off",
         )
     if avg_rir is not None and avg_rir < max(prescription.rir - 1, 0):
         return StrengthAutoregResult(
             summary, "Reps hit but well under target RIR -- grinding, high fatigue cost.",
             "Hold: repeat the same load/reps next session.", "hold",
         )
+    instruction = f"Progress: aim for ~{next_load}kg next session." if next_load is not None else "Progress: add load or a rep next session."
     if avg_rir is not None and avg_rir > prescription.rir + 1.5:
         return StrengthAutoregResult(
-            summary, "Reps hit with a lot left in reserve -- undershooting the prescribed effort.",
-            "Progress: add load or a rep next session.", "progress",
+            summary, "Reps hit with a lot left in reserve -- undershooting the prescribed effort.", instruction, "progress",
         )
     return StrengthAutoregResult(
-        summary, "Reps and effort landed in the target window.",
-        "Progress: add load or a rep next session.", "progress",
+        summary, "Reps and effort landed in the target window.", instruction, "progress",
     )

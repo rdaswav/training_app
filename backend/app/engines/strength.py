@@ -125,6 +125,61 @@ def best_mesocycle_offset(total_weeks: int, taper_start: int) -> int:
     return best_offset
 
 
+def _parse_rep_range(reps: str) -> tuple[int, int]:
+    lo, hi = reps.split("-")
+    return int(lo), int(hi)
+
+
+def estimate_e1rm(weight_kg: float, reps: int) -> float:
+    """Epley formula (decided direction, see #29): 1RM = weight * (1 + reps/30).
+    A single-rep set is just the weight itself, Epley's formula degenerates
+    to that at reps=1 anyway but reps<=1 is guarded explicitly for reps=0."""
+    if reps <= 1:
+        return weight_kg
+    return weight_kg * (1 + reps / 30)
+
+
+def best_e1rm_from_sets(logged_sets) -> float | None:
+    """logged_sets: objects with .weight_kg/.reps (StrengthLogSet or
+    equivalent). Takes the single best (highest-implied-1RM) set rather than
+    an average -- a fatigued later set in the same session underestimates
+    true current capacity."""
+    if not logged_sets:
+        return None
+    return max(estimate_e1rm(s.weight_kg, s.reps) for s in logged_sets)
+
+
+def latest_e1rm_by_pattern(completed_rows: list[dict]) -> dict[str, float]:
+    """completed_rows: [{"pattern": str, "sets": [{"reps": int, "weight_kg": float, ...}, ...]}, ...],
+    ordered most-recent-first (as strength_history_view's query already
+    returns them) -- tracked per movement pattern rather than per specific
+    exercise (decided direction, see #29), since exercise selection is
+    flexible/self-directed and isn't tracked as one continuous lift history.
+    Returns each pattern's e1RM from its single most recent logged session,
+    the "current" fitness estimate prescribe_next_load projects from."""
+    result: dict[str, float] = {}
+    for row in completed_rows:
+        pattern = row.get("pattern")
+        if not pattern or pattern in result:
+            continue  # rows are latest-first -- first hit per pattern is the most recent
+        sets = row.get("sets") or []
+        if not sets:
+            continue
+        result[pattern] = max(estimate_e1rm(s["weight_kg"], s["reps"]) for s in sets)
+    return result
+
+
+def prescribe_next_load(e1rm: float, reps: str, rir: float) -> float:
+    """Given an e1RM (per movement pattern) and a target rep-range/RIR
+    prescription, back out an actual kg working-weight target via Epley:
+    treats (target reps + RIR) as the approximate reps-to-failure the
+    working weight should be pegged against."""
+    lo, hi = _parse_rep_range(reps)
+    target_reps = (lo + hi) / 2
+    effective_reps = max(target_reps + rir, 1)
+    return round(e1rm / (1 + effective_reps / 30), 1)
+
+
 def _reps_for(category: str) -> str:
     # Compounds stay in the 3-5 rep strength range; accessories/core higher-rep (spec section 6).
     return "3-5" if category == "compound" else "8-12"
