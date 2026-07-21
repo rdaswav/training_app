@@ -24,7 +24,7 @@
 
   {% from "_session_card.html" import session_card %}
   {% for s in sessions %}
-    {{ session_card(s) }}
+    {{ session_card(s, cue=cues.get(s.id)) }}
   {% endfor %}
 
   <script src="/static/app.js"></script>

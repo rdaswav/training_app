@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About - Training App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  {% include "_nav.html" %}
+
+  <div class="header">
+    <span class="eyebrow">How this plan works</span>
+    <h1>Program &amp; Coaching Notes</h1>
+  </div>
+
+  {% if race %}
+    <div class="card">
+      <h3>Right now</h3>
+      <div class="status-line">
+        <span class="pill live">{{ race.name|upper }}</span>
+        <span class="pill">PRIORITY {{ race.priority.value|upper }}</span>
+      </div>
+      <p class="goal">
+        {{ race.distance_km }} km on {{ race.race_date.strftime("%a %-d %b %Y") }}
+        {% if weeks_out is not none %} &middot; {{ weeks_out }} weeks out{% endif %}
+      </p>
+      {% if current_phase_name %}
+        <div class="mrow"><span class="l">Current phase</span><span class="v">{{ current_phase_name }}</span></div>
+        <p class="note">{{ phase_copy.get(current_phase_name) }}</p>
+      {% endif %}
+      {% if mesocycle_status %}
+        <div class="mrow"><span class="l">Strength mode</span><span class="v">{{ mesocycle_status.mode }}</span></div>
+        <p class="note">{{ mode_copy.get(mesocycle_status.mode) }}</p>
+      {% endif %}
+    </div>
+  {% else %}
+    <p class="empty">No race configured yet. POST to /api/races to generate a plan.</p>
+  {% endif %}
+
+  <div class="card">
+    <h3>Two systems, one plan</h3>
+    <p>
+      This program runs two training systems in parallel: a run periodization engine
+      that ramps volume and intensity toward race day, and an RP-style strength engine
+      (MEV &rarr; MAV &rarr; MRV &rarr; deload) that builds and maintains strength around it.
+      They aren't independent -- the strength mesocycle's deload week is nudged to land
+      near the running plan's own down-weeks and taper, so both systems back off at the
+      same time instead of fighting each other.
+    </p>
+    <p>
+      The calendar also enforces one guardrail: a hard lower-body strength session
+      shouldn't sit right before a key quality run. When there's no free day to shuffle
+      a session into, the calendar flags the conflict instead of silently letting it
+      slide -- worth a glance, not a blocker.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>The phases</h3>
+    <div class="stats">
+      {% for name in phase_order %}
+        <div class="card{% if name == current_phase_name %} session-hard{% endif %}">
+          <h3>{{ name }}{% if name == current_phase_name %} &middot; now{% endif %}</h3>
+          <p>{{ phase_copy.get(name) }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Strength modes</h3>
+    <div class="stats">
+      {% for mode_name, copy in mode_copy.items() %}
+        <div class="card{% if mesocycle_status and mode_name == mesocycle_status.mode %} session-strength{% endif %}">
+          <h3>{{ mode_name|capitalize }}{% if mesocycle_status and mode_name == mesocycle_status.mode %} &middot; now{% endif %}</h3>
+          <p>{{ copy }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Why the plan moves</h3>
+    <p>
+      Run paces and HR ceilings autoregulate off real sessions, not just the calendar --
+      but only within a bounded drift from your profile-set baseline, so a couple of
+      rough weeks can't drag the whole plan off course.
+    </p>
+    <p>
+      Strength progression works the same way: sets and RIR move based on what you
+      actually log, with the load target computed from your own estimated 1RM rather
+      than a generic percentage table. Both systems are trying to do the same thing --
+      react to how training is actually going, inside guardrails that keep the plan honest.
+    </p>
+  </div>
+
+</body>
+</html>

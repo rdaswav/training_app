@@ -73,6 +73,12 @@ nav a.active { color: var(--accent); font-weight: 600; }
   margin-bottom: 0.25rem;
   font-family: var(--mono);
 }
+.cue {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-style: italic;
+  margin: 0 0 0.6rem;
+}
 .step {
   padding: 0.4rem 0;
   border-bottom: 1px dashed var(--border);

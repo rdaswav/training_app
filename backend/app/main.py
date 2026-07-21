@@ -11,7 +11,7 @@ from app.api.routes import get_or_create_athlete, router
 from app.auth_middleware import BasicAuthMiddleware
 from app.config import DAILY_JOB_HOUR, ENABLE_SCHEDULER
 from app.db import SessionLocal, init_db
-from app.engines import dashboard_summary, load_summary
+from app.engines import coaching_copy, dashboard_summary, load_summary
 from app.engines import strength as strength_engine
 from app.engines.running import week_start
 from app.jobs.daily_autoregulation import run_daily_job
@@ -174,9 +174,31 @@ def today_view(request: Request):
         _attach_suggested_loads(db, athlete, sessions)
         race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
         days_to_race = (race.race_date - today).days if race else None
+
+        current_phase_name = None
+        mesocycle_mode = None
+        if race and race.macrocycle:
+            phases = [{"name": p.name, "start_date": p.start_date, "end_date": p.end_date} for p in race.macrocycle.phases]
+            current_phase = dashboard_summary.active_phase(phases, today)
+            current_phase_name = current_phase["name"] if current_phase else None
+            week_idx = dashboard_summary.global_week_index(race.macrocycle.start_date, today)
+            mesocycle_status = dashboard_summary.strength_mesocycle_status(
+                week_idx, current_phase_name or "Re-base", race.macrocycle.mesocycle_start_week or 0
+            )
+            mesocycle_mode = mesocycle_status.mode
+        cues = {s.id: coaching_copy.session_cue(s.type, current_phase_name, mesocycle_mode) for s in sessions}
+
         return templates.TemplateResponse(
             "today.html",
-            {"request": request, "sessions": sessions, "today": today, "race": race, "days_to_race": days_to_race, "active": "today"},
+            {
+                "request": request,
+                "sessions": sessions,
+                "today": today,
+                "race": race,
+                "days_to_race": days_to_race,
+                "cues": cues,
+                "active": "today",
+            },
         )
     finally:
         db.close()
@@ -293,6 +315,48 @@ def plan_view(request: Request):
                 "mesocycle_status": mesocycle_status,
                 "days_to_race": days_to_race,
                 "active": "plan",
+            },
+        )
+    finally:
+        db.close()
+
+
+@app.get("/about")
+def about_view(request: Request):
+    db = SessionLocal()
+    try:
+        athlete = get_or_create_athlete(db)
+        race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
+        today = date.today()
+
+        current_phase_name = None
+        weeks_out = None
+        mesocycle_status = None
+        if race and race.macrocycle:
+            phases = [
+                {"name": p.name, "start_date": p.start_date, "end_date": p.end_date, "focus": p.focus}
+                for p in race.macrocycle.phases
+            ]
+            current_phase = dashboard_summary.active_phase(phases, today)
+            current_phase_name = current_phase["name"] if current_phase else None
+            weeks_out = (race.race_date - today).days // 7
+            week_idx = dashboard_summary.global_week_index(race.macrocycle.start_date, today)
+            mesocycle_status = dashboard_summary.strength_mesocycle_status(
+                week_idx, current_phase_name or "Re-base", race.macrocycle.mesocycle_start_week or 0
+            )
+
+        return templates.TemplateResponse(
+            "about.html",
+            {
+                "request": request,
+                "race": race,
+                "current_phase_name": current_phase_name,
+                "weeks_out": weeks_out,
+                "mesocycle_status": mesocycle_status,
+                "phase_copy": coaching_copy.PHASE_COPY,
+                "phase_order": coaching_copy.PHASE_ORDER,
+                "mode_copy": coaching_copy.MODE_COPY,
+                "active": "about",
             },
         )
     finally:
