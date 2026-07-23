@@ -13,10 +13,17 @@ from app.config import DAILY_JOB_HOUR, ENABLE_SCHEDULER
 from app.db import SessionLocal, init_db
 from app.engines import coaching_copy, dashboard_summary, load_summary
 from app.engines import strength as strength_engine
+from app.engines import vdot as vdot_engine
 from app.engines.running import week_start
-from app.jobs.daily_autoregulation import run_daily_job
+from app.jobs.daily_autoregulation import MAX_PACE_DRIFT_SEC_PER_KM, run_daily_job
 from app.models import CompletedSession, PlannedSession, Race, SessionType
+from app.plan_service import fitness_from_athlete
 from app.seed import seed_exercise_library
+
+PHASE_COLORS = {
+    "Base": "#6b7280", "Re-base": "#5b9dff", "Build 1": "#2f6fed",
+    "Build 2": "#d9a441", "Taper": "#4caf7d",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -103,14 +110,10 @@ def _attach_logged_patterns(db, sessions: list[PlannedSession]) -> None:
             s.logged_patterns = by_session.get(s.id, set())
 
 
-def _attach_suggested_loads(db, athlete, sessions: list[PlannedSession]) -> None:
-    """For each strength session, attach a `suggested_loads` dict (pattern ->
-    kg) computed from the athlete's most recent logged session for that
-    movement pattern (see #28) -- a concrete weight to load before starting,
-    not just a progress/hold/back-off label after the fact."""
-    strength_sessions = [s for s in sessions if s.type == SessionType.STRENGTH]
-    if not strength_sessions:
-        return
+def _recent_strength_completed_rows(db, athlete) -> list[dict]:
+    """Most recent 200 logged strength sets, most-recent-first, shaped for
+    strength_engine.latest_e1rm_by_pattern -- shared by the suggested-load
+    attachment below and the /about page's live e1RM numbers."""
     completed = (
         db.query(CompletedSession)
         .join(PlannedSession, CompletedSession.planned_session_id == PlannedSession.id)
@@ -119,7 +122,18 @@ def _attach_suggested_loads(db, athlete, sessions: list[PlannedSession]) -> None
         .limit(200)
         .all()
     )
-    completed_rows = [{"pattern": c.actual.get("pattern"), "sets": c.actual.get("sets", [])} for c in completed]
+    return [{"pattern": c.actual.get("pattern"), "sets": c.actual.get("sets", [])} for c in completed]
+
+
+def _attach_suggested_loads(db, athlete, sessions: list[PlannedSession]) -> None:
+    """For each strength session, attach a `suggested_loads` dict (pattern ->
+    kg) computed from the athlete's most recent logged session for that
+    movement pattern (see #28) -- a concrete weight to load before starting,
+    not just a progress/hold/back-off label after the fact."""
+    strength_sessions = [s for s in sessions if s.type == SessionType.STRENGTH]
+    if not strength_sessions:
+        return
+    completed_rows = _recent_strength_completed_rows(db, athlete)
     e1rm_by_pattern = strength_engine.latest_e1rm_by_pattern(completed_rows)
     for s in strength_sessions:
         suggested = {}
@@ -128,6 +142,50 @@ def _attach_suggested_loads(db, athlete, sessions: list[PlannedSession]) -> None
             if e1rm:
                 suggested[p["pattern"]] = strength_engine.prescribe_next_load(e1rm, p["reps"], p["rir"])
         s.suggested_loads = suggested
+
+
+def _weeks_by_monday(sessions: list[PlannedSession]) -> dict[date, list[PlannedSession]]:
+    weeks: dict[date, list[PlannedSession]] = {}
+    for s in sessions:
+        week_monday = s.date - timedelta(days=s.date.weekday())
+        weeks.setdefault(week_monday, []).append(s)
+    return weeks
+
+
+def _load_series_for_race(
+    db, athlete, start: date, end: date, weeks: dict[date, list[PlannedSession]]
+) -> list[load_summary.WeeklyLoadPoint]:
+    """Weekly run-km/strength-tonnage series across a race's full macrocycle
+    (start..end) -- shared by /plan's load dashboard and /about's
+    periodization chart, which both cover the same full-plan window. `weeks`
+    is the caller's already-queried PlannedSession-by-week-Monday map (see
+    _weeks_by_monday), so this doesn't re-query sessions the caller already has."""
+    run_rows = [
+        {"week_start": wk, "distance_km": s.content.get("total_distance_km") or 0.0}
+        for wk, sess_list in weeks.items()
+        for s in sess_list
+        if s.type == SessionType.RUN
+    ]
+    completed_strength = (
+        db.query(CompletedSession)
+        .join(PlannedSession, CompletedSession.planned_session_id == PlannedSession.id)
+        .filter(
+            PlannedSession.athlete_id == athlete.id,
+            PlannedSession.type == SessionType.STRENGTH,
+            PlannedSession.date >= start,
+            PlannedSession.date <= end,
+        )
+        .all()
+    )
+    completed_rows = [
+        {"week_start": week_start(c.date), "actual": c.actual} for c in completed_strength
+    ]
+    return load_summary.build_weekly_load_series(
+        week_starts=list(weeks.keys()),
+        run_km_by_week=load_summary.sum_run_km_by_week(run_rows),
+        tonnage_by_week=load_summary.sum_strength_tonnage_by_week(completed_rows),
+        current_week_start=week_start(date.today()),
+    )
 
 
 templates.env.globals["timedelta"] = timedelta
@@ -215,16 +273,12 @@ def plan_view(request: Request):
         end = race.macrocycle.end_date if race and race.macrocycle else date.today() + timedelta(days=7)
 
         total_days = max((end - start).days + 1, 1)
-        phase_colors = {
-            "Base": "#6b7280", "Re-base": "#5b9dff", "Build 1": "#2f6fed",
-            "Build 2": "#d9a441", "Taper": "#4caf7d",
-        }
         phase_segments = [
             {
                 "name": p.name,
                 "focus": p.focus,
                 "pct": round(((p.end_date - p.start_date).days + 1) / total_days * 100, 2),
-                "color": phase_colors.get(p.name, "#888"),
+                "color": PHASE_COLORS.get(p.name, "#888"),
                 "start_date": p.start_date,
                 "end_date": p.end_date,
             }
@@ -236,38 +290,9 @@ def plan_view(request: Request):
             .order_by(PlannedSession.date)
             .all()
         )
-        weeks: dict[date, list[PlannedSession]] = {}
-        for s in sessions:
-            week_monday = s.date - timedelta(days=s.date.weekday())
-            weeks.setdefault(week_monday, []).append(s)
-
-        run_rows = [
-            {"week_start": wk, "distance_km": s.content.get("total_distance_km") or 0.0}
-            for wk, sess_list in weeks.items()
-            for s in sess_list
-            if s.type == SessionType.RUN
-        ]
-        completed_strength = (
-            db.query(CompletedSession)
-            .join(PlannedSession, CompletedSession.planned_session_id == PlannedSession.id)
-            .filter(
-                PlannedSession.athlete_id == athlete.id,
-                PlannedSession.type == SessionType.STRENGTH,
-                PlannedSession.date >= start,
-                PlannedSession.date <= end,
-            )
-            .all()
-        )
-        completed_rows = [
-            {"week_start": week_start(c.date), "actual": c.actual} for c in completed_strength
-        ]
+        weeks = _weeks_by_monday(sessions)
         today = date.today()
-        load_series = load_summary.build_weekly_load_series(
-            week_starts=list(weeks.keys()),
-            run_km_by_week=load_summary.sum_run_km_by_week(run_rows),
-            tonnage_by_week=load_summary.sum_strength_tonnage_by_week(completed_rows),
-            current_week_start=week_start(today),
-        )
+        load_series = _load_series_for_race(db, athlete, start, end, weeks)
 
         current_phase = None
         week_idx = 0
@@ -329,10 +354,31 @@ def about_view(request: Request):
         race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
         today = date.today()
 
-        current_phase_name = None
-        weeks_out = None
-        mesocycle_status = None
+        context = {
+            "request": request,
+            "race": race,
+            "current_phase_name": None,
+            "weeks_out": None,
+            "mesocycle_status": None,
+            "phase_copy": coaching_copy.PHASE_COPY,
+            "phase_order": coaching_copy.PHASE_ORDER,
+            "mode_copy": coaching_copy.MODE_COPY,
+            "phase_colors": PHASE_COLORS,
+            "load_series": [],
+            "week_grid": [],
+            "total_weeks": 0,
+            "week_idx": None,
+            "vdot": None,
+            "race_pace_sec_per_km": None,
+            "landmarks": strength_engine.DEFAULT_LANDMARKS,
+            "e1rm_by_pattern": {},
+            "athlete": athlete,
+            "max_pace_drift": MAX_PACE_DRIFT_SEC_PER_KM,
+            "active": "about",
+        }
+
         if race and race.macrocycle:
+            start, end = race.macrocycle.start_date, race.macrocycle.end_date
             phases = [
                 {"name": p.name, "start_date": p.start_date, "end_date": p.end_date, "focus": p.focus}
                 for p in race.macrocycle.phases
@@ -340,25 +386,52 @@ def about_view(request: Request):
             current_phase = dashboard_summary.active_phase(phases, today)
             current_phase_name = current_phase["name"] if current_phase else None
             weeks_out = (race.race_date - today).days // 7
-            week_idx = dashboard_summary.global_week_index(race.macrocycle.start_date, today)
+            week_idx = dashboard_summary.global_week_index(start, today)
+            mesocycle_start_week = race.macrocycle.mesocycle_start_week or 0
             mesocycle_status = dashboard_summary.strength_mesocycle_status(
-                week_idx, current_phase_name or "Re-base", race.macrocycle.mesocycle_start_week or 0
+                week_idx, current_phase_name or "Re-base", mesocycle_start_week
             )
 
-        return templates.TemplateResponse(
-            "about.html",
-            {
-                "request": request,
-                "race": race,
-                "current_phase_name": current_phase_name,
-                "weeks_out": weeks_out,
-                "mesocycle_status": mesocycle_status,
-                "phase_copy": coaching_copy.PHASE_COPY,
-                "phase_order": coaching_copy.PHASE_ORDER,
-                "mode_copy": coaching_copy.MODE_COPY,
-                "active": "about",
-            },
-        )
+            sessions = (
+                db.query(PlannedSession)
+                .filter(PlannedSession.athlete_id == athlete.id, PlannedSession.date >= start, PlannedSession.date <= end)
+                .order_by(PlannedSession.date)
+                .all()
+            )
+            weeks = _weeks_by_monday(sessions)
+            load_series = _load_series_for_race(db, athlete, start, end, weeks)
+
+            total_weeks = (end - start).days // 7 + 1
+            taper_phase = next((p for p in phases if p["name"] == "Taper"), None)
+            taper_start_week = (
+                dashboard_summary.global_week_index(start, taper_phase["start_date"]) if taper_phase else total_weeks
+            )
+            week_grid = dashboard_summary.macrocycle_week_grid(
+                phases, start, total_weeks, taper_start_week, mesocycle_start_week
+            )
+
+            fitness = fitness_from_athlete(athlete, race_distance_km=race.distance_km, goal_time_sec=race.goal_time_sec)
+            vdot = vdot_engine.vdot_from_threshold_pace(athlete.threshold_pace_sec_per_km)
+
+            completed_rows = _recent_strength_completed_rows(db, athlete)
+            e1rm_by_pattern = strength_engine.latest_e1rm_by_pattern(completed_rows)
+
+            context.update(
+                {
+                    "current_phase_name": current_phase_name,
+                    "weeks_out": weeks_out,
+                    "mesocycle_status": mesocycle_status,
+                    "load_series": load_series,
+                    "week_grid": week_grid,
+                    "total_weeks": total_weeks,
+                    "week_idx": week_idx,
+                    "vdot": round(vdot, 1),
+                    "race_pace_sec_per_km": fitness.race_pace_sec_per_km,
+                    "e1rm_by_pattern": e1rm_by_pattern,
+                }
+            )
+
+        return templates.TemplateResponse("about.html", context)
     finally:
         db.close()
 

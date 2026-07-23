@@ -5,7 +5,7 @@ dicts/dates first (see main.py's plan_view), no DB dependency here.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 
 @dataclass
@@ -19,6 +19,14 @@ class RaceFlag:
     label: str
     tag: str  # "target" | "tune-up"
     pct: float  # 0-100 position along the macrocycle timeline
+
+
+@dataclass
+class WeekDetail:
+    week_num: int  # 1-indexed
+    phase_name: str
+    is_running_recovery: bool  # running plan's own down-week or taper week
+    is_strength_deload: bool
 
 
 @dataclass
@@ -77,6 +85,33 @@ def race_flags(races: list[dict], macrocycle_start: date, macrocycle_end: date) 
                 )
             )
     return flags
+
+
+def macrocycle_week_grid(
+    phases: list[dict], macro_start: date, total_weeks: int, taper_start_week: int, mesocycle_start_week: int = 0
+) -> list[WeekDetail]:
+    """Week-by-week view of how the running plan's own recovery weeks (down-
+    weeks + taper) line up against the strength mesocycle's deload weeks --
+    the concrete evidence behind the "two systems are coupled" claim (see
+    engines/strength.py's best_mesocycle_offset), rendered as a small grid on
+    the /about page rather than just asserted in prose."""
+    from app.engines.running import is_down_week
+    from app.engines.strength import is_deload_week, mesocycle_week_local
+
+    grid = []
+    for i in range(total_weeks):
+        week_monday = macro_start + timedelta(weeks=i)
+        phase = active_phase(phases, week_monday) or (phases[-1] if phases else None)
+        local_week = mesocycle_week_local(i, mesocycle_start_week)
+        grid.append(
+            WeekDetail(
+                week_num=i + 1,
+                phase_name=phase["name"] if phase else "",
+                is_running_recovery=is_down_week(i, taper_start_week) or i >= taper_start_week,
+                is_strength_deload=is_deload_week(local_week),
+            )
+        )
+    return grid
 
 
 def strength_mesocycle_status(week_idx: int, current_phase_name: str, mesocycle_start_week: int = 0) -> MesocycleStatus:

@@ -394,6 +394,29 @@ form.settings-form button {
   white-space: nowrap;
 }
 
+.weekgrid-scroll { overflow-x: auto; }
+.weekgrid-row { display: flex; gap: 2px; min-width: min-content; margin-bottom: 4px; }
+.weekgrid-label {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--muted);
+  width: 96px;
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+.wk-cell { width: 14px; height: 16px; flex: none; border-radius: 2px; background: var(--slate2); }
+.wk-cell.on { background: var(--amber); }
+.wk-cell.recovery { background: var(--teal-dim); }
+
+.numbers-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 0.5rem; }
+.numbers-grid .mrow { padding: 0.3rem 0; border-bottom: 1px dashed var(--border); }
+.numbers-grid .mrow:last-child { border-bottom: none; }
+.landmark-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; margin-top: 0.3rem; }
+.landmark-table th, .landmark-table td { text-align: left; padding: 0.25rem 0.5rem 0.25rem 0; color: var(--muted); }
+.landmark-table td.v { color: var(--text); font-family: var(--mono); }
+.landmark-table th { font-family: var(--mono); text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em; }
+
 @media (max-width: 600px) {
   body { padding: 0.75rem; }
   .header { flex-direction: column; align-items: flex-start; gap: 0.25rem; }

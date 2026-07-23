@@ -22,7 +22,7 @@ from app.models import (
 )
 
 
-def _fitness_from_athlete(
+def fitness_from_athlete(
     athlete: AthleteProfile, race_distance_km: float | None = None, goal_time_sec: int | None = None
 ) -> running_engine.AthleteFitness:
     kwargs = dict(
@@ -112,7 +112,7 @@ def generate_and_persist_plan(
     if plan_start_date is None:
         plan_start_date = race.macrocycle.start_date if race.macrocycle is not None else today
     regen_from = max(plan_start_date, today)
-    fitness = _fitness_from_athlete(athlete, race_distance_km=race.distance_km, goal_time_sec=race.goal_time_sec)
+    fitness = fitness_from_athlete(athlete, race_distance_km=race.distance_km, goal_time_sec=race.goal_time_sec)
 
     phases, weeks = running_engine.generate_run_plan(plan_start_date, race.race_date, fitness)
     total_weeks = len(weeks)
