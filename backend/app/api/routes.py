@@ -56,6 +56,8 @@ def get_athlete(db: Session = Depends(get_db)):
 def update_athlete(payload: AthleteUpdate, db: Session = Depends(get_db)):
     athlete = get_or_create_athlete(db)
     fields = payload.model_dump(exclude_unset=True)
+    if "week_template" in fields and not any(v == "run" for v in fields["week_template"].values()):
+        raise HTTPException(400, "Schedule needs at least one running day")
     for field, value in fields.items():
         setattr(athlete, field, value)
     # A manually-edited pace re-baselines the daily job's drift clamp (#24) --
@@ -67,6 +69,14 @@ def update_athlete(payload: AthleteUpdate, db: Session = Depends(get_db)):
         athlete.threshold_pace_baseline_sec_per_km = fields["threshold_pace_sec_per_km"]
     db.commit()
     db.refresh(athlete)
+    if "week_template" in fields:
+        # Schedule changes affect which weekdays sessions land on -- every
+        # still-planned session across every race needs regenerating against
+        # the new template (completed/missed history is untouched, same
+        # guarantee generate_and_persist_plan gives every other caller).
+        for race in db.query(Race).filter(Race.athlete_id == athlete.id).all():
+            generate_and_persist_plan(db, athlete, race)
+        sync_upcoming_runs_to_intervals(db, athlete)
     return athlete
 
 

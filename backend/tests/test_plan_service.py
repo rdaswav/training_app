@@ -44,6 +44,33 @@ def test_generate_plan_creates_sessions_from_today_only(db_session):
     assert all(s.date >= today for s in sessions)
 
 
+def test_default_schedule_generates_run_and_strength_days_with_no_flagged_conflicts(db_session):
+    """The app default is now Mon/Wed/Fri/Sun running with Tue/Thu strength
+    (config.DEFAULT_WEEK_TEMPLATE), applied whenever an athlete's own
+    week_template is empty. Unlike the old Mon/Wed/Fri-strength default, this
+    pairing was chosen so hard-lower-body work (SESSION_TEMPLATES[2]'s
+    "Lower" day) never falls the day before a quality/long run -- confirm
+    that holds end-to-end through the unified calendar, not just by
+    construction in the engines."""
+    today = date(2026, 7, 6)  # Monday
+    athlete, race = _make_athlete_and_race(db_session, today, race_weeks=14)
+
+    generate_and_persist_plan(db_session, athlete, race, today=today)
+
+    sessions = (
+        db_session.query(PlannedSession)
+        .filter(PlannedSession.athlete_id == athlete.id, PlannedSession.date >= today, PlannedSession.date < today + timedelta(days=7))
+        .all()
+    )
+    run_weekdays = {s.date.weekday() for s in sessions if s.type == SessionType.RUN}
+    strength_weekdays = {s.date.weekday() for s in sessions if s.type == SessionType.STRENGTH}
+    assert run_weekdays == {0, 2, 4, 6}
+    assert strength_weekdays == {1, 3}
+
+    all_sessions = db_session.query(PlannedSession).filter(PlannedSession.athlete_id == athlete.id).all()
+    assert not any(s.content.get("flagged") for s in all_sessions)
+
+
 def test_macrocycle_persists_a_mesocycle_offset_consistent_with_generated_sessions(db_session):
     """Regression test for #31: the strength mesocycle used to always start
     at offset 0 regardless of the running plan's down-weeks/taper. Confirm

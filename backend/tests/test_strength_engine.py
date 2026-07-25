@@ -79,6 +79,28 @@ def test_generate_strength_session_upper_lower_hybrid():
     assert "squat" in lower_patterns and "hinge" in lower_patterns
 
 
+def test_generate_strength_session_supports_a_two_day_split():
+    """Regression coverage for making strength_days configurable: with a
+    2-day template (e.g. Tue/Thu), the split must be Upper/Lower, and the
+    hard-lower patterns must land on the second day only, so a caller that
+    schedules it before an easy (not quality/long) run avoids the adjacency
+    guardrail entirely."""
+    upper = generate_strength_session(1, date(2026, 7, 7), 0, "Re-base", strength_days=(1, 3))
+    lower = generate_strength_session(3, date(2026, 7, 9), 0, "Re-base", strength_days=(1, 3))
+    off_day = generate_strength_session(5, date(2026, 7, 11), 0, "Re-base", strength_days=(1, 3))
+
+    assert upper.name == "Upper"
+    assert lower.name == "Lower"
+    assert off_day is None
+
+    from app.engines.calendar import HARD_LOWER_PATTERNS
+
+    upper_patterns = {p.pattern for p in upper.prescriptions}
+    lower_patterns = {p.pattern for p in lower.prescriptions}
+    assert not (upper_patterns & HARD_LOWER_PATTERNS)
+    assert lower_patterns & HARD_LOWER_PATTERNS
+
+
 def test_build2_strength_is_maintenance_across_the_week():
     session = generate_strength_session(2, date(2026, 7, 8), week_index := 5, "Build 2")
     for p in session.prescriptions:

@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.api.routes import get_or_create_athlete, router
 from app.auth_middleware import BasicAuthMiddleware
-from app.config import DAILY_JOB_HOUR, ENABLE_SCHEDULER
+from app.config import DAILY_JOB_HOUR, DEFAULT_WEEK_TEMPLATE, ENABLE_SCHEDULER
 from app.db import SessionLocal, init_db
 from app.engines import coaching_copy, dashboard_summary, load_summary
 from app.engines import strength as strength_engine
@@ -443,9 +443,17 @@ def settings_view(request: Request):
         athlete = get_or_create_athlete(db)
         race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
         macrocycle_start = race.macrocycle.start_date if race and race.macrocycle else None
+        week_template = athlete.week_template or {str(k): v for k, v in DEFAULT_WEEK_TEMPLATE.items()}
         return templates.TemplateResponse(
             "settings.html",
-            {"request": request, "athlete": athlete, "race": race, "macrocycle_start": macrocycle_start, "active": "settings"},
+            {
+                "request": request,
+                "athlete": athlete,
+                "race": race,
+                "macrocycle_start": macrocycle_start,
+                "week_template": week_template,
+                "active": "settings",
+            },
         )
     finally:
         db.close()

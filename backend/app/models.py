@@ -60,7 +60,10 @@ class AthleteProfile(Base):
     last_job_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
     last_job_error: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
 
-    # Available days: fixed defaults (3 run, 3 strength, 1 rest) but stored so it's editable.
+    # Per-athlete weekly schedule: {weekday (Monday=0): "run" | "strength" | "rest"}.
+    # Defaults to config.DEFAULT_WEEK_TEMPLATE on creation, editable from Settings;
+    # plan_service.py reads this to decide which weekdays engines/running.py and
+    # engines/strength.py generate sessions for.
     week_template: Mapped[dict] = mapped_column(JSON, default=dict)
 
     # Injury flags restrict strength movement patterns (see engines/strength.py).

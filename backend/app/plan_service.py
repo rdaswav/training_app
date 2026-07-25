@@ -6,6 +6,7 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.config import DEFAULT_WEEK_TEMPLATE
 from app.engines import calendar as calendar_engine
 from app.engines import running as running_engine
 from app.engines import strength as strength_engine
@@ -36,6 +37,18 @@ def fitness_from_athlete(
     if goal_time_sec is not None:
         kwargs["goal_time_sec"] = goal_time_sec
     return running_engine.AthleteFitness(**kwargs)
+
+
+def _days_for(week_template: dict, session_type: str) -> tuple[int, ...]:
+    """Weekdays (Monday=0) assigned to `session_type` in the athlete's week
+    template. JSON round-trips int dict keys as strings, so keys are
+    normalized via int() here regardless of which shape they're in. Falls
+    back wholesale to the app default template only when the athlete's
+    template is entirely unset (a fresh profile) -- a non-empty template with
+    zero days of a given type (e.g. "no strength this cycle") is a real
+    choice and is respected, not silently overridden."""
+    template = week_template or DEFAULT_WEEK_TEMPLATE
+    return tuple(sorted({int(k) for k, v in template.items() if v == session_type}))
 
 
 def _leaf_dict(step: running_engine.RunStep) -> dict:
@@ -113,8 +126,10 @@ def generate_and_persist_plan(
         plan_start_date = race.macrocycle.start_date if race.macrocycle is not None else today
     regen_from = max(plan_start_date, today)
     fitness = fitness_from_athlete(athlete, race_distance_km=race.distance_km, goal_time_sec=race.goal_time_sec)
+    run_days = _days_for(athlete.week_template, "run")
+    strength_days = _days_for(athlete.week_template, "strength")
 
-    phases, weeks = running_engine.generate_run_plan(plan_start_date, race.race_date, fitness)
+    phases, weeks = running_engine.generate_run_plan(plan_start_date, race.race_date, fitness, run_days)
     total_weeks = len(weeks)
     macro_start = weeks[0].start_date
     macro_end = weeks[-1].start_date + timedelta(days=6)
@@ -193,7 +208,7 @@ def generate_and_persist_plan(
         return running_engine.phase_for_week(phases, week_index).name
 
     strength_sessions = strength_engine.generate_strength_plan(
-        macro_start, total_weeks, phase_name_for_week, mesocycle_start_week=mesocycle_start_week
+        macro_start, total_weeks, phase_name_for_week, mesocycle_start_week=mesocycle_start_week, strength_days=strength_days
     )
     strength_session_dicts = []
     for s in strength_sessions:

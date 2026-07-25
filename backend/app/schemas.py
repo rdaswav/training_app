@@ -13,6 +13,7 @@ class AthleteUpdate(BaseModel):
     aerobic_hr_ceiling: int | None = None
     max_hr: int | None = None
     injury_flags: list[str] | None = None
+    week_template: dict[str, str] | None = None
 
 
 class AthleteOut(BaseModel):
@@ -24,6 +25,7 @@ class AthleteOut(BaseModel):
     aerobic_hr_ceiling: int
     max_hr: int
     injury_flags: list[str]
+    week_template: dict[str, str]
 
     model_config = {"from_attributes": True}
 

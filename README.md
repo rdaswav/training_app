@@ -244,22 +244,26 @@ app/
 The engines are deliberately pure/dataclass-based with no DB or HTTP dependency, so the
 periodization rules are unit-testable in isolation (`backend/tests/`).
 
-## A known tension in the fixed weekly template
+## The weekly schedule is a real per-athlete setting
 
-The default template is Mon strength / Tue run / Wed strength / Thu run / Fri strength /
-Sat rest / Sun long run (`engines/running.py`'s `run_days` and `engines/strength.py`'s
-`DAY_TEMPLATE`; changed from the spec's original Sat-long-run/Sun-rest layout so Saturday
-is the athlete's rest day). This still has one built-in hard-lower-before-key-run
-adjacency every week: Wed (Lower) before Thu's quality run. Previously (with Sunday as
-the rest day) the guardrail could shuffle this to the free rest day; now it can't --
-Saturday's day-after is Sunday's long run, so swapping Wednesday there would just create
-a new conflict, and the guardrail correctly refuses and flags it in place instead. Net
-effect: still exactly one flagged conflict per week (same as before), just consistently
-on Wednesday now rather than occasionally on Friday -- the Fri (Hybrid) -> Sat (long run)
-adjacency the spec's original layout had is fully eliminated by this swap, since Saturday
-is rest now. Worth revisiting if you want zero flags: either drop Wednesday's squat/hinge
-compound work in favor of something lighter, or accept the flag as informational and rely
-on RIR/load to keep it light the day before a quality run.
+`AthleteProfile.week_template` (`{weekday: "run" | "strength" | "rest"}`, Monday=0) is the
+source of truth for which days get sessions -- editable from Settings, validated to keep
+at least one running day, and threaded into `engines/running.py`'s `run_days` and
+`engines/strength.py`'s `strength_days` by `plan_service.py`'s `_days_for`. A `PUT
+/api/athlete` with a new `week_template` regenerates every still-planned session (across
+every race) onto the new days; completed/missed history is untouched, same guarantee
+every other regeneration path already gives.
+
+The app default (`config.DEFAULT_WEEK_TEMPLATE`, applied whenever an athlete's own
+template is unset) is Mon/Wed/Fri/Sun running with Tue/Thu strength, Sat rest. Unlike the
+old fixed Mon/Wed/Fri-strength template, this pairing has zero built-in
+hard-lower-before-key-run adjacencies: `engines/strength.py`'s `SESSION_TEMPLATES[2]`
+concentrates all the hard-lower patterns (squat/hinge/single_leg/unilateral/
+posterior_chain) into the second strength day (Thursday), which is only ever followed by
+an easy run (Friday) or a rest day -- never a quality or long session -- so
+`engines/calendar.py`'s adjacency guardrail has nothing to swap or flag by construction.
+A custom schedule that puts hard-lower work the day before a quality/long run will still
+hit the guardrail exactly as before.
 
 ## intervals.icu spike -- confirmed 2026-07-09 (spec section 11)
 
