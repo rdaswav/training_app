@@ -298,46 +298,72 @@ def _long_run_session(fitness: AthleteFitness, distance_km: float, run_date: dat
     )
 
 
+def _assign_run_roles(sorted_days: list[int]) -> dict[int, str]:
+    """Assign easy/quality/long roles across an arbitrary number of weekly run
+    days: the latest day in the week is always the long run, the middle of
+    the remaining days becomes the quality session (roughly equidistant from
+    the long run and the start of the week), and every other day is easy."""
+    if not sorted_days:
+        return {}
+    long_day = sorted_days[-1]
+    others = sorted_days[:-1]
+    roles = {long_day: "long"}
+    if others:
+        quality_day = others[len(others) // 2]
+        for d in others:
+            roles[d] = "quality" if d == quality_day else "easy"
+    return roles
+
+
 def generate_week(
     week_index: int,
     start_date: date,
     target_volume_km: float,
     phase: PhaseSpec,
     fitness: AthleteFitness,
-    run_days: tuple[int, int, int] = (1, 3, 6),  # Tue, Thu, Sun (Monday=0); Sat is the rest day
+    run_days: tuple[int, ...] = (1, 3, 6),  # Tue, Thu, Sun (Monday=0) by default
 ) -> WeekPlan:
-    """Build the 3 run sessions for one week: easy, quality, long."""
+    """Build one run session per entry in `run_days` -- the latest day is
+    always long, the middle of the remaining days is quality, the rest easy
+    (see _assign_run_roles). With the historical 3-day default this reduces
+    to exactly the old fixed easy/quality/long assignment."""
+    sorted_days = sorted(run_days)
+    roles = _assign_run_roles(sorted_days)
+    easy_days = [d for d in sorted_days if roles[d] == "easy"]
+
     long_km = round(target_volume_km * LONG_RUN_SHARE, 1)
     remainder = max(target_volume_km - long_km, 0.0)
-    easy_km = round(remainder / 2, 1)
-    quality_km = round(remainder - easy_km, 1)
+    # Split the non-long volume evenly across the easy days plus one "slot"
+    # for quality (quality's own distance is actually dictated by its
+    # structure -- see _quality_session -- this just sizes the easy days).
+    easy_km = round(remainder / (len(easy_days) + 1), 1)
 
-    easy_date = start_date + timedelta(days=run_days[0])
-    quality_date = start_date + timedelta(days=run_days[1])
-    long_date = start_date + timedelta(days=run_days[2])
+    sessions: list[RunSessionPlan] = []
+    for d in sorted_days:
+        session_date = start_date + timedelta(days=d)
+        role = roles[d]
+        if role == "long":
+            sessions.append(_long_run_session(fitness, long_km, session_date, phase.name))
+        elif role == "quality":
+            sessions.append(_quality_session(phase.name, fitness, session_date))
+        else:
+            sessions.append(_easy_session(fitness, easy_km, session_date, phase.name))
 
-    quality_session = _quality_session(phase.name, fitness, quality_date)
-    # Quality session distance is dictated by its structure; use it as the source of truth.
-    week = WeekPlan(
+    return WeekPlan(
         week_index=week_index,
         start_date=start_date,
         phase_name=phase.name,
         target_volume_km=target_volume_km,
         is_down_week=False,
-        sessions=[
-            _easy_session(fitness, easy_km, easy_date, phase.name),
-            quality_session,
-            _long_run_session(fitness, long_km, long_date, phase.name),
-        ],
+        sessions=sessions,
     )
-    return week
 
 
 def generate_run_plan(
     today: date,
     race_date: date,
     fitness: AthleteFitness,
-    run_days: tuple[int, int, int] = (1, 3, 6),
+    run_days: tuple[int, ...] = (1, 3, 6),
 ) -> tuple[list[PhaseSpec], list[WeekPlan]]:
     """Top-level entry point: race date + distance (implicit via fitness/race context) +
     current fitness -> full block of weekly plans."""

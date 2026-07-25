@@ -340,6 +340,14 @@ form.settings-form button {
 .form-status.success { color: var(--good); }
 .form-status.error { color: #d9534f; }
 
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 0.6rem;
+  max-width: 560px;
+}
+.schedule-grid label { gap: 0.3rem; }
+
 .calendar-scroll { overflow-x: auto; }
 
 .load-chart { margin-bottom: 1rem; }

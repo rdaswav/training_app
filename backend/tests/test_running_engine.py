@@ -89,6 +89,32 @@ def test_generate_run_plan_produces_three_runs_per_week():
             assert s.total_distance_km > 0
 
 
+def test_generate_run_plan_supports_four_run_days_with_two_easy_sessions():
+    """Regression coverage for making run_days configurable rather than a
+    fixed 3-tuple: a 4-day week (e.g. Mon/Wed/Fri/Sun) must produce one
+    session per day, still exactly one long (the latest day) and one quality
+    (the middle of the rest), with the remainder split across both easy days."""
+    today = date(2026, 7, 8)
+    race = today + timedelta(weeks=14)
+    fitness = AthleteFitness(
+        weekly_volume_km=40.0,
+        easy_pace_sec_per_km=390,
+        threshold_pace_sec_per_km=330,
+        aerobic_hr_ceiling=150,
+    )
+    phases, weeks = generate_run_plan(today, race, fitness, run_days=(0, 2, 4, 6))
+    for week in weeks:
+        assert len(week.sessions) == 4
+        roles = [s.role for s in week.sessions]
+        assert roles.count("long") == 1
+        assert roles.count("quality") == 1
+        assert roles.count("easy") == 2
+        for s in week.sessions:
+            assert s.total_distance_km > 0
+        long_session = next(s for s in week.sessions if s.role == "long")
+        assert long_session.date.weekday() == 6  # the latest of the run days
+
+
 def test_build_2_long_run_embeds_race_pace_segment():
     today = date(2026, 7, 8)
     race = today + timedelta(weeks=14)

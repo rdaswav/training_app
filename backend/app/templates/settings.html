@@ -78,6 +78,31 @@
   </div>
 
   <div class="card">
+    <h3>Weekly schedule</h3>
+    <p class="note">Choose what each day is for. Needs at least one running day (for the long run) to save.</p>
+    <form class="settings-form" onsubmit="return submitScheduleForm(event)">
+      <div class="schedule-grid">
+        {% set weekday_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] %}
+        {% for i in range(7) %}
+          {% set day_value = week_template.get(i|string, "rest") %}
+          <label>{{ weekday_names[i] }}
+            <select name="day_{{ i }}">
+              <option value="run" {% if day_value == "run" %}selected{% endif %}>Run</option>
+              <option value="strength" {% if day_value == "strength" %}selected{% endif %}>Strength</option>
+              <option value="rest" {% if day_value == "rest" %}selected{% endif %}>Rest</option>
+            </select>
+          </label>
+        {% endfor %}
+      </div>
+      <button type="submit">Save schedule</button>
+      <div id="schedule-status" class="form-status"></div>
+    </form>
+    {% if race %}
+      <p class="note">Saving regenerates every still-planned session across your races (completed/missed history is preserved).</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
     <h3>Daily job health</h3>
     {% if athlete.last_job_run_at %}
       <p class="meta">Last run: {{ athlete.last_job_run_at.strftime("%Y-%m-%d %H:%M UTC") }}</p>

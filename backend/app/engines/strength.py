@@ -17,28 +17,93 @@ from datetime import date, timedelta
 ACCUMULATION_WEEKS = 4  # + 1 deload week = 5-week mesocycle (spec: "4-6 wks + deload")
 MESOCYCLE_LENGTH = ACCUMULATION_WEEKS + 1
 
-# Movement-pattern day template (spec section 6). Keyed by weekday, Monday=0.
-DAY_TEMPLATE: dict[int, list[tuple[str, str]]] = {
-    0: [  # Mon — Upper
-        ("horizontal_push", "compound"),
-        ("vertical_pull", "compound"),
-        ("horizontal_pull", "compound"),
-        ("shoulder_accessory", "accessory"),
-        ("core", "core"),
+# Movement-pattern session templates (spec section 6), keyed by how many
+# strength days the athlete's week template has that week -- assigned to
+# actual weekdays in order (earliest strength day gets the first entry, and
+# so on). HARD_LOWER_PATTERNS (engines/calendar.py's adjacency guardrail) are
+# deliberately concentrated into a single "Lower"-style day per split rather
+# than spread evenly, so a sane weekday assignment (e.g. hard-lower two-plus
+# days before a quality/long run) avoids the adjacency conflict by
+# construction instead of relying on the guardrail's swap-or-flag fallback.
+SESSION_TEMPLATES: dict[int, list[tuple[str, list[tuple[str, str]]]]] = {
+    1: [
+        (
+            "Full Body",
+            [
+                ("squat", "compound"),
+                ("horizontal_push", "compound"),
+                ("hinge", "compound"),
+                ("horizontal_pull", "compound"),
+                ("single_leg", "accessory"),
+                ("core", "core"),
+            ],
+        ),
     ],
-    2: [  # Wed — Lower
-        ("squat", "compound"),
-        ("hinge", "compound"),
-        ("single_leg", "accessory"),
-        ("core", "core"),
+    2: [
+        (
+            "Upper",
+            [
+                ("horizontal_push", "compound"),
+                ("vertical_pull", "compound"),
+                ("horizontal_pull", "compound"),
+                ("shoulder_accessory", "accessory"),
+                ("carry", "accessory"),
+                ("core", "core"),
+            ],
+        ),
+        (
+            "Lower",
+            [
+                ("squat", "compound"),
+                ("hinge", "compound"),
+                ("single_leg", "accessory"),
+                ("unilateral", "accessory"),
+                ("posterior_chain", "compound"),
+                ("core_running_support", "core"),
+            ],
+        ),
     ],
-    4: [  # Fri — Hybrid
-        ("unilateral", "accessory"),
-        ("carry", "accessory"),
-        ("posterior_chain", "compound"),
-        ("core_running_support", "core"),
+    3: [
+        (
+            "Upper",
+            [
+                ("horizontal_push", "compound"),
+                ("vertical_pull", "compound"),
+                ("horizontal_pull", "compound"),
+                ("shoulder_accessory", "accessory"),
+                ("core", "core"),
+            ],
+        ),
+        (
+            "Lower",
+            [
+                ("squat", "compound"),
+                ("hinge", "compound"),
+                ("single_leg", "accessory"),
+                ("core", "core"),
+            ],
+        ),
+        (
+            "Hybrid",
+            [
+                ("unilateral", "accessory"),
+                ("carry", "accessory"),
+                ("posterior_chain", "compound"),
+                ("core_running_support", "core"),
+            ],
+        ),
     ],
 }
+
+DEFAULT_STRENGTH_DAYS: tuple[int, ...] = (0, 2, 4)  # Mon/Wed/Fri, matching SESSION_TEMPLATES[3]
+
+
+def _session_template_for(weekday: int, strength_days: tuple[int, ...]) -> tuple[str, list[tuple[str, str]]] | None:
+    sorted_days = sorted(strength_days)
+    if weekday not in sorted_days:
+        return None
+    templates = SESSION_TEMPLATES.get(len(sorted_days)) or SESSION_TEMPLATES[3]
+    return templates[sorted_days.index(weekday) % len(templates)]
 
 
 @dataclass
@@ -236,18 +301,19 @@ def generate_strength_session(
     global_week_index: int,
     run_phase_name: str,
     mesocycle_start_week: int = 0,
+    strength_days: tuple[int, ...] = DEFAULT_STRENGTH_DAYS,
 ) -> StrengthSessionPlan | None:
     """Build one strength day's prescription skeleton (patterns only; exercise
     selection is a separate DB-backed step via select_exercise)."""
-    patterns = DAY_TEMPLATE.get(weekday)
-    if not patterns:
+    template = _session_template_for(weekday, strength_days)
+    if template is None:
         return None
 
+    name, patterns = template
     mode = race_proximity_mode(run_phase_name)
     local_week = mesocycle_week_local(global_week_index, mesocycle_start_week)
     prescriptions = [prescribe(pattern, category, local_week, mode) for pattern, category in patterns]
-    names = {0: "Upper", 2: "Lower", 4: "Hybrid"}
-    return StrengthSessionPlan(date=session_date, name=names.get(weekday, "Strength"), prescriptions=prescriptions)
+    return StrengthSessionPlan(date=session_date, name=name, prescriptions=prescriptions)
 
 
 def all_prescriptions_logged(prescriptions: list[dict], logged_patterns: set[str]) -> bool:
@@ -259,9 +325,11 @@ def generate_strength_plan(
     total_weeks: int,
     phase_for_week_index,  # callable: int -> phase name, from the running engine
     mesocycle_start_week: int = 0,
+    strength_days: tuple[int, ...] = DEFAULT_STRENGTH_DAYS,
 ) -> list[StrengthSessionPlan]:
-    """Generate strength sessions for every week of the macrocycle, on the fixed
-    Mon/Wed/Fri template, modulated by race proximity. `mesocycle_start_week`
+    """Generate strength sessions for every week of the macrocycle, on
+    `strength_days` (see SESSION_TEMPLATES for how a day's split is chosen
+    from the count), modulated by race proximity. `mesocycle_start_week`
     should be best_mesocycle_offset's output, computed by the caller once
     against the same running plan (see #31) -- defaults to 0 (the old,
     phase-unaware behavior) for callers that don't care."""
@@ -272,9 +340,11 @@ def generate_strength_plan(
     for week_index in range(total_weeks):
         week_monday = base_monday + timedelta(weeks=week_index)
         phase_name = phase_for_week_index(week_index)
-        for weekday in DAY_TEMPLATE:
+        for weekday in sorted(strength_days):
             session_date = week_monday + timedelta(days=weekday)
-            session = generate_strength_session(weekday, session_date, week_index, phase_name, mesocycle_start_week)
+            session = generate_strength_session(
+                weekday, session_date, week_index, phase_name, mesocycle_start_week, strength_days
+            )
             if session:
                 sessions.append(session)
     return sessions

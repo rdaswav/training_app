@@ -172,6 +172,31 @@ async function submitRaceForm(event, existingRaceId) {
   return false;
 }
 
+async function submitScheduleForm(event) {
+  event.preventDefault();
+  const form = event.target;
+  const weekTemplate = {};
+  for (let i = 0; i < 7; i++) {
+    weekTemplate[i] = form[`day_${i}`].value;
+  }
+  if (!Object.values(weekTemplate).includes("run")) {
+    showFormStatus("schedule-status", "Pick at least one running day.", false);
+    return false;
+  }
+  const confirmed = window.confirm(
+    "Saving regenerates every still-planned session across your races. Continue?"
+  );
+  if (!confirmed) return false;
+  try {
+    await postJSON("/api/athlete", { week_template: weekTemplate }, "PUT");
+    showFormStatus("schedule-status", "Saved. Reloading...", true);
+    setTimeout(() => window.location.reload(), 800);
+  } catch (e) {
+    showFormStatus("schedule-status", "Failed to save: " + e.message, false);
+  }
+  return false;
+}
+
 async function submitRunComplete(event, sessionId) {
   event.preventDefault();
   const form = event.target;

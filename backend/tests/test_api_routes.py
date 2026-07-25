@@ -202,6 +202,56 @@ def test_plan_apply_404s_for_unknown_race(client):
     assert resp.status_code == 404
 
 
+def test_update_schedule_rejects_template_with_no_run_day(client):
+    client.get("/api/athlete")  # create the default athlete row
+    resp = client.put(
+        "/api/athlete",
+        json={"week_template": {"0": "strength", "1": "strength", "2": "rest", "3": "rest", "4": "rest", "5": "rest", "6": "rest"}},
+    )
+    assert resp.status_code == 400
+
+
+def test_update_schedule_regenerates_sessions_onto_the_new_days(client):
+    """Regression coverage for making the weekly schedule a real, editable
+    per-athlete setting rather than a hardcoded engine default: saving a new
+    week_template must actually move where sessions land, for every race.
+    Uses a plan_start_date pinned to next Monday (rather than a fixed past
+    date) so generate_and_persist_plan's "never touch a day before today"
+    guard can't silently leave the queried week unregenerated."""
+    next_monday = date.today() + timedelta(days=(7 - date.today().weekday()) % 7 or 7)
+    race_date = next_monday + timedelta(weeks=14)
+    client.post(
+        "/api/races",
+        json={
+            "name": "Half",
+            "race_date": race_date.isoformat(),
+            "distance_km": 21.1,
+            "plan_start_date": next_monday.isoformat(),
+        },
+    )
+
+    resp = client.put(
+        "/api/athlete",
+        json={
+            "week_template": {
+                "0": "run", "1": "rest", "2": "run", "3": "rest", "4": "run", "5": "rest", "6": "run",
+            }
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["week_template"] == {
+        "0": "run", "1": "rest", "2": "run", "3": "rest", "4": "run", "5": "rest", "6": "run",
+    }
+
+    calendar = client.get(
+        "/api/calendar",
+        params={"start": next_monday.isoformat(), "end": (next_monday + timedelta(days=6)).isoformat()},
+    ).json()
+    run_weekdays = {date.fromisoformat(s["date"]).weekday() for s in calendar if s["type"] == "run"}
+    assert run_weekdays == {0, 2, 4, 6}
+    assert not any(s["type"] == "strength" for s in calendar)  # no strength day left in this template
+
+
 def test_trigger_daily_job_runs_without_error(client):
     resp = client.post("/api/jobs/daily-autoregulation")
     assert resp.status_code == 200

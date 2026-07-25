@@ -12,9 +12,9 @@ from app.seed import seed_exercise_library
 from app.integrations.intervals_icu import IntervalsIcuClient
 
 
-def _make_athlete_and_race(db_session, today: date):
+def _make_athlete_and_race(db_session, today: date, **overrides):
     seed_exercise_library(db_session)
-    athlete = AthleteProfile(injury_flags=[])
+    athlete = AthleteProfile(injury_flags=[], **overrides)
     db_session.add(athlete)
     db_session.commit()
     db_session.refresh(athlete)
@@ -99,9 +99,14 @@ def test_matched_run_activity_marks_completed_and_progresses_pace(db_session, mo
     monkeypatch.setattr(intervals_sync, "INTERVALS_ICU_API_KEY", "test-key")
     monkeypatch.setattr(intervals_sync, "INTERVALS_ICU_ATHLETE_ID", "i123")
 
-    yesterday = date(2026, 7, 7)
+    yesterday = date(2026, 7, 7)  # Tuesday
     today = date(2026, 7, 8)
-    athlete, race = _make_athlete_and_race(db_session, yesterday)
+    # Tuesday must actually be a run day for this test's date-pinned activity
+    # match to land -- pin the schedule explicitly rather than relying on
+    # whichever days the app's default template currently assigns to running.
+    athlete, race = _make_athlete_and_race(
+        db_session, yesterday, week_template={1: "run", 3: "run", 6: "run", 0: "strength", 2: "strength", 4: "strength", 5: "rest"}
+    )
     generate_and_persist_plan(db_session, athlete, race, today=yesterday)
 
     stale_run = (
