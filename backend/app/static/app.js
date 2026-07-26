@@ -224,56 +224,293 @@ async function submitRunComplete(event, sessionId) {
   return false;
 }
 
-function addSetRow(button) {
-  const setRows = button.closest("form").querySelector(".set-rows");
-  const lastRow = setRows.querySelector(".set-row:last-child");
-  const newRow = lastRow.cloneNode(true);
-  newRow.querySelectorAll("input").forEach((input) => (input.value = ""));
-  setRows.appendChild(newRow);
+// ---------------------------------------------------------------------------
+// Strength logging: prefilled steppers, one set at a time (gym mode)
+//
+// Each prescription accumulates logged sets client-side as the athlete steps
+// through them (matching a fixed set count -- no add/remove-row UI needed).
+// Only the *last* set for a pattern triggers a real network call, and even
+// that call is deferred behind the undo window: POST /api/sessions/{id}/log
+// still takes the whole `sets` array in one request (evaluate_strength_log
+// needs all sets together to compute average RIR / hit-reps), so nothing
+// about the backend contract changed -- only when the one call fires.
+// ---------------------------------------------------------------------------
+
+const WEIGHT_STEP_KG = 2.5;
+const REST_DURATION_SEC = 150; // no per-exercise rest convention in the data; a sane default, easy to tune here
+const UNDO_WINDOW_MS = 6000;
+
+function parseRepDefault(repsRange) {
+  const parts = String(repsRange).split("-").map(Number);
+  if (parts.length !== 2 || parts.some((n) => Number.isNaN(n))) return Number(repsRange) || 1;
+  return Math.round((parts[0] + parts[1]) / 2);
 }
 
-function removeSetRow(button) {
-  const row = button.closest(".set-row");
-  const setRows = row.parentElement;
-  if (setRows.querySelectorAll(".set-row").length > 1) {
-    row.remove();
+function formatWeight(w) {
+  return Number.isInteger(w) ? String(w) : w.toFixed(1);
+}
+
+function nextUpAfter(prescriptionEl) {
+  const card = prescriptionEl.closest(".card");
+  if (!card) return "Session complete";
+  const prescriptions = Array.from(card.querySelectorAll(".prescription"));
+  const idx = prescriptions.indexOf(prescriptionEl);
+  for (let i = idx + 1; i < prescriptions.length; i++) {
+    const p = prescriptions[i];
+    if (p.querySelector(".entry")) {
+      return `${p.dataset.exerciseName} &middot; set 1 of ${p.dataset.sets}<br>${p.dataset.reps} reps &middot; RIR ${p.dataset.rir}`;
+    }
+  }
+  return "Session complete";
+}
+
+function showUndoToast(msg, onUndo) {
+  const toast = document.getElementById("gymToast");
+  if (!toast) return;
+  toast.querySelector("span").textContent = msg;
+  toast.classList.add("on");
+  clearTimeout(showUndoToast._t);
+  toast.querySelector("button").onclick = () => {
+    toast.classList.remove("on");
+    clearTimeout(showUndoToast._t);
+    onUndo();
+  };
+  showUndoToast._t = setTimeout(() => toast.classList.remove("on"), UNDO_WINDOW_MS);
+}
+
+let gymRestInterval = null;
+function startRestTimer(durationSec, nextUpHtml) {
+  const rest = document.getElementById("gymRest");
+  if (!rest) return;
+  let left = durationSec;
+  const clock = document.getElementById("gymRestClock");
+  const ring = document.getElementById("gymRestRing");
+  const nextUp = document.getElementById("gymRestNext");
+  nextUp.innerHTML = "Up next<br><b>" + nextUpHtml + "</b>";
+  const paint = () => {
+    const m = Math.floor(left / 60), s = left % 60;
+    clock.textContent = `${m}:${String(s).padStart(2, "0")}`;
+    ring.style.width = Math.max(0, (left / durationSec) * 100) + "%";
+  };
+  paint();
+  rest.classList.add("on");
+  clearInterval(gymRestInterval);
+  gymRestInterval = setInterval(() => {
+    left--;
+    paint();
+    if (left <= 0) stopRestTimer();
+  }, 1000);
+  document.getElementById("gymRestSkip").onclick = stopRestTimer;
+  document.getElementById("gymRestAdd30").onclick = () => {
+    left += 30;
+    paint();
+  };
+}
+function stopRestTimer() {
+  clearInterval(gymRestInterval);
+  const rest = document.getElementById("gymRest");
+  if (rest) rest.classList.remove("on");
+}
+
+function updateStickyBarFor(prescriptionEl) {
+  const stick = document.getElementById("gymStick");
+  if (!stick || !prescriptionEl) return;
+  const entry = prescriptionEl._entry;
+  const loggedCount = entry ? entry.logged.length : 0;
+  const total = Number(prescriptionEl.dataset.sets);
+  const target = prescriptionEl.dataset.suggested
+    ? `${prescriptionEl.dataset.reps} &times; ${prescriptionEl.dataset.suggested}`
+    : `${prescriptionEl.dataset.reps} reps`;
+  const lastChip = prescriptionEl.dataset.lastSets
+    ? `<span class="chip">Last <b>${prescriptionEl.dataset.lastSets}&times;${prescriptionEl.dataset.lastReps} @ ${prescriptionEl.dataset.lastWeight}</b></span>`
+    : "";
+  stick.innerHTML = `
+    <div class="r1">
+      <div>
+        <div class="ptn">${prescriptionEl.dataset.pattern.replace(/_/g, " ")}</div>
+        <h4>${prescriptionEl.dataset.exerciseName}</h4>
+      </div>
+      <div class="setof">set<b>${Math.min(loggedCount + 1, total)} / ${total}</b></div>
+    </div>
+    <div class="r2">
+      <span class="chip tgt">Target <b>${target}</b></span>
+      <span class="chip">RIR <b>${prescriptionEl.dataset.rir}</b></span>
+      ${lastChip}
+    </div>`;
+  stick.classList.add("on");
+}
+
+class StrengthEntry {
+  constructor(prescriptionEl) {
+    this.el = prescriptionEl;
+    this.el._entry = this;
+    this.sessionId = prescriptionEl.dataset.sessionId;
+    this.pattern = prescriptionEl.dataset.pattern;
+    this.totalSets = Number(prescriptionEl.dataset.sets);
+    this.rirTarget = prescriptionEl.dataset.rir;
+    this.weight = prescriptionEl.dataset.suggested ? Number(prescriptionEl.dataset.suggested) : 20;
+    this.reps = parseRepDefault(prescriptionEl.dataset.reps);
+    this.logged = [];
+    this.pendingTimeoutId = null;
+
+    this.entryEl = prescriptionEl.querySelector(".entry");
+    this.wVal = prescriptionEl.querySelector(".wval");
+    this.rVal = prescriptionEl.querySelector(".rval");
+    this.rirInput = prescriptionEl.querySelector(".rir-input");
+    this.doneRow = prescriptionEl.querySelector(".done-row");
+    this.ctaBtn = prescriptionEl.querySelector(".log-set-btn");
+
+    prescriptionEl.querySelectorAll(".stepbtn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const dir = Number(btn.dataset.dir);
+        if (btn.dataset.step === "w") {
+          this.weight = Math.max(0, Math.round((this.weight + dir * WEIGHT_STEP_KG) * 10) / 10);
+        } else {
+          this.reps = Math.max(1, this.reps + dir);
+        }
+        this.paint();
+      });
+    });
+    if (this.ctaBtn) this.ctaBtn.addEventListener("click", () => this.logCurrentSet());
+    this.paint();
+  }
+
+  paint() {
+    if (this.wVal) this.wVal.textContent = formatWeight(this.weight);
+    if (this.rVal) this.rVal.textContent = this.reps;
+    if (this.doneRow) {
+      Array.from(this.doneRow.children).forEach((chip, i) => {
+        const done = this.logged[i];
+        chip.className = done ? "dchip" : "dchip pending";
+        chip.textContent = done ? `${done.reps} × ${formatWeight(done.weight)}` : `set ${i + 1}`;
+      });
+    }
+    if (this.ctaBtn) {
+      const nextSet = this.logged.length + 1;
+      if (nextSet <= this.totalSets) {
+        this.ctaBtn.textContent = `✓ Log set ${nextSet}`;
+        this.ctaBtn.disabled = false;
+      } else {
+        this.ctaBtn.textContent = "Logged";
+        this.ctaBtn.disabled = true;
+      }
+    }
+  }
+
+  logCurrentSet() {
+    if (this.logged.length >= this.totalSets) return;
+    const setEntry = { reps: this.reps, weight: this.weight };
+    this.logged.push(setEntry);
+    this.paint();
+    const isLast = this.logged.length >= this.totalSets;
+    const nextUpHtml = isLast
+      ? nextUpAfter(this.el)
+      : `${this.el.dataset.exerciseName} &middot; set ${this.logged.length + 1} of ${this.totalSets}<br>${this.reps} × ${formatWeight(this.weight)} &middot; RIR ${this.rirTarget}`;
+    showUndoToast(
+      isLast ? `Session logged · ${setEntry.reps} × ${formatWeight(setEntry.weight)}` : `Set logged · ${setEntry.reps} × ${formatWeight(setEntry.weight)}`,
+      () => this.undoLastSet()
+    );
+    startRestTimer(REST_DURATION_SEC, nextUpHtml);
+    updateStickyBarFor(this.el);
+    if (isLast) this.scheduleSubmit();
+  }
+
+  undoLastSet() {
+    if (!this.logged.length) return;
+    if (this.pendingTimeoutId) {
+      clearTimeout(this.pendingTimeoutId);
+      this.pendingTimeoutId = null;
+    }
+    this.logged.pop();
+    stopRestTimer();
+    this.paint();
+    updateStickyBarFor(this.el);
+  }
+
+  scheduleSubmit() {
+    const rirActual = this.rirInput && this.rirInput.value ? Number(this.rirInput.value) : null;
+    const payload = {
+      pattern: this.pattern,
+      sets: this.logged.map((s) => ({ reps: s.reps, weight_kg: s.weight, rir_actual: rirActual })),
+    };
+    this.pendingTimeoutId = setTimeout(async () => {
+      this.pendingTimeoutId = null;
+      try {
+        const result = await postJSON(`/api/sessions/${this.sessionId}/log`, payload);
+        const badge = document.createElement("span");
+        badge.className = "stat st-done";
+        badge.textContent = "✓ Logged";
+        this.el.querySelector(".prescription-head").appendChild(badge);
+        this.entryEl.remove();
+        const swapBtn = this.el.querySelector(".swap-toggle");
+        const swapPicker = this.el.querySelector(".swap-picker");
+        if (swapBtn) swapBtn.remove();
+        if (swapPicker) swapPicker.remove();
+        const target = document.getElementById(`feedback-${this.sessionId}`);
+        if (target) {
+          target.appendChild(
+            buildCoachCard([
+              { label: "Did", cls: "cl-log", text: result.summary },
+              { label: "Read", cls: "cl-read", text: result.feedback },
+              { label: "Next", cls: "cl-next", text: result.next_instruction, action: result.action },
+            ])
+          );
+        }
+      } catch (e) {
+        alert("Failed to log set: " + e.message);
+      }
+    }, UNDO_WINDOW_MS);
   }
 }
 
-async function submitStrengthLog(event, sessionId, pattern) {
-  event.preventDefault();
-  const form = event.target;
-  const rows = form.querySelectorAll(".set-row");
-  const sets = Array.from(rows).map((row) => ({
-    reps: Number(row.querySelector(".set-reps").value),
-    weight_kg: Number(row.querySelector(".set-weight").value),
-    rir_actual: row.querySelector(".set-rir").value ? Number(row.querySelector(".set-rir").value) : null,
-  }));
-  const body = { pattern, sets };
-  try {
-    const result = await postJSON(`/api/sessions/${sessionId}/log`, body);
-    const prescription = form.closest(".prescription");
-    const swapBtn = prescription.querySelector(".swap-toggle");
-    const swapPicker = prescription.querySelector(".swap-picker");
-    form.remove();
-    if (swapBtn) swapBtn.remove();
-    if (swapPicker) swapPicker.remove();
-    const badge = document.createElement("span");
-    badge.className = "stat st-done";
-    badge.textContent = "✓ Logged";
-    prescription.appendChild(badge);
-    const target = document.getElementById(`feedback-${sessionId}`);
-    const coach = buildCoachCard([
-      { label: "Did", cls: "cl-log", text: result.summary },
-      { label: "Read", cls: "cl-read", text: result.feedback },
-      { label: "Next", cls: "cl-next", text: result.next_instruction, action: result.action },
-    ]);
-    target.appendChild(coach);
-  } catch (e) {
-    alert("Failed to log set: " + e.message);
+function initGymMode() {
+  const prescriptions = document.querySelectorAll(".prescription .entry");
+  if (!prescriptions.length) return;
+
+  if (!document.getElementById("gymStick")) {
+    const stick = document.createElement("div");
+    stick.id = "gymStick";
+    stick.className = "stick";
+    document.body.insertBefore(stick, document.body.firstChild.nextSibling);
   }
-  return false;
+  if (!document.getElementById("gymToast")) {
+    const toast = document.createElement("div");
+    toast.id = "gymToast";
+    toast.className = "toast";
+    toast.innerHTML = '<span></span><button type="button">Undo</button>';
+    document.body.appendChild(toast);
+  }
+  if (!document.getElementById("gymRest")) {
+    const rest = document.createElement("div");
+    rest.id = "gymRest";
+    rest.className = "rest";
+    rest.innerHTML = `
+      <div class="lab">Rest</div>
+      <div class="clock" id="gymRestClock">2:30</div>
+      <div class="ring"><i id="gymRestRing"></i></div>
+      <div class="acts">
+        <button type="button" id="gymRestAdd30">+30s</button>
+        <button type="button" class="go" id="gymRestSkip">Skip &rarr; next set</button>
+      </div>
+      <div class="nextup" id="gymRestNext"></div>`;
+    document.body.appendChild(rest);
+  }
+
+  document.querySelectorAll(".prescription").forEach((el) => {
+    if (el.querySelector(".entry")) new StrengthEntry(el);
+  });
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+      if (visible.length) updateStickyBarFor(visible[0].target.closest(".prescription"));
+    },
+    { threshold: [0.3, 0.6, 0.9] }
+  );
+  document.querySelectorAll(".prescription .entry").forEach((el) => observer.observe(el));
 }
+
+document.addEventListener("DOMContentLoaded", initGymMode);
 
 async function toggleSwap(button, sessionId, pattern) {
   const container = button.nextElementSibling;

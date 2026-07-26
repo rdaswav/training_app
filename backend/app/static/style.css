@@ -104,26 +104,10 @@ nav a.active { color: var(--accent); font-weight: 600; }
 }
 .stat.st-done { background: rgba(53, 196, 174, 0.14); color: var(--good); } /* was an off-palette green (76,175,125); now --teal's rgb at the same alpha */
 .stat.st-flag { background: rgba(245, 166, 35, 0.14); color: var(--warn); cursor: help; }
-.prescription {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0;
-  border-bottom: 1px dashed var(--border);
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
+.prescription { padding: 0.6rem 0; border-bottom: 1px dashed var(--border); }
 .prescription:last-child { border-bottom: none; }
+.prescription-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .prescription .meta { color: var(--muted); font-size: 0.85rem; }
-.link-button {
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: 0.8rem;
-  cursor: pointer;
-  padding: 0.2rem 0;
-  text-decoration: underline;
-}
 .swap-picker {
   display: flex;
   gap: 0.4rem;
@@ -152,21 +136,170 @@ form.log-form input {
   background: transparent;
   color: var(--text);
 }
-.set-rows { display: flex; flex-direction: column; gap: 0.4rem; flex: 1 1 100%; }
-.set-row { display: flex; gap: 0.4rem; align-items: center; }
-.set-remove {
-  background: none;
-  border: 1px solid var(--border);
+
+/* ---------- strength entry: prefilled stepper logging (gym mode) ---------- */
+.entry { margin-top: 0.75rem; }
+.fieldrow { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.field { flex: 1 1 auto; text-align: center; min-width: 5.5rem; }
+.field label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--muted);
-  border-radius: 6px;
-  width: 1.8rem;
-  height: 1.8rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-  line-height: 1;
-  padding: 0;
+  margin-bottom: 0.4rem;
 }
-.set-actions { display: flex; gap: 0.6rem; align-items: center; flex: 1 1 100%; margin-top: 0.2rem; }
+.field .val { font-family: var(--disp); font-weight: 800; font-size: 1.8rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.field .val small { font-size: 0.8rem; color: var(--muted); font-weight: 600; margin-left: 0.15rem; }
+.field .step { display: flex; gap: 0.4rem; margin-top: 0.5rem; justify-content: center; }
+.stepbtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 1.3rem;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+.stepbtn:active { transform: scale(0.93); background: var(--slate2); }
+.field-rir { flex: 0 1 5rem; }
+.field-rir input {
+  width: 100%;
+  text-align: center;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 1rem;
+  min-height: 44px;
+}
+.hint { font-family: var(--mono); font-size: 0.75rem; color: var(--dim); text-align: center; margin-top: 0.7rem; }
+.hint b { color: var(--muted); }
+
+.done-row { display: flex; gap: 0.4rem; margin-top: 0.7rem; flex-wrap: wrap; align-items: center; }
+.dchip {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  background: rgba(53, 196, 174, 0.13);
+  color: var(--teal-hi);
+  border: 1px solid rgba(53, 196, 174, 0.22);
+}
+.dchip.pending { background: transparent; border: 1px dashed var(--line); color: var(--dim); }
+
+.cta {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 12px;
+  margin-top: 0.85rem;
+  background: linear-gradient(90deg, var(--teal), var(--teal-hi));
+  color: var(--ink);
+  border: none;
+  font-family: var(--disp);
+  font-weight: 800;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.cta:active { transform: scale(0.985); filter: brightness(0.94); }
+.cta:disabled { opacity: 0.6; cursor: default; }
+
+.swapbtn {
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--slate2);
+  margin-top: 0.6rem;
+  cursor: pointer;
+}
+
+/* ---------- sticky target bar: pinned while scrolling a multi-exercise session ---------- */
+.stick {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(14, 21, 34, 0.96);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  padding: 0.75rem 1rem 0.8rem;
+  display: none;
+  margin: 0 0 1rem;
+}
+.stick.on { display: block; }
+.stick .r1 { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.stick .ptn { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--violet); }
+.stick h4 { font-family: var(--disp); font-weight: 800; font-size: 1.15rem; line-height: 1.1; margin: 0.15rem 0 0; }
+.stick .setof { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); text-align: right; white-space: nowrap; }
+.stick .setof b { display: block; font-family: var(--disp); font-size: 1.2rem; color: var(--text); font-weight: 800; }
+.stick .r2 { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+.stick .chip { font-family: var(--mono); font-size: 0.75rem; padding: 0.3rem 0.6rem; border-radius: 7px; background: var(--slate2); color: var(--muted); }
+.stick .chip b { color: var(--text); }
+.stick .chip.tgt { background: rgba(139, 127, 232, 0.16); color: #c9c2ff; }
+.stick .chip.tgt b { color: #fff; }
+
+/* ---------- rest timer: full-screen overlay ---------- */
+.rest {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(9, 14, 22, 0.94);
+  backdrop-filter: blur(8px);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  text-align: center;
+  padding: 1rem;
+}
+.rest.on { display: flex; }
+.rest .lab { font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+.rest .clock { font-family: var(--disp); font-weight: 800; font-size: 4.2rem; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.rest .ring { width: 210px; height: 6px; background: var(--slate2); border-radius: 4px; overflow: hidden; margin: 0.9rem 0 1.6rem; }
+.rest .ring i { display: block; height: 100%; width: 100%; background: var(--amber); transition: width 1s linear; }
+.rest .acts { display: flex; gap: 0.6rem; }
+.rest .acts button { min-height: 48px; padding: 0 1.1rem; border-radius: 12px; border: 1px solid var(--line); background: var(--slate); font-family: var(--mono); font-size: 0.85rem; color: var(--text); }
+.rest .acts button.go { background: var(--teal); color: var(--ink); border-color: transparent; font-weight: 700; }
+.rest .nextup { font-family: var(--mono); font-size: 0.8rem; color: var(--dim); margin-top: 1.4rem; line-height: 1.6; }
+.rest .nextup b { color: var(--text); }
+
+/* ---------- undo toast: reversible, not a confirm dialog ---------- */
+.toast {
+  position: fixed;
+  bottom: 1.2rem;
+  left: 1rem;
+  right: 1rem;
+  z-index: 70;
+  max-width: 460px;
+  margin-inline: auto;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 0.8rem 0.9rem;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.7);
+}
+.toast.on { display: flex; }
+.toast span { font-size: 0.85rem; color: var(--muted); }
+.toast button { font-family: var(--mono); font-size: 0.85rem; color: var(--teal-hi); font-weight: 700; min-height: 40px; padding: 0 0.75rem; border-radius: 9px; background: rgba(53, 196, 174, 0.1); border: none; cursor: pointer; }
+
 button {
   background: var(--accent);
   color: var(--ink); /* was white -- 2.2:1 on teal, fails AA; ink-on-teal is 8.4:1 */
@@ -481,7 +614,7 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
   }
   button { padding: 0.6rem 1rem; min-height: 44px; font-size: 0.95rem; }
   .swap-picker select { min-height: 44px; }
-  .prescription { flex-direction: column; align-items: flex-start; }
+  .rest .clock { font-size: 3.2rem; }
 
   table.calendar { min-width: 480px; }
 

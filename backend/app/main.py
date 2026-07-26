@@ -219,6 +219,31 @@ def _attach_suggested_loads(db, athlete, sessions: list[PlannedSession]) -> None
         s.suggested_loads = suggested
 
 
+def _attach_last_logged_sets(db, athlete, sessions: list[PlannedSession]) -> None:
+    """For each strength session, attach a `last_logged` dict (pattern ->
+    {set_count, reps, weight_kg}) -- the athlete's most recent *actual* logged
+    sets for that pattern, distinct from suggested_loads' derived e1RM target.
+    This is the "Last: 3x5 @ 70" inline reference on the gym-mode sticky bar
+    (UI_AUDIT.md suggestion #4), not a training recommendation."""
+    strength_sessions = [s for s in sessions if s.type == SessionType.STRENGTH]
+    if not strength_sessions:
+        return
+    completed_rows = _recent_strength_completed_rows(db, athlete)
+    last_by_pattern: dict[str, dict] = {}
+    for row in completed_rows:
+        pattern = row.get("pattern")
+        sets = row.get("sets") or []
+        if not pattern or pattern in last_by_pattern or not sets:
+            continue  # rows are latest-first -- first hit per pattern is the most recent
+        last_by_pattern[pattern] = {
+            "set_count": len(sets),
+            "reps": sets[0]["reps"],
+            "weight_kg": sets[0]["weight_kg"],
+        }
+    for s in strength_sessions:
+        s.last_logged = last_by_pattern
+
+
 def _weeks_by_monday(sessions: list[PlannedSession]) -> dict[date, list[PlannedSession]]:
     weeks: dict[date, list[PlannedSession]] = {}
     for s in sessions:
@@ -313,6 +338,7 @@ def today_view(request: Request):
         )
         _attach_logged_patterns(db, sessions)
         _attach_suggested_loads(db, athlete, sessions)
+        _attach_last_logged_sets(db, athlete, sessions)
         race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
         days_to_race = (race.race_date - today).days if race else None
 
@@ -578,6 +604,7 @@ def session_view(session_id: int, request: Request):
         athlete = get_or_create_athlete(db)
         _attach_logged_patterns(db, [session])
         _attach_suggested_loads(db, athlete, [session])
+        _attach_last_logged_sets(db, athlete, [session])
         return templates.TemplateResponse("session.html", {"request": request, "s": session, "active": None})
     finally:
         db.close()
