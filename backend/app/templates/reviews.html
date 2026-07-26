@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reviews - Training App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  {% include "_nav.html" %}
+
+  <div class="header">
+    <span class="eyebrow">Weekly coach review</span>
+    <h1>Reviews</h1>
+  </div>
+
+  {% if not coach_configured %}
+    <p class="note">ANTHROPIC_API_KEY isn't set on this instance, so reviews record their computed metrics but no written analysis.</p>
+  {% endif %}
+
+  {% if not reviews %}
+    <p class="empty">No reviews yet. They generate automatically on Sunday evening, or POST to /api/coach/weekly-review to run one now.</p>
+  {% endif %}
+
+  {% for r in reviews %}
+    {% set m = r.metrics or {} %}
+    {% set c = (m.get("compliance") or {}).get("overall") or {} %}
+    {% set load = m.get("load") or {} %}
+    {% set plan = m.get("plan") or {} %}
+    <div class="card">
+      <div class="session-type">
+        Week of {{ r.week_start.strftime("%-d %b %Y") }}
+        {% if plan.get("phase_name") %} &middot; {{ plan.phase_name }}{% endif %}
+        {% if plan.get("week_index") %} &middot; week {{ plan.week_index }}{% if plan.get("total_weeks") %} of {{ plan.total_weeks }}{% endif %}{% endif %}
+      </div>
+
+      <div class="status-line">
+        {% if c.get("completion_pct") is not none %}
+          <span class="pill">{{ c.completed }}/{{ c.planned }} SESSIONS &middot; {{ c.completion_pct }}%</span>
+        {% endif %}
+        {% if load.get("run_km") is not none %}
+          <span class="pill">{{ load.run_km|round(1) }} KM
+            {%- if load.get("run_km_delta_pct") is not none %} &middot; {{ '+' if load.run_km_delta_pct >= 0 else '' }}{{ load.run_km_delta_pct }}%{% endif %}</span>
+        {% endif %}
+        {% if m.get("hr_ceiling_flags") %}
+          <span class="pill live">{{ m.hr_ceiling_flags|length }} OVER HR CEILING</span>
+        {% endif %}
+      </div>
+
+      {% if r.error %}
+        <p class="note">Not generated: {{ r.error }}</p>
+      {% endif %}
+
+      {% if r.markdown %}
+        <div class="review-body">{{ r.markdown|markdown }}</div>
+      {% endif %}
+
+      <details class="metrics-detail">
+        <summary>The numbers this was written from</summary>
+        {% if m.get("sessions") %}
+          <div class="calendar-scroll">
+            <table class="calendar review-sessions">
+              <thead>
+                <tr><th>Date</th><th>Session</th><th>Status</th><th>Prescribed</th><th>Actual</th></tr>
+              </thead>
+              <tbody>
+                {% for s in m.sessions %}
+                  <tr>
+                    <td>{{ s.date }}</td>
+                    <td>{{ s.name }}{% if s.role %} <span class="meta">({{ s.role }})</span>{% endif %}</td>
+                    <td>{{ s.status }}</td>
+                    <td>
+                      {% if s.prescribed_pace_sec_per_km %}{{ s.prescribed_pace_sec_per_km|pace }}{% endif %}
+                      {% if s.prescribed_hr_ceiling %} &middot; HR &le;{{ s.prescribed_hr_ceiling }}{% endif %}
+                    </td>
+                    <td>
+                      {% if s.actual_pace_sec_per_km %}{{ s.actual_pace_sec_per_km|pace }}{% endif %}
+                      {% if s.actual_hr %} &middot; HR {{ s.actual_hr }}{% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+        <pre class="metrics-json">{{ r.metrics|tojson(indent=2) }}</pre>
+      </details>
+
+      <div class="sync-status">
+        {% if r.model %}{{ r.model }} &middot; {{ r.input_tokens }} in / {{ r.output_tokens }} out &middot; {% endif %}
+        generated {{ r.created_at.strftime("%-d %b %H:%M") }}
+      </div>
+    </div>
+  {% endfor %}
+
+</body>
+</html>

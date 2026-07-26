@@ -191,3 +191,33 @@ class CompletedSession(Base):
     next_instruction: Mapped[str] = mapped_column(String, default="")
 
     planned_session: Mapped["PlannedSession"] = relationship(back_populates="completed")
+
+
+class CoachReview(Base):
+    """One LLM-written weekly review, keyed to the Monday of the week it covers.
+
+    The latest row for an athlete doubles as the weekly job's health record --
+    a skipped or failed run still writes a row carrying `error`, so there's no
+    need for last_run_at/last_error columns on AthleteProfile (which, unlike
+    this brand-new table, would have required a real column migration)."""
+
+    __tablename__ = "coach_reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    athlete_id: Mapped[int] = mapped_column(ForeignKey("athlete_profiles.id"))
+    week_start: Mapped[date] = mapped_column(Date)  # Monday of the reviewed week
+
+    # The exact deterministic payload handed to the model, and the exact user
+    # message rendered from it. Stored so a bad review can be traced to bad
+    # inputs at a glance rather than guessed at -- the whole point of computing
+    # the numbers here instead of letting the model derive them.
+    metrics: Mapped[dict] = mapped_column(JSON, default=dict)
+    prompt: Mapped[str] = mapped_column(String, default="")
+
+    markdown: Mapped[str] = mapped_column(String, default="")
+    model: Mapped[str] = mapped_column(String, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

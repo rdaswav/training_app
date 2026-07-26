@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -115,3 +115,27 @@ class ExerciseOut(BaseModel):
 class ExerciseSwapRequest(BaseModel):
     pattern: str
     exercise_name: str
+
+
+class CoachReviewRequest(BaseModel):
+    """`week_start` is any date inside the week to review -- it's normalized to
+    that week's Monday. Defaults to the most recently finished week."""
+
+    week_start: date | None = None
+
+
+class CoachReviewOut(BaseModel):
+    id: int
+    week_start: date
+    markdown: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    error: str | None
+    created_at: datetime
+
+    # The computed inputs travel with the prose deliberately: the review is only
+    # trustworthy if its numbers can be checked at a glance.
+    metrics: dict
+
+    model_config = {"from_attributes": True}

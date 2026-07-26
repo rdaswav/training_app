@@ -1,4 +1,6 @@
+import html
 import logging
+import re
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -6,17 +8,26 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 
 from app.api.routes import get_or_create_athlete, router
 from app.auth_middleware import BasicAuthMiddleware
-from app.config import DAILY_JOB_HOUR, DEFAULT_WEEK_TEMPLATE, ENABLE_SCHEDULER
+from app.config import (
+    DAILY_JOB_HOUR,
+    DEFAULT_WEEK_TEMPLATE,
+    ENABLE_SCHEDULER,
+    WEEKLY_REVIEW_DAY,
+    WEEKLY_REVIEW_HOUR,
+)
 from app.db import SessionLocal, init_db
 from app.engines import coaching_copy, dashboard_summary, load_summary
 from app.engines import strength as strength_engine
 from app.engines import vdot as vdot_engine
 from app.engines.running import week_start
+from app.integrations.anthropic_coach import coach_configured
 from app.jobs.daily_autoregulation import MAX_PACE_DRIFT_SEC_PER_KM, run_daily_job
-from app.models import CompletedSession, PlannedSession, Race, SessionType
+from app.jobs.weekly_review import run_weekly_review_job
+from app.models import CoachReview, CompletedSession, PlannedSession, Race, SessionType
 from app.plan_service import fitness_from_athlete
 from app.seed import seed_exercise_library
 
@@ -41,6 +52,17 @@ def _run_daily_job_with_own_session():
         logger.info("daily autoregulation job ran: %s", summary)
     except Exception:
         logger.exception("daily autoregulation job failed")
+    finally:
+        db.close()
+
+
+def _run_weekly_review_with_own_session():
+    db = SessionLocal()
+    try:
+        summary = run_weekly_review_job(db)
+        logger.info("weekly coach review job ran: %s", summary)
+    except Exception:
+        logger.exception("weekly coach review job failed")
     finally:
         db.close()
 
@@ -81,10 +103,63 @@ def format_goal_time(goal_time_sec: int | None) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
+_MD_BOLD = re.compile(r"\*\*(.+?)\*\*")
+_MD_ITALIC = re.compile(r"(?<!\*)\*([^*]+)\*(?!\*)")
+_MD_CODE = re.compile(r"`([^`]+)`")
+_MD_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
+
+
+def _markdown_inline(text: str) -> str:
+    text = _MD_BOLD.sub(r"<strong>\1</strong>", text)
+    text = _MD_ITALIC.sub(r"<em>\1</em>", text)
+    return _MD_CODE.sub(r"<code>\1</code>", text)
+
+
+def format_markdown(text: str | None) -> Markup:
+    """Minimal markdown -> HTML for the LLM-written coach reviews: headings,
+    bold/italic/code, bullet lists, paragraphs. Deliberately hand-rolled rather
+    than pulling in a markdown dependency for one page.
+
+    The source is escaped before any tag is emitted. This only ever renders our
+    own model's output, but rendering model output as unescaped HTML is exactly
+    how that becomes an injection bug the first time a review quotes something."""
+    if not text:
+        return Markup("")
+    out: list[str] = []
+    list_open = False
+    for raw_line in html.escape(text).split("\n"):
+        line = raw_line.strip()
+        if not line:
+            if list_open:
+                out.append("</ul>")
+                list_open = False
+            continue
+        if line.startswith(("- ", "* ")):
+            if not list_open:
+                out.append("<ul>")
+                list_open = True
+            out.append(f"<li>{_markdown_inline(line[2:])}</li>")
+            continue
+        if list_open:
+            out.append("</ul>")
+            list_open = False
+        heading = _MD_HEADING.match(line)
+        if heading:
+            # Shift down one level so the page's own <h1> stays the only h1.
+            level = min(len(heading.group(1)) + 1, 6)
+            out.append(f"<h{level}>{_markdown_inline(heading.group(2))}</h{level}>")
+            continue
+        out.append(f"<p>{_markdown_inline(line)}</p>")
+    if list_open:
+        out.append("</ul>")
+    return Markup("".join(out))
+
+
 templates.env.filters["pace"] = format_pace
 templates.env.filters["pace_mmss"] = format_pace_mmss
 templates.env.filters["duration"] = format_duration
 templates.env.filters["goal_time"] = format_goal_time
+templates.env.filters["markdown"] = format_markdown
 
 
 def _attach_logged_patterns(db, sessions: list[PlannedSession]) -> None:
@@ -206,6 +281,14 @@ def on_startup():
             "cron",
             hour=DAILY_JOB_HOUR,
             id="daily_autoregulation",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _run_weekly_review_with_own_session,
+            "cron",
+            day_of_week=WEEKLY_REVIEW_DAY,
+            hour=WEEKLY_REVIEW_HOUR,
+            id="weekly_coach_review",
             replace_existing=True,
         )
         scheduler.start()
@@ -432,6 +515,32 @@ def about_view(request: Request):
             )
 
         return templates.TemplateResponse("about.html", context)
+    finally:
+        db.close()
+
+
+@app.get("/reviews")
+def reviews_view(request: Request):
+    db = SessionLocal()
+    try:
+        athlete = get_or_create_athlete(db)
+        reviews = (
+            db.query(CoachReview)
+            .filter(CoachReview.athlete_id == athlete.id)
+            .order_by(CoachReview.week_start.desc())
+            .limit(12)
+            .all()
+        )
+        return templates.TemplateResponse(
+            "reviews.html",
+            {
+                "request": request,
+                "reviews": reviews,
+                "coach_configured": coach_configured(),
+                "timedelta": timedelta,
+                "active": "reviews",
+            },
+        )
     finally:
         db.close()
 

@@ -3,14 +3,18 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.coach_service import generate_weekly_review
 from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID
 from app.db import get_db
 from app.engines import autoregulation
+from app.engines.running import week_start as monday_of
 from app.engines.strength import all_prescriptions_logged
+from app.integrations.anthropic_coach import coach_configured
 from app.intervals_sync import delete_synced_events, sync_upcoming_runs_to_intervals
 from app.jobs.daily_autoregulation import run_daily_job
 from app.models import (
     AthleteProfile,
+    CoachReview,
     CompletedSession,
     Exercise,
     PlannedSession,
@@ -22,6 +26,8 @@ from app.plan_service import generate_and_persist_plan
 from app.schemas import (
     AthleteOut,
     AthleteUpdate,
+    CoachReviewOut,
+    CoachReviewRequest,
     ExerciseOut,
     ExerciseSwapRequest,
     PlanApplyRequest,
@@ -337,6 +343,30 @@ def trigger_daily_job(db: Session = Depends(get_db)):
     return run_daily_job(db)
 
 
+@router.post("/coach/weekly-review", response_model=CoachReviewOut)
+def create_weekly_review(payload: CoachReviewRequest, db: Session = Depends(get_db)):
+    """Generate (or regenerate) the coach review for one week.
+
+    Always writes a row, even with no API key configured -- the deterministic
+    metrics are the durable half, and persisting them with the resulting `error`
+    is how the inputs stay checkable without spending a token."""
+    athlete = get_or_create_athlete(db)
+    week = monday_of(payload.week_start) if payload.week_start else None
+    return generate_weekly_review(db, athlete, week_start=week)
+
+
+@router.get("/coach/reviews", response_model=list[CoachReviewOut])
+def list_coach_reviews(limit: int = 12, db: Session = Depends(get_db)):
+    athlete = get_or_create_athlete(db)
+    return (
+        db.query(CoachReview)
+        .filter(CoachReview.athlete_id == athlete.id)
+        .order_by(CoachReview.week_start.desc())
+        .limit(limit)
+        .all()
+    )
+
+
 @router.get("/config-check")
 def config_check():
     """Reports whether the running process sees the intervals.icu credentials as
@@ -345,4 +375,5 @@ def config_check():
     return {
         "intervals_icu_api_key_set": bool(INTERVALS_ICU_API_KEY),
         "intervals_icu_athlete_id_set": bool(INTERVALS_ICU_ATHLETE_ID),
+        "anthropic_api_key_set": coach_configured(),
     }

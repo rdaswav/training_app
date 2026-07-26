@@ -261,5 +261,11 @@ def test_config_check_never_exposes_actual_credential_values(client):
     resp = client.get("/api/config-check")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"intervals_icu_api_key_set", "intervals_icu_athlete_id_set"}
+    assert set(body.keys()) == {
+        "intervals_icu_api_key_set",
+        "intervals_icu_athlete_id_set",
+        "anthropic_api_key_set",
+    }
+    # The real guard: every value is a bool, so no endpoint change can ever start
+    # leaking a credential through here.
     assert all(isinstance(v, bool) for v in body.values())
