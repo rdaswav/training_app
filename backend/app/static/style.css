@@ -526,6 +526,27 @@ form.settings-form button {
 
 .calendar-scroll { overflow-x: auto; }
 
+/* Day cards: the <700px alternative to table.calendar/table.review-sessions.
+   Both views are built from the same underlying loop/dict in the template --
+   this is a pure display swap, not a second data path. */
+.calendar-cards { display: none; }
+.day-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  margin-bottom: 0.6rem;
+}
+.day-card:last-child { margin-bottom: 0; }
+.day-card-date {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+.day-card-rest { opacity: 0.7; }
+
 .load-chart { margin-bottom: 1rem; }
 .load-chart:last-child { margin-bottom: 0; }
 .load-chart-title {
@@ -617,6 +638,8 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
   color: var(--muted);
   max-height: 22rem;
   overflow: auto;
+  white-space: pre-wrap; /* was pre-only -- long JSON lines forced horizontal scroll on mobile */
+  overflow-wrap: break-word;
 }
 
 .weekgrid-scroll { overflow-x: auto; }
@@ -664,6 +687,8 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
   .rest .clock { font-size: 3.2rem; }
 
   table.calendar { min-width: 480px; }
+  .calendar-table-wrap { display: none; }
+  .calendar-cards { display: block; }
 
   .hero { flex-direction: column; align-items: stretch; }
   .countdown-card { min-width: 0; }

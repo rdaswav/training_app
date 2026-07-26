@@ -50,7 +50,7 @@
       <details class="metrics-detail">
         <summary>The numbers this was written from</summary>
         {% if m.get("sessions") %}
-          <div class="calendar-scroll">
+          <div class="calendar-table-wrap calendar-scroll">
             <table class="calendar review-sessions">
               <thead>
                 <tr><th>Date</th><th>Session</th><th>Status</th><th>Prescribed</th><th>Actual</th></tr>
@@ -73,6 +73,29 @@
                 {% endfor %}
               </tbody>
             </table>
+          </div>
+
+          <div class="calendar-cards">
+            {% for s in m.sessions %}
+              <div class="card day-card">
+                <div class="day-card-date">{{ s.date }} &middot; {{ s.status }}</div>
+                <strong>{{ s.name }}{% if s.role %} <span class="meta">({{ s.role }})</span>{% endif %}</strong>
+                {% if s.prescribed_pace_sec_per_km or s.prescribed_hr_ceiling %}
+                  <div class="meta">
+                    Target
+                    {% if s.prescribed_pace_sec_per_km %} {{ s.prescribed_pace_sec_per_km|pace }}{% endif %}
+                    {% if s.prescribed_hr_ceiling %} &middot; HR &le;{{ s.prescribed_hr_ceiling }}{% endif %}
+                  </div>
+                {% endif %}
+                {% if s.actual_pace_sec_per_km or s.actual_hr %}
+                  <div class="meta">
+                    Actual
+                    {% if s.actual_pace_sec_per_km %} {{ s.actual_pace_sec_per_km|pace }}{% endif %}
+                    {% if s.actual_hr %} &middot; HR {{ s.actual_hr }}{% endif %}
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
           </div>
         {% endif %}
         <pre class="metrics-json">{{ r.metrics|tojson(indent=2) }}</pre>
