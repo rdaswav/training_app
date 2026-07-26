@@ -29,6 +29,7 @@
   --mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 * { box-sizing: border-box; }
+:focus-visible { outline: 2px solid var(--teal-hi); outline-offset: 2px; }
 body {
   margin: 0;
   font-family: var(--body);
@@ -54,6 +55,7 @@ nav a {
   font-family: var(--mono);
 }
 nav a.active { color: var(--accent); font-weight: 600; }
+.nav-bottom { display: none; }
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -145,7 +147,7 @@ nav a.active { color: var(--accent); font-weight: 600; }
   white-space: nowrap;
 }
 .stat.st-done { background: rgba(53, 196, 174, 0.14); color: var(--good); } /* was an off-palette green (76,175,125); now --teal's rgb at the same alpha */
-.stat.st-flag { background: rgba(245, 166, 35, 0.14); color: var(--warn); cursor: help; }
+.stat.st-flag { background: rgba(255, 107, 107, 0.14); color: var(--red); cursor: help; } /* was amber -- collided with .session-hard/the "now" marker's effort/active meaning; "needs attention" gets its own colour */
 .prescription { padding: 0.6rem 0; border-bottom: 1px dashed var(--border); }
 .prescription:last-child { border-bottom: none; }
 .prescription-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
@@ -670,9 +672,80 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
    so there's a single mobile breakpoint across the app instead of a 600-700px
    dead zone between two competing ones. */
 @media (max-width: 700px) {
-  body { padding: 0.75rem; }
+  body { padding: 0.75rem; padding-bottom: calc(4.4rem + env(safe-area-inset-bottom)); }
   .header { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
-  nav a { margin-right: 0.75rem; padding: 0.25rem 0; display: inline-block; }
+
+  /* Bottom tab bar replaces the top nav row below 700px: Today/Plan/History
+     as the three daily destinations (48px+ targets), Reviews/Settings/About
+     behind "More" -- occasional destinations, not worth permanent thumb-zone
+     real estate. Native <details> for "More" needs no JS and is keyboard-
+     operable by default. */
+  .nav-top { display: none; }
+  .nav-bottom {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    background: rgba(14, 21, 34, 0.97);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line);
+    padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom));
+    justify-content: space-around;
+  }
+  .nav-bottom .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    min-width: 48px;
+    min-height: 48px;
+    padding: 0.3rem 0.5rem;
+    border-radius: 10px;
+    margin-right: 0;
+    color: var(--muted);
+    text-decoration: none;
+    font-family: var(--mono);
+    cursor: pointer;
+  }
+  .nav-bottom .tab.active { color: var(--accent); font-weight: 600; }
+  .nav-bottom .tab-ic { font-size: 1.1rem; line-height: 1; }
+  .nav-bottom .tab-lab { font-size: 0.65rem; letter-spacing: 0.02em; }
+  .tab-more { position: relative; }
+  .tab-more > summary { list-style: none; }
+  .tab-more > summary::-webkit-details-marker { display: none; }
+  .tab-more-menu {
+    position: absolute;
+    bottom: calc(100% + 0.6rem);
+    right: 0;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 140px;
+    box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.6);
+  }
+  .tab-more-menu a {
+    padding: 0.6rem 0.7rem;
+    border-radius: 8px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.85rem;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    margin-right: 0;
+  }
+  .tab-more-menu a.active { color: var(--accent); background: var(--slate2); font-weight: 600; }
+
+  /* The undo toast (turn 2) would otherwise sit underneath the fixed bottom
+     tab bar -- float it just above instead. */
+  .toast { bottom: calc(4.4rem + env(safe-area-inset-bottom)); }
 
   form.log-form { gap: 0.5rem; }
   form.log-form input {
@@ -702,4 +775,16 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
   .panel { padding: 1.1rem 1.1rem; }
   .disclosure > summary { padding: 0.9rem 1.1rem; }
   .disclosure .body { padding: 0 1.1rem 1.1rem; }
+}
+
+/* Every transition/animation introduced across turns 1-4: the rest-timer
+   countdown ring and the disclosure chevron rotation. The numeric rest
+   clock itself isn't animated (app.js sets its text directly each tick),
+   so disabling the ring's transition here is enough -- no JS change needed. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -1,8 +1,30 @@
-<nav>
+<nav class="nav-top">
   <a href="/" {% if active == "today" %}class="active"{% endif %}>Today</a>
   <a href="/plan" {% if active == "plan" %}class="active"{% endif %}>Plan</a>
   <a href="/strength-history" {% if active == "history" %}class="active"{% endif %}>History</a>
   <a href="/reviews" {% if active == "reviews" %}class="active"{% endif %}>Reviews</a>
   <a href="/settings" {% if active == "settings" %}class="active"{% endif %}>Settings</a>
   <a href="/about" {% if active == "about" %}class="active"{% endif %}>About</a>
+</nav>
+
+<nav class="nav-bottom">
+  <a href="/" class="tab {% if active == 'today' %}active{% endif %}">
+    <span class="tab-ic">&#9679;</span><span class="tab-lab">Today</span>
+  </a>
+  <a href="/plan" class="tab {% if active == 'plan' %}active{% endif %}">
+    <span class="tab-ic">&#9636;</span><span class="tab-lab">Plan</span>
+  </a>
+  <a href="/strength-history" class="tab {% if active == 'history' %}active{% endif %}">
+    <span class="tab-ic">&#8635;</span><span class="tab-lab">History</span>
+  </a>
+  <details class="tab-more">
+    <summary class="tab{% if active in ('reviews', 'settings', 'about') %} active{% endif %}">
+      <span class="tab-ic">&#8942;</span><span class="tab-lab">More</span>
+    </summary>
+    <div class="tab-more-menu">
+      <a href="/reviews" {% if active == "reviews" %}class="active"{% endif %}>Reviews</a>
+      <a href="/settings" {% if active == "settings" %}class="active"{% endif %}>Settings</a>
+      <a href="/about" {% if active == "about" %}class="active"{% endif %}>About</a>
+    </div>
+  </details>
 </nav>
