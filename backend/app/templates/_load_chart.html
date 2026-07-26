@@ -1,0 +1,41 @@
+{% macro load_chart(load_series, volume_delta_pct=none) %}
+<div class="load-chart">
+  <div class="load-chart-title">
+    Run volume (km)
+    {% if volume_delta_pct is not none %}
+      <span class="delta {{ 'up' if volume_delta_pct >= 0 else 'down' }}">{{ '▲' if volume_delta_pct >= 0 else '▼' }} {{ volume_delta_pct|abs }}% vs last week</span>
+    {% endif %}
+  </div>
+  <div class="load-chart-scroll">
+    <div class="load-chart-row">
+      {% for pt in load_series %}
+        <div class="load-col" title="{{ pt.week_start.strftime('%-d %b') }}: {{ pt.run_km|round(1) }} km">
+          <div class="load-col-bars">
+            <div class="load-bar run-bar" style="height: {{ pt.run_pct }}%;"></div>
+          </div>
+          <div class="load-col-label">{{ pt.week_start.strftime('%-d %b') }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+<div class="load-chart">
+  <div class="load-chart-title">Strength tonnage (kg)</div>
+  <div class="load-chart-scroll">
+    <div class="load-chart-row">
+      {% for pt in load_series %}
+        <div class="load-col" title="{{ pt.week_start.strftime('%-d %b') }}: {% if pt.tonnage_kg is none %}not yet logged{% else %}{{ pt.tonnage_kg|round|int }} kg{% endif %}">
+          <div class="load-col-bars">
+            {% if pt.tonnage_kg is none %}
+              <div class="load-bar-empty"></div>
+            {% else %}
+              <div class="load-bar tonnage-bar" style="height: {{ pt.tonnage_pct }}%;"></div>
+            {% endif %}
+          </div>
+          <div class="load-col-label">{{ pt.week_start.strftime('%-d %b') }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endmacro %}

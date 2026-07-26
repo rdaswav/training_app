@@ -473,6 +473,7 @@ def about_view(request: Request):
             "phase_order": coaching_copy.PHASE_ORDER,
             "mode_copy": coaching_copy.MODE_COPY,
             "phase_colors": PHASE_COLORS,
+            "phase_segments": [],
             "load_series": [],
             "week_grid": [],
             "total_weeks": 0,
@@ -494,6 +495,18 @@ def about_view(request: Request):
             ]
             current_phase = dashboard_summary.active_phase(phases, today)
             current_phase_name = current_phase["name"] if current_phase else None
+            total_days = max((end - start).days + 1, 1)
+            phase_segments = [
+                {
+                    "name": p["name"],
+                    "focus": p["focus"],
+                    "pct": round(((p["end_date"] - p["start_date"]).days + 1) / total_days * 100, 2),
+                    "color": PHASE_COLORS.get(p["name"], "#888"),
+                    "start_date": p["start_date"],
+                    "end_date": p["end_date"],
+                }
+                for p in phases
+            ]
             weeks_out = (race.race_date - today).days // 7
             week_idx = dashboard_summary.global_week_index(start, today)
             mesocycle_start_week = race.macrocycle.mesocycle_start_week or 0
@@ -528,6 +541,7 @@ def about_view(request: Request):
             context.update(
                 {
                     "current_phase_name": current_phase_name,
+                    "phase_segments": phase_segments,
                     "weeks_out": weeks_out,
                     "mesocycle_status": mesocycle_status,
                     "load_series": load_series,

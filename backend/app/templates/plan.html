@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Plan - Training App{% endblock %}
 {% block content %}
+  {% from "_phase_strip.html" import phase_strip %}
+  {% from "_load_chart.html" import load_chart %}
   {% if race %}
     <div class="hero">
       <div>
@@ -24,16 +26,7 @@
     </div>
 
     <div class="ribbon">
-      <div class="phases">
-        {% for seg in phase_segments %}
-          <div class="phase-block{% if current_phase and seg.name == current_phase.name %} active{% endif %}" style="flex: {{ seg.pct }};" title="{{ seg.name }}: {{ seg.focus }}">
-            <span class="ph-top" style="background: {{ seg.color }};"></span>
-            <div class="wk">{{ seg.start_date.strftime("%-d %b") }}&ndash;{{ seg.end_date.strftime("%-d %b") }}</div>
-            <h3>{{ seg.name }}</h3>
-            <div class="foc">{{ seg.focus }}</div>
-          </div>
-        {% endfor %}
-      </div>
+      {{ phase_strip(phase_segments, current_phase.name if current_phase else none) }}
       <div class="track">
         <div class="weeks">
           {% for tick in ticks %}<i class="{{ tick.status }}"></i>{% endfor %}
@@ -54,45 +47,7 @@
       {% if load_series %}
       <div class="card load-summary">
         <h3>Weekly Load</h3>
-        <div class="load-chart">
-          <div class="load-chart-title">
-            Run volume (km)
-            {% if volume_delta_pct is not none %}
-              <span class="delta {{ 'up' if volume_delta_pct >= 0 else 'down' }}">{{ '▲' if volume_delta_pct >= 0 else '▼' }} {{ volume_delta_pct|abs }}% vs last week</span>
-            {% endif %}
-          </div>
-          <div class="load-chart-scroll">
-            <div class="load-chart-row">
-              {% for pt in load_series %}
-                <div class="load-col" title="{{ pt.week_start.strftime('%-d %b') }}: {{ pt.run_km|round(1) }} km">
-                  <div class="load-col-bars">
-                    <div class="load-bar run-bar" style="height: {{ pt.run_pct }}%;"></div>
-                  </div>
-                  <div class="load-col-label">{{ pt.week_start.strftime('%-d %b') }}</div>
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-        <div class="load-chart">
-          <div class="load-chart-title">Strength tonnage (kg)</div>
-          <div class="load-chart-scroll">
-            <div class="load-chart-row">
-              {% for pt in load_series %}
-                <div class="load-col" title="{{ pt.week_start.strftime('%-d %b') }}: {% if pt.tonnage_kg is none %}not yet logged{% else %}{{ pt.tonnage_kg|round|int }} kg{% endif %}">
-                  <div class="load-col-bars">
-                    {% if pt.tonnage_kg is none %}
-                      <div class="load-bar-empty"></div>
-                    {% else %}
-                      <div class="load-bar tonnage-bar" style="height: {{ pt.tonnage_pct }}%;"></div>
-                    {% endif %}
-                  </div>
-                  <div class="load-col-label">{{ pt.week_start.strftime('%-d %b') }}</div>
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
+        {{ load_chart(load_series, volume_delta_pct) }}
       </div>
       {% endif %}
 

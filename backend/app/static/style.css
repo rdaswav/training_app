@@ -64,6 +64,48 @@ nav a.active { color: var(--accent); font-weight: 600; }
 .card.session-easy { border-left: 4px solid var(--teal); }
 .card.session-hard { border-left: 4px solid var(--amber); }
 .card.session-strength { border-left: 4px solid var(--violet); }
+
+/* ---------- surface tiers (About restructure): panel/subpanel, additive to .card ---------- */
+.panel { background: var(--slate); border: 1px solid var(--line-soft); border-radius: 16px; padding: 1.4rem 1.5rem; margin-bottom: 1rem; }
+.panel h2 { font-family: var(--disp); font-weight: 700; font-size: 1.05rem; margin-bottom: 0.9rem; }
+.subpanel { background: var(--ink); border-radius: 12px; padding: 0.9rem 1rem; }
+.lede { color: var(--muted); font-size: 0.95rem; margin-top: 0.6rem; max-width: 60ch; }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.two h3 { margin-bottom: 0.55rem; }
+.two p { font-size: 0.9rem; color: var(--muted); }
+.two .mode { background: var(--ink); border-radius: 12px; padding: 0.95rem 1rem; }
+.two .mode.on { background: var(--slate2); box-shadow: 0 0 0 1px rgba(139, 127, 232, 0.35) inset; }
+
+/* progressive disclosure: everything operational lives behind this on About */
+.disclosure { background: var(--slate); border: 1px solid var(--line-soft); border-radius: 16px; margin-bottom: 1rem; }
+.disclosure > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 1.05rem 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 56px;
+}
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary .t { font-family: var(--disp); font-weight: 700; font-size: 0.95rem; }
+.disclosure > summary .d { font-family: var(--mono); font-size: 0.75rem; color: var(--dim); margin-top: 0.15rem; }
+.disclosure > summary .car { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); flex: none; display: inline-block; transition: transform 0.2s ease; }
+.disclosure[open] > summary .car { transform: rotate(90deg); }
+.disclosure .body { padding: 0 1.4rem 1.3rem; }
+
+/* numbers as rows, not a table */
+.rows { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.6rem; }
+.rows .row { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.55rem 0; border-bottom: 1px solid var(--line-soft); font-size: 0.9rem; }
+.rows .row .l { color: var(--muted); }
+.rows .row .v { font-family: var(--mono); color: var(--text); white-space: nowrap; }
+
+.lm { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+.lmc { background: var(--ink); border-radius: 10px; padding: 0.65rem 0.7rem; }
+.lmc .k { font-family: var(--mono); font-size: 0.7rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.lmc .n { font-family: var(--mono); font-size: 0.9rem; margin-top: 0.3rem; color: var(--text); }
 .session-type {
   display: inline-block;
   font-size: 0.7rem;
@@ -386,6 +428,7 @@ table.calendar th, table.calendar td {
   color: var(--muted);
 }
 .pill.live { color: var(--amber-hi); border-color: rgba(245, 166, 35, 0.45); background: rgba(245, 166, 35, 0.08); }
+.pill.str { color: #c9c2ff; border-color: rgba(139, 127, 232, 0.4); background: rgba(139, 127, 232, 0.09); }
 .goal { color: var(--muted); font-size: 0.9rem; margin-top: 0.4rem; }
 .countdown-card {
   background: var(--slate2);
@@ -599,7 +642,11 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
 .landmark-table td.v { color: var(--text); font-family: var(--mono); }
 .landmark-table th { font-family: var(--mono); text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em; }
 
-@media (max-width: 600px) {
+/* was max-width: 600px -- widened to 700px to match the reference builds
+   (about-redesign.html, gym-mode.html) and the rest of the UI-audit turns,
+   so there's a single mobile breakpoint across the app instead of a 600-700px
+   dead zone between two competing ones. */
+@media (max-width: 700px) {
   body { padding: 0.75rem; }
   .header { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
   nav a { margin-right: 0.75rem; padding: 0.25rem 0; display: inline-block; }
@@ -624,4 +671,10 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
   .phase-block { flex: 1 1 calc(50% - 6px) !important; }
   .flag, .nowmark { display: none; }
   .stats { grid-template-columns: 1fr; }
+
+  .two, .rows { grid-template-columns: 1fr; }
+  .lm { grid-template-columns: 1fr 1fr; }
+  .panel { padding: 1.1rem 1.1rem; }
+  .disclosure > summary { padding: 0.9rem 1.1rem; }
+  .disclosure .body { padding: 0 1.1rem 1.1rem; }
 }

@@ -1,194 +1,161 @@
 {% extends "base.html" %}
 {% block title %}About - Training App{% endblock %}
 {% block content %}
+  {% from "_phase_strip.html" import phase_strip %}
+  {% from "_load_chart.html" import load_chart %}
+
   <div class="header">
-    <span class="eyebrow">The innards of the plan</span>
-    <h1>Program &amp; Periodization</h1>
+    <span class="eyebrow">How the plan is built</span>
+    <h1>Two engines, one calendar</h1>
+    <p class="lede">A run periodization engine ramps volume and intensity toward race day. An RP-style strength engine builds and maintains strength around it. Everything below is this plan&rsquo;s actual output, not a description of it.</p>
   </div>
 
   {% if race %}
-    <div class="card">
-      <h3>Right now</h3>
-      <div class="status-line">
-        <span class="pill live">{{ race.name|upper }}</span>
-        <span class="pill">PRIORITY {{ race.priority.value|upper }}</span>
-      </div>
-      <p class="goal">
-        {{ race.distance_km }} km on {{ race.race_date.strftime("%a %-d %b %Y") }}
-        {% if weeks_out is not none %} &middot; {{ weeks_out }} weeks out{% endif %}
-        {% if week_idx is not none and total_weeks %} &middot; week {{ week_idx + 1 }} of {{ total_weeks }}{% endif %}
-      </p>
-      {% if current_phase_name %}
-        <div class="mrow"><span class="l">Current phase</span><span class="v">{{ current_phase_name }} &middot; {{ phase_copy.get(current_phase_name) }}</span></div>
+    <div class="status-line">
+      <span class="pill live">{{ race.name|upper }}{% if weeks_out is not none %} &middot; {{ weeks_out }}W OUT{% endif %}</span>
+      {% if current_phase_name and week_idx is not none and total_weeks %}
+        <span class="pill">WEEK {{ week_idx + 1 }} OF {{ total_weeks }} &middot; {{ current_phase_name|upper }}</span>
       {% endif %}
       {% if mesocycle_status %}
-        <div class="mrow"><span class="l">Strength mode</span><span class="v">{{ mesocycle_status.mode }} &middot; week {{ mesocycle_status.local_week + 1 }}/{{ mesocycle_status.mesocycle_length }} of the mesocycle</span></div>
+        <span class="pill str">STRENGTH &middot; {{ mesocycle_status.mode|upper }}, WK {{ mesocycle_status.local_week + 1 }}/{{ mesocycle_status.mesocycle_length }}</span>
       {% endif %}
     </div>
 
-    <div class="card">
-      <h3>Under the hood -- this athlete's live numbers</h3>
-      <div class="numbers-grid">
-        <div>
-          <div class="mrow"><span class="l">VDOT (fitness score)</span><span class="v">{{ vdot }}</span></div>
-          <div class="mrow"><span class="l">Threshold pace</span><span class="v">{{ athlete.threshold_pace_sec_per_km|pace }}</span></div>
-          <div class="mrow"><span class="l">Easy pace</span><span class="v">{{ athlete.easy_pace_sec_per_km|pace }}</span></div>
-          <div class="mrow"><span class="l">Baseline (drift bound &plusmn;{{ max_pace_drift }}s/km)</span><span class="v">{{ athlete.threshold_pace_baseline_sec_per_km|pace }} thr &middot; {{ athlete.easy_pace_baseline_sec_per_km|pace }} easy</span></div>
-          <div class="mrow"><span class="l">Race pace{% if race.goal_time_sec %} (from goal time){% endif %}</span><span class="v">{{ race_pace_sec_per_km|pace }}</span></div>
-        </div>
-        <div>
-          <table class="landmark-table">
-            <thead><tr><th>Category</th><th>MEV</th><th>MAV</th><th>MRV</th></tr></thead>
-            <tbody>
-              {% for category, lm in landmarks.items() %}
-                <tr><td>{{ category }}</td><td class="v">{{ lm.mev }}</td><td class="v">{{ lm.mav }}</td><td class="v">{{ lm.mrv }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          {% if e1rm_by_pattern %}
-            <table class="landmark-table">
-              <thead><tr><th>Pattern</th><th>Est. 1RM</th></tr></thead>
-              <tbody>
-                {% for pattern, e1rm in e1rm_by_pattern.items() %}
-                  <tr><td>{{ pattern }}</td><td class="v">{{ e1rm|round(1) }} kg</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          {% else %}
-            <p class="empty">No strength sets logged yet -- e1RM per pattern will appear here once you do.</p>
-          {% endif %}
-        </div>
+    {% if phase_segments %}
+      <div class="panel">
+        <h2>The running phases</h2>
+        {{ phase_strip(phase_segments, current_phase_name) }}
       </div>
-      <p class="note">
-        Sets/reps come from RP-style volume landmarks (MEV&rarr;MAV&rarr;MRV) per movement-pattern
-        category. Working weight is computed from each pattern's own most recent estimated 1RM
-        (Epley formula), not a generic percentage table.
-      </p>
-    </div>
-
-    {% if load_series %}
-    <div class="card">
-      <h3>Periodization -- the whole plan, one chart</h3>
-      <div class="load-chart">
-        <div class="load-chart-title">Run volume (km) per week</div>
-        <div class="load-chart-scroll">
-          <div class="load-chart-row">
-            {% for pt in load_series %}
-              <div class="load-col" title="{{ pt.week_start.strftime('%-d %b') }}: {{ pt.run_km|round(1) }} km">
-                <div class="load-col-bars"><div class="load-bar run-bar" style="height: {{ pt.run_pct }}%;"></div></div>
-                <div class="load-col-label">{{ pt.week_start.strftime('%-d %b') }}</div>
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-      <div class="load-chart">
-        <div class="load-chart-title">Strength tonnage (kg) per week</div>
-        <div class="load-chart-scroll">
-          <div class="load-chart-row">
-            {% for pt in load_series %}
-              <div class="load-col" title="{{ pt.week_start.strftime('%-d %b') }}: {% if pt.tonnage_kg is none %}not yet logged{% else %}{{ pt.tonnage_kg|round|int }} kg{% endif %}">
-                <div class="load-col-bars">
-                  {% if pt.tonnage_kg is none %}<div class="load-bar-empty"></div>
-                  {% else %}<div class="load-bar tonnage-bar" style="height: {{ pt.tonnage_pct }}%;"></div>{% endif %}
-                </div>
-                <div class="load-col-label">{{ pt.week_start.strftime('%-d %b') }}</div>
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-      <p class="note">This is the entire macrocycle, start to taper -- the ramp, the down-weeks, and the drop into race week are all visible in the bar heights above.</p>
-    </div>
     {% endif %}
 
-    {% if week_grid %}
-    <div class="card">
-      <h3>How the two clocks line up</h3>
-      <div class="weekgrid-scroll">
-        <div class="weekgrid-row">
-          <span class="weekgrid-label">Phase</span>
-          {% for wk in week_grid %}
-            <div class="wk-cell" style="background: {{ phase_colors.get(wk.phase_name, '#888') }};" title="Week {{ wk.week_num }}: {{ wk.phase_name }}"></div>
-          {% endfor %}
+    {% if mesocycle_status %}
+      <div class="panel">
+        <h2>What strength does as the race approaches</h2>
+        <div class="two">
+          <div class="mode{% if mesocycle_status.mode == 'accumulate' %} on{% endif %}">
+            <h3>Accumulate{% if mesocycle_status.mode == 'accumulate' %} &middot; now{% endif %}</h3>
+            <p>{{ mode_copy.get('accumulate') }}</p>
+          </div>
+          <div class="mode{% if mesocycle_status.mode == 'maintenance' %} on{% endif %}">
+            <h3>Maintenance{% if mesocycle_status.mode == 'maintenance' %} &middot; now{% endif %}</h3>
+            <p>{{ mode_copy.get('maintenance') }}</p>
+          </div>
         </div>
-        <div class="weekgrid-row">
-          <span class="weekgrid-label">Running recovery</span>
-          {% for wk in week_grid %}
-            <div class="wk-cell{% if wk.is_running_recovery %} recovery{% endif %}" title="Week {{ wk.week_num }}: {{ 'down-week/taper' if wk.is_running_recovery else 'normal load' }}"></div>
-          {% endfor %}
-        </div>
-        <div class="weekgrid-row">
-          <span class="weekgrid-label">Strength deload</span>
-          {% for wk in week_grid %}
-            <div class="wk-cell{% if wk.is_strength_deload %} on{% endif %}" title="Week {{ wk.week_num }}: {{ 'deload' if wk.is_strength_deload else 'accumulating' }}"></div>
-          {% endfor %}
-        </div>
+        <p class="note">Through the taper it drops to minimal: {{ mode_copy.get('minimal') }}</p>
       </div>
-      <p class="note">
-        The running plan's own recovery weeks (teal) don't share a period with the 5-week
-        strength mesocycle's deload weeks (amber) -- 4 vs 5 weeks never lines up every cycle.
-        The mesocycle's start offset is chosen to land its deloads as close as possible to
-        the running plan's recovery weeks anyway, rather than forcing an exact match.
-      </p>
+    {% endif %}
+
+    <div class="panel">
+      <h2>The one guardrail</h2>
+      <p class="lede">A hard lower-body session shouldn&rsquo;t sit the day before a key quality run. When there&rsquo;s a free day, the calendar shuffles it. When there isn&rsquo;t, it flags the conflict in place rather than letting it slide &mdash; informational, not a blocker.</p>
     </div>
+
+    <details class="disclosure">
+      <summary>
+        <span><span class="t">Your current numbers</span><span class="d">VDOT, paces, drift bounds, race pace</span></span>
+        <span class="car">&#9656;</span>
+      </summary>
+      <div class="body">
+        <div class="rows">
+          <div class="row"><span class="l">VDOT (fitness score)</span><span class="v">{{ vdot }}</span></div>
+          <div class="row"><span class="l">Threshold pace</span><span class="v">{{ athlete.threshold_pace_sec_per_km|pace }}</span></div>
+          <div class="row"><span class="l">Easy pace</span><span class="v">{{ athlete.easy_pace_sec_per_km|pace }}</span></div>
+          <div class="row"><span class="l">Race pace{% if race.goal_time_sec %} (from goal time){% endif %}</span><span class="v">{{ race_pace_sec_per_km|pace }}</span></div>
+          <div class="row"><span class="l">Baseline threshold</span><span class="v">{{ athlete.threshold_pace_baseline_sec_per_km|pace }}</span></div>
+          <div class="row"><span class="l">Drift bound</span><span class="v">&plusmn;{{ max_pace_drift }} s/km of baseline</span></div>
+        </div>
+        <p class="note">Paces autoregulate off real sessions, but only within a bounded drift from your profile baseline, so a couple of rough weeks can&rsquo;t drag the plan off course.</p>
+      </div>
+    </details>
+
+    <details class="disclosure">
+      <summary>
+        <span><span class="t">Strength volume landmarks</span><span class="d">MEV &rarr; MAV &rarr; MRV per movement-pattern category</span></span>
+        <span class="car">&#9656;</span>
+      </summary>
+      <div class="body">
+        {% for category, lm in landmarks.items() %}
+          <div class="lm" {% if not loop.first %}style="margin-top: 0.5rem;"{% endif %}>
+            <div class="lmc"><div class="k">Category</div><div class="n">{{ category }}</div></div>
+            <div class="lmc"><div class="k">MEV</div><div class="n">{{ lm.mev }} sets</div></div>
+            <div class="lmc"><div class="k">MAV</div><div class="n">{{ lm.mav }} sets</div></div>
+            <div class="lmc"><div class="k">MRV</div><div class="n">{{ lm.mrv }} sets</div></div>
+          </div>
+        {% endfor %}
+        {% if e1rm_by_pattern %}
+          <div class="rows" style="margin-top: 0.9rem;">
+            {% for pattern, e1rm in e1rm_by_pattern.items() %}
+              <div class="row"><span class="l">{{ pattern }} est. 1RM</span><span class="v">{{ e1rm|round(1) }} kg</span></div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty" style="margin-top: 0.9rem;">No strength sets logged yet &mdash; estimated 1RM per pattern will appear here once you do.</p>
+        {% endif %}
+        <p class="note">Working weight comes from each pattern&rsquo;s own most recent estimated 1RM (Epley), not a generic percentage table.</p>
+      </div>
+    </details>
+
+    <details class="disclosure">
+      <summary>
+        <span><span class="t">What each phase means</span><span class="d">Base &rarr; Re-base &rarr; Build 1 &rarr; Build 2 &rarr; Taper</span></span>
+        <span class="car">&#9656;</span>
+      </summary>
+      <div class="body">
+        {% for name in phase_order %}
+          <div class="subpanel"{% if not loop.first %} style="margin-top: 0.6rem;"{% endif %}>
+            <h3>{{ name }}{% if name == current_phase_name %} &middot; now{% endif %}</h3>
+            <p class="note" style="margin-top: 0.3rem;">{{ phase_copy.get(name) }}</p>
+          </div>
+        {% endfor %}
+      </div>
+    </details>
+
+    {% if week_grid %}
+    <details class="disclosure">
+      <summary>
+        <span><span class="t">Why the two clocks don&rsquo;t line up</span><span class="d">4-week run recovery vs. 5-week strength deload</span></span>
+        <span class="car">&#9656;</span>
+      </summary>
+      <div class="body">
+        <div class="weekgrid-scroll">
+          <div class="weekgrid-row">
+            <span class="weekgrid-label">Phase</span>
+            {% for wk in week_grid %}
+              <div class="wk-cell" style="background: {{ phase_colors.get(wk.phase_name, '#888') }};" title="Week {{ wk.week_num }}: {{ wk.phase_name }}"></div>
+            {% endfor %}
+          </div>
+          <div class="weekgrid-row">
+            <span class="weekgrid-label">Running recovery</span>
+            {% for wk in week_grid %}
+              <div class="wk-cell{% if wk.is_running_recovery %} recovery{% endif %}" title="Week {{ wk.week_num }}: {{ 'down-week/taper' if wk.is_running_recovery else 'normal load' }}"></div>
+            {% endfor %}
+          </div>
+          <div class="weekgrid-row">
+            <span class="weekgrid-label">Strength deload</span>
+            {% for wk in week_grid %}
+              <div class="wk-cell{% if wk.is_strength_deload %} on{% endif %}" title="Week {{ wk.week_num }}: {{ 'deload' if wk.is_strength_deload else 'accumulating' }}"></div>
+            {% endfor %}
+          </div>
+        </div>
+        <p class="note">
+          The running plan&rsquo;s recovery weeks and the strength mesocycle&rsquo;s deloads run on different periods, so they never coincide every cycle. The mesocycle start offset is chosen to land deloads as close as possible to running down-weeks rather than forcing an exact match, which would distort one system to flatter the other.
+        </p>
+      </div>
+    </details>
+    {% endif %}
+
+    {% if load_series %}
+    <details class="disclosure">
+      <summary>
+        <span><span class="t">The whole plan, one chart</span><span class="d">Weekly run volume and strength tonnage, start to taper</span></span>
+        <span class="car">&#9656;</span>
+      </summary>
+      <div class="body">
+        {{ load_chart(load_series) }}
+      </div>
+    </details>
     {% endif %}
   {% else %}
     <p class="empty">No race configured yet. POST to /api/races to generate a plan.</p>
   {% endif %}
-
-  <div class="card">
-    <h3>Two systems, one plan</h3>
-    <p>
-      This program runs two training systems in parallel: a run periodization engine
-      that ramps volume and intensity toward race day, and an RP-style strength engine
-      (MEV &rarr; MAV &rarr; MRV &rarr; deload) that builds and maintains strength around it.
-      The chart and week grid above are that plan's actual output, not a description of it.
-    </p>
-    <p>
-      The calendar also enforces one guardrail: a hard lower-body strength session
-      shouldn't sit right before a key quality run. When there's no free day to shuffle
-      a session into, the calendar flags the conflict instead of silently letting it
-      slide -- worth a glance, not a blocker.
-    </p>
-  </div>
-
-  <div class="card">
-    <h3>The phases</h3>
-    <div class="stats">
-      {% for name in phase_order %}
-        <div class="card{% if name == current_phase_name %} session-hard{% endif %}">
-          <h3>{{ name }}{% if name == current_phase_name %} &middot; now{% endif %}</h3>
-          <p>{{ phase_copy.get(name) }}</p>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <div class="card">
-    <h3>Strength modes</h3>
-    <div class="stats">
-      {% for mode_name, copy in mode_copy.items() %}
-        <div class="card{% if mesocycle_status and mode_name == mesocycle_status.mode %} session-strength{% endif %}">
-          <h3>{{ mode_name|capitalize }}{% if mesocycle_status and mode_name == mesocycle_status.mode %} &middot; now{% endif %}</h3>
-          <p>{{ copy }}</p>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <div class="card">
-    <h3>Why the plan moves</h3>
-    <p>
-      Run paces and HR ceilings autoregulate off real sessions, not just the calendar --
-      but only within a bounded drift from your profile-set baseline (the numbers above),
-      so a couple of rough weeks can't drag the whole plan off course.
-    </p>
-    <p>
-      Strength progression works the same way: sets and RIR move based on what you
-      actually log, with the load target computed from your own estimated 1RM rather
-      than a generic percentage table. Both systems are trying to do the same thing --
-      react to how training is actually going, inside guardrails that keep the plan honest.
-    </p>
-  </div>
 {% endblock %}

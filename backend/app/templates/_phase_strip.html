@@ -1,0 +1,12 @@
+{% macro phase_strip(phase_segments, current_phase_name=none) %}
+<div class="phases">
+  {% for seg in phase_segments %}
+    <div class="phase-block{% if current_phase_name and seg.name == current_phase_name %} active{% endif %}" style="flex: {{ seg.pct }};" title="{{ seg.name }}: {{ seg.focus }}">
+      <span class="ph-top" style="background: {{ seg.color }};"></span>
+      <div class="wk">{{ seg.start_date.strftime("%-d %b") }}&ndash;{{ seg.end_date.strftime("%-d %b") }}</div>
+      <h3>{{ seg.name }}</h3>
+      <div class="foc">{{ seg.focus }}</div>
+    </div>
+  {% endfor %}
+</div>
+{% endmacro %}
