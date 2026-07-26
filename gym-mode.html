@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Gym mode — reference build</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0e1522; --slate:#16202f; --slate2:#1e2a3b; --raised:#22303f;
+  --line:#2a3a4d; --line-soft:#223141;
+  --text:#e7edf3; --muted:#9fb2c7;      /* lifted from #8da0b6 */
+  --dim:#7d90a6;                         /* lifted from #5e7085 → 4.9:1 */
+  --amber:#f5a623; --amber-hi:#ffc470;
+  --teal:#35c4ae; --teal-hi:#5fe0cc; --teal-dim:#1f6e64;
+  --red:#ff6b6b; --violet:#8b7fe8;
+  --disp:'Archivo',sans-serif; --body:'Inter',sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --tap:48px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  background:var(--ink);color:var(--text);font-family:var(--body);
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:calc(84px + env(safe-area-inset-bottom));
+  max-width:460px;margin-inline:auto;position:relative;min-height:100vh;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+:focus-visible{outline:2px solid var(--teal-hi);outline-offset:2px}
+
+/* ---------- sticky target bar: the thing you glance at ---------- */
+.stick{
+  position:sticky;top:0;z-index:30;background:rgba(14,21,34,.96);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--line);
+  padding:12px 16px 13px;
+}
+.stick .r1{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ptn{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--violet)}
+.stick h1{font-family:var(--disp);font-weight:800;font-size:25px;line-height:1.05;margin-top:3px}
+.setof{font-family:var(--mono);font-size:13px;color:var(--muted);text-align:right;white-space:nowrap}
+.setof b{display:block;font-family:var(--disp);font-size:22px;color:var(--text);font-weight:800}
+.stick .r2{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
+.chip{font-family:var(--mono);font-size:12.5px;padding:5px 10px;border-radius:7px;background:var(--slate2);color:var(--muted)}
+.chip b{color:var(--text)}
+.chip.tgt{background:rgba(139,127,232,.16);color:#c9c2ff}
+.chip.tgt b{color:#fff}
+.prog{height:4px;background:var(--slate2);border-radius:3px;margin-top:12px;overflow:hidden}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--teal-hi));transition:width .35s ease}
+
+/* ---------- set entry ---------- */
+.pad{padding:18px 16px 0}
+.entry{background:var(--slate);border:1px solid var(--line);border-radius:18px;padding:18px 16px 16px}
+.fieldrow{display:flex;gap:12px}
+.field{flex:1;text-align:center}
+.field label{display:block;font-family:var(--mono);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.val{font-family:var(--disp);font-weight:800;font-size:40px;line-height:1;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}
+.val small{font-size:15px;color:var(--muted);font-weight:600;margin-left:3px}
+.step{display:flex;gap:8px;margin-top:11px;justify-content:center}
+.step button{
+  width:var(--tap);height:var(--tap);border-radius:12px;background:var(--raised);
+  border:1px solid var(--line);color:var(--text);font-size:22px;font-weight:600;
+  display:grid;place-items:center;line-height:1;transition:transform .08s ease,background .15s
+}
+.step button:active{transform:scale(.93);background:var(--slate2)}
+.hint{font-family:var(--mono);font-size:12px;color:var(--dim);text-align:center;margin-top:14px}
+.hint b{color:var(--muted)}
+
+/* logged set chips */
+.done{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+.dchip{font-family:var(--mono);font-size:13px;padding:8px 11px;border-radius:9px;
+  background:rgba(53,196,174,.13);color:var(--teal-hi);border:1px solid rgba(53,196,174,.22)}
+.dchip.pending{background:transparent;border:1px dashed var(--line);color:var(--dim)}
+
+/* ---------- primary action, thumb zone ---------- */
+.dock{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;max-width:460px;margin-inline:auto;
+  padding:10px 16px calc(12px + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,rgba(14,21,34,0),rgba(14,21,34,.97) 32%);
+}
+.cta{
+  width:100%;min-height:58px;border-radius:15px;
+  background:linear-gradient(90deg,var(--teal),var(--teal-hi));
+  color:#06110f;                                  /* 8.5:1, not white-on-teal */
+  font-family:var(--disp);font-weight:800;font-size:17px;letter-spacing:.01em;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  transition:transform .08s ease,filter .15s
+}
+.cta:active{transform:scale(.985);filter:brightness(.94)}
+.cta.next{background:linear-gradient(90deg,var(--violet),#a79dff)}
+.dock .sub{font-family:var(--mono);font-size:12px;color:var(--dim);text-align:center;margin-top:7px}
+
+/* ---------- rest timer ---------- */
+.rest{
+  position:fixed;inset:0;z-index:60;background:rgba(9,14,22,.94);backdrop-filter:blur(8px);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  max-width:460px;margin-inline:auto
+}
+.rest.on{display:flex}
+.rest .lab{font-family:var(--mono);font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.rest .clock{font-family:var(--disp);font-weight:800;font-size:88px;letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;line-height:1.05}
+.rest .ring{width:210px;height:6px;background:var(--slate2);border-radius:4px;overflow:hidden;margin:14px 0 26px}
+.rest .ring i{display:block;height:100%;width:100%;background:var(--amber);transition:width 1s linear}
+.rest .acts{display:flex;gap:10px}
+.rest .acts button{min-height:var(--tap);padding:0 18px;border-radius:12px;border:1px solid var(--line);
+  background:var(--slate);font-family:var(--mono);font-size:13.5px;color:var(--text)}
+.rest .acts button.go{background:var(--teal);color:#06110f;border-color:transparent;font-weight:700}
+.rest .nextup{font-family:var(--mono);font-size:13px;color:var(--dim);margin-top:22px;text-align:center;line-height:1.6}
+.rest .nextup b{color:var(--text)}
+
+/* ---------- coach response (kept from existing CSS, it's the good bit) ---------- */
+.coach{margin:16px 16px 0;border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(53,196,174,.06),rgba(245,166,35,.035));display:none}
+.coach.on{display:block;animation:fade .35s ease}
+.coach .hd{padding:10px 14px 9px;border-bottom:1px solid var(--line-soft);font-family:var(--mono);
+  font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+.coach .hd .ic{width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--amber))}
+.crow{display:flex;gap:10px;padding:10px 14px;font-size:14px;line-height:1.5}
+.crow+.crow{border-top:1px solid var(--line-soft)}
+.clab{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.07em;padding:3px 7px;
+  border-radius:5px;height:fit-content;margin-top:1px;white-space:nowrap}
+.cl-log{background:rgba(125,144,166,.18);color:var(--muted)}
+.cl-read{background:rgba(53,196,174,.15);color:var(--teal-hi)}
+.cl-next{background:rgba(245,166,35,.15);color:var(--amber-hi)}
+.crow b{color:var(--amber-hi);font-weight:600}
+
+/* ---------- undo toast, not a confirm dialog ---------- */
+.toast{
+  position:fixed;bottom:calc(88px + env(safe-area-inset-bottom));left:16px;right:16px;z-index:70;
+  max-width:428px;margin-inline:auto;background:var(--raised);border:1px solid var(--line);
+  border-radius:13px;padding:13px 15px;display:none;align-items:center;justify-content:space-between;gap:12px;
+  box-shadow:0 18px 40px -14px rgba(0,0,0,.7)
+}
+.toast.on{display:flex;animation:up .28s cubic-bezier(.2,.8,.2,1)}
+.toast span{font-size:13.5px;color:var(--muted)}
+.toast button{font-family:var(--mono);font-size:13.5px;color:var(--teal-hi);font-weight:700;
+  min-height:40px;padding:0 12px;border-radius:9px;background:rgba(53,196,174,.1)}
+
+/* ---------- upcoming ---------- */
+.rest-of{padding:20px 16px 0}
+.rest-of .h{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:10px}
+.up{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 15px;
+  background:var(--slate);border:1px solid var(--line-soft);border-radius:13px;margin-bottom:9px}
+.up .l .n{font-family:var(--disp);font-weight:700;font-size:16px}
+.up .l .m{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:3px}
+.up .s{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+  padding:5px 9px;border-radius:7px;white-space:nowrap}
+.s-done{background:rgba(53,196,174,.14);color:var(--teal-hi)}
+.s-up{background:rgba(125,144,166,.14);color:var(--muted)}
+.swapbtn{min-height:40px;padding:0 12px;border-radius:9px;border:1px solid var(--line);
+  font-family:var(--mono);font-size:12.5px;color:var(--muted);background:var(--slate2)}
+
+.foot{padding:26px 16px 8px;font-family:var(--mono);font-size:12px;color:var(--dim);line-height:1.7}
+
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- STICKY TARGET: visible from any scroll position -->
+<div class="stick">
+  <div class="r1">
+    <div>
+      <div class="ptn">Squat pattern</div>
+      <h1 id="exName">Back Squat</h1>
+    </div>
+    <div class="setof">set<b id="setNum">1 / 3</b></div>
+  </div>
+  <div class="r2">
+    <span class="chip tgt">Target <b>5 × 72.5</b></span>
+    <span class="chip">RIR <b>3</b></span>
+    <span class="chip">Last wk <b>3×5 @ 70</b></span>
+  </div>
+  <div class="prog"><i id="progBar" style="width:12%"></i></div>
+</div>
+
+<!-- SET ENTRY: prefilled, stepper-first -->
+<div class="pad">
+  <div class="entry">
+    <div class="fieldrow">
+      <div class="field">
+        <label for="wUp">Weight</label>
+        <div class="val"><span id="wVal">72.5</span><small>kg</small></div>
+        <div class="step">
+          <button id="wDn" aria-label="Decrease weight 2.5 kg">−</button>
+          <button id="wUp" aria-label="Increase weight 2.5 kg">+</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="rUp">Reps</label>
+        <div class="val"><span id="rVal">5</span></div>
+        <div class="step">
+          <button id="rDn" aria-label="Decrease reps">−</button>
+          <button id="rUp" aria-label="Increase reps">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="hint">Prefilled from your target. <b>Tap only if it changed.</b></div>
+    <div class="done" id="doneRow">
+      <span class="dchip pending">set 1</span>
+      <span class="dchip pending">set 2</span>
+      <span class="dchip pending">set 3</span>
+    </div>
+  </div>
+</div>
+
+<!-- COACH: DID / READ / NEXT -->
+<div class="coach" id="coach">
+  <div class="hd"><span class="ic"></span>Coach</div>
+  <div class="crow"><span class="clab cl-log">DID</span><span id="cDid">—</span></div>
+  <div class="crow"><span class="clab cl-read">READ</span><span id="cRead">—</span></div>
+  <div class="crow"><span class="clab cl-next">NEXT</span><span id="cNext">—</span></div>
+</div>
+
+<!-- REMAINING WORK -->
+<div class="rest-of">
+  <div class="h">Rest of session</div>
+  <div class="up">
+    <div class="l"><div class="n">Romanian Deadlift</div><div class="m">Hinge · 3 × 6 @ 70 · RIR 3</div></div>
+    <span class="s s-up">Next</span>
+  </div>
+  <div class="up">
+    <div class="l"><div class="n">Walking Lunge</div><div class="m">Single-leg · 3 × 10</div></div>
+    <button class="swapbtn">⇄ Swap</button>
+  </div>
+  <div class="up">
+    <div class="l"><div class="n">Hanging Leg Raise</div><div class="m">Core · 3 × 12</div></div>
+    <span class="s s-up">Later</span>
+  </div>
+</div>
+
+<div class="foot">
+  Reference build · gym mode<br>
+  48px targets · labels not placeholders · 12px type floor · ink-on-teal 8.5:1
+</div>
+
+<!-- PRIMARY ACTION IN THUMB ZONE -->
+<div class="dock">
+  <button class="cta" id="cta">✓ Log set 1</button>
+  <div class="sub" id="dockSub">Starts a 2:30 rest timer</div>
+</div>
+
+<!-- UNDO, not a confirm dialog -->
+<div class="toast" id="toast">
+  <span id="toastMsg">Set logged · 5 × 72.5</span>
+  <button id="undo">Undo</button>
+</div>
+
+<!-- REST TIMER -->
+<div class="rest" id="rest">
+  <div class="lab">Rest</div>
+  <div class="clock" id="clock">2:30</div>
+  <div class="ring"><i id="ring"></i></div>
+  <div class="acts">
+    <button id="add30">+30s</button>
+    <button class="go" id="skip">Skip → next set</button>
+  </div>
+  <div class="nextup" id="nextUp">Up next<br><b>Back Squat · set 2 of 3</b><br>5 × 72.5 · RIR 3</div>
+</div>
+
+<script>
+(function(){
+  var W=72.5, R=5, set=1, TOTAL=3, logged=[], t=null, left=150, DUR=150;
+  var $=function(id){return document.getElementById(id)};
+
+  function paint(){
+    $('wVal').textContent = (W%1===0)? W : W.toFixed(1);
+    $('rVal').textContent = R;
+    $('setNum').textContent = Math.min(set,TOTAL)+' / '+TOTAL;
+    $('progBar').style.width = (12 + (logged.length/TOTAL)*88) + '%';
+    var chips = $('doneRow').children;
+    for(var i=0;i<TOTAL;i++){
+      if(logged[i]){ chips[i].className='dchip'; chips[i].textContent = logged[i].r+' × '+logged[i].w; }
+      else { chips[i].className='dchip pending'; chips[i].textContent='set '+(i+1); }
+    }
+    if(logged.length>=TOTAL){
+      $('cta').textContent='→ Romanian Deadlift';
+      $('cta').classList.add('next');
+      $('dockSub').textContent='Squat complete · 3 sets logged';
+    } else {
+      $('cta').textContent='✓ Log set '+set;
+      $('cta').classList.remove('next');
+      $('dockSub').textContent='Starts a 2:30 rest timer';
+    }
+  }
+
+  function bump(el,fn){ el.addEventListener('click',function(){ fn(); paint(); }); }
+  bump($('wUp'),function(){ W=Math.round((W+2.5)*10)/10 });
+  bump($('wDn'),function(){ W=Math.max(0,Math.round((W-2.5)*10)/10) });
+  bump($('rUp'),function(){ R++ });
+  bump($('rDn'),function(){ R=Math.max(1,R-1) });
+
+  function coach(){
+    var tonnage = logged.reduce(function(a,s){return a + s.r*s.w},0);
+    $('coach').classList.add('on');
+    $('cDid').innerHTML = logged.length+' × '+logged[0].r+' @ '+logged[0].w+' kg — <b>'+Math.round(tonnage)+' kg</b> tonnage.';
+    if(logged.length<TOTAL){
+      $('cRead').textContent = 'Bar speed holding, effort on target.';
+      $('cNext').innerHTML = 'Same load next set. <b>'+(TOTAL-logged.length)+' to go.</b>';
+    } else {
+      $('cRead').textContent = 'All reps clean at RIR 2–3, no grind. Fatigue where accumulation wants it.';
+      $('cNext').innerHTML = 'Progress — <b>+2.5 kg → 75</b> next session, hold 3×5.';
+    }
+  }
+
+  function toast(msg){
+    $('toastMsg').textContent = msg;
+    $('toast').classList.add('on');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function(){ $('toast').classList.remove('on') }, 6000);
+  }
+  $('undo').addEventListener('click',function(){
+    if(logged.length){ logged.pop(); set=logged.length+1; }
+    $('toast').classList.remove('on');
+    stopRest();
+    if(!logged.length) $('coach').classList.remove('on'); else coach();
+    paint();
+  });
+
+  function tick(){
+    left--;
+    var m=Math.floor(left/60), s=left%60;
+    $('clock').textContent = m+':'+(s<10?'0':'')+s;
+    $('ring').style.width = Math.max(0,(left/DUR)*100)+'%';
+    if(left<=0){ stopRest(); }
+  }
+  function startRest(){
+    left=DUR; DUR=150;
+    $('clock').textContent='2:30'; $('ring').style.width='100%';
+    $('nextUp').innerHTML = (logged.length>=TOTAL)
+      ? 'Up next<br><b>Romanian Deadlift · set 1 of 3</b><br>6 × 70 · RIR 3'
+      : 'Up next<br><b>Back Squat · set '+set+' of '+TOTAL+'</b><br>'+R+' × '+((W%1===0)?W:W.toFixed(1))+' · RIR 3';
+    $('rest').classList.add('on');
+    clearInterval(t); t=setInterval(tick,1000);
+  }
+  function stopRest(){ clearInterval(t); $('rest').classList.remove('on'); }
+  $('skip').addEventListener('click',stopRest);
+  $('add30').addEventListener('click',function(){
+    left+=30; DUR=Math.max(DUR,left);
+    var m=Math.floor(left/60), s=left%60;
+    $('clock').textContent=m+':'+(s<10?'0':'')+s;
+  });
+
+  $('cta').addEventListener('click',function(){
+    if(logged.length>=TOTAL){
+      $('cta').textContent='→ Loading Romanian Deadlift…';
+      return;
+    }
+    logged.push({r:R,w:W});
+    set = logged.length+1;
+    paint(); coach();
+    toast('Set logged · '+R+' × '+((W%1===0)?W:W.toFixed(1)));
+    startRest();
+  });
+
+  paint();
+})();
+</script>
+</body>
+</html>
