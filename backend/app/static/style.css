@@ -8,7 +8,7 @@
   --line-soft: #223141;
   --text: #e7edf3;
   --muted: #8da0b6;
-  --dim: #5e7085;
+  --dim: #8598ab; /* was #5e7085 (3.6:1 on --ink, fails AA) -- now 6.0:1 on --ink, 5.4:1 on --slate, 4.9:1 on --slate2, the darkest surface this token is used on (.countdown-card) */
   --amber: #f5a623;
   --amber-hi: #ffc470;
   --teal: #35c4ae;
@@ -102,7 +102,7 @@ nav a.active { color: var(--accent); font-weight: 600; }
   border-radius: 6px;
   white-space: nowrap;
 }
-.stat.st-done { background: rgba(76, 175, 125, 0.14); color: var(--good); }
+.stat.st-done { background: rgba(53, 196, 174, 0.14); color: var(--good); } /* was an off-palette green (76,175,125); now --teal's rgb at the same alpha */
 .stat.st-flag { background: rgba(245, 166, 35, 0.14); color: var(--warn); cursor: help; }
 .prescription {
   display: flex;
@@ -169,7 +169,7 @@ form.log-form input {
 .set-actions { display: flex; gap: 0.6rem; align-items: center; flex: 1 1 100%; margin-top: 0.2rem; }
 button {
   background: var(--accent);
-  color: white;
+  color: var(--ink); /* was white -- 2.2:1 on teal, fails AA; ink-on-teal is 8.4:1 */
   border: none;
   border-radius: 6px;
   padding: 0.35rem 0.8rem;
@@ -280,7 +280,7 @@ table.calendar th, table.calendar td {
 .phase-block { position: relative; border-radius: 9px; padding: 0.7rem 0.75rem 0.8rem; min-height: 74px; border: 1px solid var(--border); overflow: hidden; }
 .phase-block .ph-top { height: 3px; border-radius: 3px; position: absolute; left: 0; right: 0; top: 0; }
 .phase-block h3 { font-size: 0.85rem; margin: 0.15rem 0 0; }
-.phase-block .wk { font-family: var(--mono); font-size: 0.6rem; color: var(--dim); letter-spacing: 0.04em; }
+.phase-block .wk { font-family: var(--mono); font-size: 0.75rem; color: var(--dim); letter-spacing: 0.04em; }
 .phase-block .foc { font-size: 0.7rem; color: var(--muted); margin-top: 0.4rem; line-height: 1.35; }
 .phase-block.active { border-color: rgba(245, 166, 35, 0.5); box-shadow: 0 0 0 1px rgba(245, 166, 35, 0.25) inset; }
 .track { margin-top: 2rem; position: relative; height: 34px; }
@@ -290,11 +290,11 @@ table.calendar th, table.calendar td {
 .weeks i.done { background: var(--teal-dim); }
 .weeks i.now { background: var(--amber); }
 .wklabels { display: flex; margin-top: 0.45rem; }
-.wklabels i { flex: 1; text-align: center; font-family: var(--mono); font-size: 0.6rem; color: var(--dim); font-style: normal; }
+.wklabels i { flex: 1; text-align: center; font-family: var(--mono); font-size: 0.75rem; color: var(--dim); font-style: normal; }
 .wklabels i.hl { color: var(--amber-hi); }
 .nowmark { position: absolute; top: -6px; width: 2px; height: 20px; background: var(--amber); box-shadow: 0 0 10px rgba(245, 166, 35, 0.8); }
-.flag { position: absolute; top: -1.9rem; transform: translateX(-50%); font-family: var(--mono); font-size: 0.6rem; color: var(--muted); white-space: nowrap; text-align: center; }
-.flag b { display: block; color: var(--text); font-size: 0.6rem; }
+.flag { position: absolute; top: -1.9rem; transform: translateX(-50%); font-family: var(--mono); font-size: 0.75rem; color: var(--muted); white-space: nowrap; text-align: center; }
+.flag b { display: block; color: var(--text); font-size: 0.75rem; }
 .flag .pin { width: 7px; height: 7px; border-radius: 50%; margin: 0.15rem auto 0; background: var(--muted); }
 .flag.race .pin { background: var(--red); }
 .flag.race b { color: var(--red); }
@@ -338,7 +338,7 @@ form.settings-form button {
 }
 .form-status { font-size: 0.85rem; min-height: 1.2em; }
 .form-status.success { color: var(--good); }
-.form-status.error { color: #d9534f; }
+.form-status.error { color: var(--red); }
 
 .schedule-grid {
   display: grid;
@@ -396,7 +396,7 @@ form.settings-form button {
 }
 .load-col-label {
   font-family: var(--mono);
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   color: var(--muted);
   margin-top: 0.3rem;
   white-space: nowrap;
@@ -421,7 +421,7 @@ form.settings-form button {
 .metrics-detail summary {
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--dim);
@@ -447,9 +447,9 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
 .weekgrid-row { display: flex; gap: 2px; min-width: min-content; margin-bottom: 4px; }
 .weekgrid-label {
   font-family: var(--mono);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   color: var(--muted);
-  width: 96px;
+  width: 120px; /* was 96px -- too narrow for "Running recovery"/"Strength deload" at the new 12px floor, wrapped to 2 lines */
   flex: none;
   display: flex;
   align-items: center;
