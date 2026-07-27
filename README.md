@@ -1,4 +1,9 @@
-# Training App
+<p align="center">
+  <img src="backend/app/static/apple-touch-icon.png" width="96" alt="Parallax logo">
+</p>
+
+<h1 align="center">Parallax</h1>
+<p align="center"><i>Run and lift, in the same view.</i></p>
 
 A personal running + strength periodization app. Generates a race-driven half-marathon
 (default) training block, unifies running and RP-style strength into one calendar, and
