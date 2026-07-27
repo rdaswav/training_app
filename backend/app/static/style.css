@@ -71,6 +71,7 @@ nav a.active { color: var(--accent); font-weight: 600; }
   letter-spacing: -0.01em;
 }
 .nav-bottom { display: none; }
+.mobile-brand { display: none; }
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -710,7 +711,7 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
    so there's a single mobile breakpoint across the app instead of a 600-700px
    dead zone between two competing ones. */
 @media (max-width: 700px) {
-  body { padding: 0.75rem; padding-bottom: calc(4.4rem + env(safe-area-inset-bottom)); }
+  body { padding: 0.75rem; padding-bottom: calc(4.7rem + env(safe-area-inset-bottom)); }
   .header { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
 
   /* Bottom tab bar replaces the top nav row below 700px: Today/Plan/History
@@ -719,6 +720,10 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
      real estate. Native <details> for "More" needs no JS and is keyboard-
      operable by default. */
   .nav-top { display: none; }
+  .mobile-brand {
+    display: inline-flex;
+    margin: 0.15rem 0 0.6rem;
+  }
   .nav-bottom {
     display: flex;
     position: fixed;
@@ -729,7 +734,7 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
     background: rgba(14, 21, 34, 0.97);
     backdrop-filter: blur(12px);
     border-top: 1px solid var(--line);
-    padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom));
+    padding: 0.4rem 0.6rem calc(0.7rem + env(safe-area-inset-bottom));
     justify-content: space-around;
   }
   .nav-bottom .tab {
@@ -738,17 +743,24 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
     align-items: center;
     justify-content: center;
     gap: 0.15rem;
-    min-width: 48px;
+    min-width: 52px;
     min-height: 48px;
-    padding: 0.3rem 0.5rem;
-    border-radius: 10px;
+    padding: 0.35rem 0.6rem;
+    border-radius: 12px;
     margin-right: 0;
+    background: var(--slate2);
+    border: 1px solid transparent;
     color: var(--muted);
     text-decoration: none;
     font-family: var(--mono);
     cursor: pointer;
   }
-  .nav-bottom .tab.active { color: var(--accent); font-weight: 600; }
+  .nav-bottom .tab.active {
+    color: var(--accent);
+    font-weight: 600;
+    background: rgba(53, 196, 174, 0.14);
+    border-color: rgba(53, 196, 174, 0.3);
+  }
   .nav-bottom .tab-ic { font-size: 1.1rem; line-height: 1; }
   .nav-bottom .tab-lab { font-size: 0.65rem; letter-spacing: 0.02em; }
   .tab-more { position: relative; }
@@ -783,7 +795,7 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
 
   /* The undo toast (turn 2) would otherwise sit underneath the fixed bottom
      tab bar -- float it just above instead. */
-  .toast { bottom: calc(4.4rem + env(safe-area-inset-bottom)); }
+  .toast { bottom: calc(4.7rem + env(safe-area-inset-bottom)); }
 
   form.log-form { gap: 0.5rem; }
   form.log-form input {
