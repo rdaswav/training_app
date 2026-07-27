@@ -55,6 +55,21 @@ nav a {
   font-family: var(--mono);
 }
 nav a.active { color: var(--accent); font-weight: 600; }
+.nav-top { display: flex; align-items: center; }
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 1.25rem;
+  text-decoration: none;
+}
+.brand-word {
+  font-family: var(--disp);
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
 .nav-bottom { display: none; }
 .card {
   background: var(--card);
@@ -446,6 +461,29 @@ table.calendar th, table.calendar td {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--dim);
+}
+.about-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+.about-brand-name {
+  font-family: var(--disp);
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--text);
+}
+.about-brand-tagline {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.settings-footer {
+  margin-top: 1.5rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--dim);
+  text-align: center;
 }
 .countdown-card .num { font-family: var(--disp); font-weight: 800; font-size: 2.2rem; line-height: 1; margin: 0.3rem 0 0.1rem; }
 .countdown-card .num small { font-size: 0.9rem; color: var(--muted); font-weight: 600; margin-left: 0.3rem; }
