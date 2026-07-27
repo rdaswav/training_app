@@ -32,6 +32,10 @@ _ATHLETE_PROFILE_NEW_COLUMNS = {
     "threshold_pace_baseline_sec_per_km": "INTEGER",
     "last_job_run_at": "DATETIME",
     "last_job_error": "TEXT",
+    # NULL on migration (not backfilled to "now") is deliberate: an existing
+    # profile's physiology inputs have no confirmed-fresh date, so they should
+    # read as stale/never-reviewed until the athlete next saves Settings.
+    "physiology_reviewed_at": "DATETIME",
 }
 
 _MACROCYCLE_NEW_COLUMNS = {

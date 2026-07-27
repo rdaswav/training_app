@@ -3,6 +3,20 @@
 {% block content %}
   <h1>Settings</h1>
 
+  {% if physiology_stale %}
+    <div class="card physio-nudge">
+      {% if physiology_stale_days is none %}
+        <strong>Confirm your HR/pace numbers.</strong> Max HR, HR ceiling, and paces below
+        have never been manually confirmed.
+      {% else %}
+        <strong>Time to recheck your HR/pace numbers.</strong> It's been {{ physiology_stale_days }}
+        days since you last confirmed max HR, HR ceiling, and paces below.
+      {% endif %}
+      Fitness changes over a training block and nothing re-tests these automatically --
+      update them (or just re-save the form) to confirm they're still current.
+    </div>
+  {% endif %}
+
   <div class="card">
     <h3>Athlete profile</h3>
     <form class="settings-form" onsubmit="return submitAthleteProfile(event)">

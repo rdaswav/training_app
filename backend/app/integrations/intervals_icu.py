@@ -29,10 +29,18 @@ step 1 -- see README "Confirm before relying on this" for the full writeup):
       bpm syntax. A zone form ("Z2 HR") also works if the athlete has HR
       zones configured on intervals.icu, but this app only models an
       absolute bpm ceiling, so bpm is converted to %max_hr instead (see
-      `session_to_description`'s `max_hr` param). NOT independently
-      confirmed whether intervals.icu's "%HR" base is max HR or LTHR --
-      spot-check a generated event's target against the athlete's own HR
-      zone chart once before trusting the exact percentage.
+      `session_to_description`'s `max_hr` param). CONFIRMED 2026-07-27: the
+      "%HR" base is max HR, not LTHR. A synced event with a 77% HR token
+      (from a 150bpm ceiling / 196bpm max_hr athlete) landed entirely in
+      Z2 (142-151bpm) of the athlete's intervals.icu Run-sport HR zones,
+      which only reconciles against %max_hr (0.77 x 186bpm max_hr = 143bpm);
+      %LTHR would have put it in Z1 (0.77 x 169bpm lthr = 130bpm). Verified
+      directly off the event's own `workout_doc.zoneTimes` via the API, not
+      the UI. Note this reads intervals.icu's *own* stored max_hr for the
+      athlete's Run sport-settings, which is independent of this app's
+      `AthleteProfile.max_hr` -- keep both in sync manually when either
+      changes (e.g. after a fitness test), there's no automatic sync between
+      them.
     - Confirmed a single step CAN carry both a pace AND an HR target at once
       (e.g. "8km 6:30/km Pace 75% HR" parsed both fields) -- this resolves
       the previously-open spec section 11 question.

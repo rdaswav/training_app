@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -40,6 +40,8 @@ from app.schemas import (
 
 router = APIRouter(prefix="/api")
 
+_PHYSIOLOGY_FIELDS = {"easy_pace_sec_per_km", "threshold_pace_sec_per_km", "aerobic_hr_ceiling", "max_hr"}
+
 
 def get_or_create_athlete(db: Session) -> AthleteProfile:
     athlete = db.query(AthleteProfile).first()
@@ -73,6 +75,10 @@ def update_athlete(payload: AthleteUpdate, db: Session = Depends(get_db)):
         athlete.easy_pace_baseline_sec_per_km = fields["easy_pace_sec_per_km"]
     if "threshold_pace_sec_per_km" in fields:
         athlete.threshold_pace_baseline_sec_per_km = fields["threshold_pace_sec_per_km"]
+    # The athlete manually confirming any physiology input resets the
+    # staleness clock Settings nudges against (config.PHYSIOLOGY_REVIEW_INTERVAL_DAYS).
+    if _PHYSIOLOGY_FIELDS & fields.keys():
+        athlete.physiology_reviewed_at = datetime.utcnow()
     db.commit()
     db.refresh(athlete)
     if "week_template" in fields:

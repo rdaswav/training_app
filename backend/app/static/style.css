@@ -82,6 +82,13 @@ nav a.active { color: var(--accent); font-weight: 600; }
 .card.session-easy { border-left: 4px solid var(--teal); }
 .card.session-hard { border-left: 4px solid var(--amber); }
 .card.session-strength { border-left: 4px solid var(--violet); }
+.physio-nudge {
+  border-left: 4px solid var(--amber);
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.physio-nudge strong { color: var(--amber-hi); display: block; margin-bottom: 0.3rem; }
 
 /* ---------- surface tiers (About restructure): panel/subpanel, additive to .card ---------- */
 .panel { background: var(--slate); border: 1px solid var(--line-soft); border-radius: 16px; padding: 1.4rem 1.5rem; margin-bottom: 1rem; }

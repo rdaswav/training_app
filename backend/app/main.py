@@ -1,7 +1,7 @@
 import html
 import logging
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -16,6 +16,7 @@ from app.config import (
     DAILY_JOB_HOUR,
     DEFAULT_WEEK_TEMPLATE,
     ENABLE_SCHEDULER,
+    PHYSIOLOGY_REVIEW_INTERVAL_DAYS,
     WEEKLY_REVIEW_DAY,
     WEEKLY_REVIEW_HOUR,
 )
@@ -593,6 +594,11 @@ def settings_view(request: Request):
         race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
         macrocycle_start = race.macrocycle.start_date if race and race.macrocycle else None
         week_template = athlete.week_template or {str(k): v for k, v in DEFAULT_WEEK_TEMPLATE.items()}
+        if athlete.physiology_reviewed_at is None:
+            physiology_stale_days = None  # never confirmed -- always stale
+        else:
+            physiology_stale_days = (datetime.utcnow() - athlete.physiology_reviewed_at).days
+        physiology_stale = physiology_stale_days is None or physiology_stale_days >= PHYSIOLOGY_REVIEW_INTERVAL_DAYS
         return templates.TemplateResponse(
             "settings.html",
             {
@@ -602,6 +608,8 @@ def settings_view(request: Request):
                 "macrocycle_start": macrocycle_start,
                 "week_template": week_template,
                 "active": "settings",
+                "physiology_stale": physiology_stale,
+                "physiology_stale_days": physiology_stale_days,
             },
         )
     finally:

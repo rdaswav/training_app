@@ -60,6 +60,13 @@ class AthleteProfile(Base):
     last_job_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
     last_job_error: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
 
+    # Last time the athlete manually confirmed their physiology inputs (max_hr,
+    # aerobic_hr_ceiling, easy/threshold pace) are still current -- set whenever
+    # any of those fields change via PUT /api/athlete (see api/routes.py). Fitness
+    # changes over a training block, but nothing re-tests these automatically;
+    # Settings surfaces a reminder once this goes stale (config.PHYSIOLOGY_REVIEW_INTERVAL_DAYS).
+    physiology_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
+
     # Per-athlete weekly schedule: {weekday (Monday=0): "run" | "strength" | "rest"}.
     # Defaults to config.DEFAULT_WEEK_TEMPLATE on creation, editable from Settings;
     # plan_service.py reads this to decide which weekdays engines/running.py and

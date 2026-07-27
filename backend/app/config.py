@@ -31,6 +31,13 @@ COACH_MODEL = os.environ.get("COACH_MODEL", "claude-opus-5")
 WEEKLY_REVIEW_DAY = os.environ.get("WEEKLY_REVIEW_DAY", "sun")
 WEEKLY_REVIEW_HOUR = int(os.environ.get("WEEKLY_REVIEW_HOUR", "18"))
 
+# How long a manually-confirmed physiology snapshot (max_hr, aerobic_hr_ceiling,
+# easy/threshold pace) is considered fresh before Settings nudges the athlete to
+# recheck it -- these drift as fitness changes but nothing re-tests them
+# automatically. 12 weeks: long enough not to nag every session, short enough to
+# catch a season's worth of fitness change (see AthleteProfile.physiology_reviewed_at).
+PHYSIOLOGY_REVIEW_INTERVAL_DAYS = int(os.environ.get("PHYSIOLOGY_REVIEW_INTERVAL_DAYS", "84"))
+
 # Default weekly schedule (day-of-week indices, Monday=0), applied to a new
 # athlete profile and used as the fallback whenever an athlete's own
 # week_template is empty. plan_service.py reads the *athlete's* week_template

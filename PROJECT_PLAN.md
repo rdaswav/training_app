@@ -178,9 +178,14 @@ Shipped:
     decimal-minute duration token (e.g. `"1.5m"`, or `"0.333...m"` for a 20-second
     stride) silently fails to parse and drops the whole step -- fixed by converting
     fractional minutes to whole seconds (`"90s"`, `"20s"`) in `_format_duration`.
-- **%HR basis spot-check**: still an open manual follow-up, not code -- once real
-  syncing runs against the live account, compare a synced event's `%HR` value
-  against the athlete's own HR zone chart to confirm whether it's %max HR or %LTHR.
+- **%HR basis spot-check -- resolved 2026-07-27**: confirmed against a live synced
+  event's `workout_doc.zoneTimes` that intervals.icu's `%HR` token resolves against
+  the athlete's stored max HR, not LTHR -- see `app/integrations/intervals_icu.py`'s
+  module docstring for the full evidence. Also surfaced along the way: intervals.icu's
+  own Run sport-settings max HR/LTHR were stale since account creation (2023-10-31),
+  predating multiple real fitness changes; updated to 193/174 to match a fresh Garmin
+  recalibration, alongside this app's own `AthleteProfile.max_hr`. The two aren't
+  auto-synced -- see the "Periodic zone/pace re-check" item below.
 
 ---
 
