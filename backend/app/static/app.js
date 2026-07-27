@@ -197,31 +197,76 @@ async function submitScheduleForm(event) {
   return false;
 }
 
-async function submitRunComplete(event, sessionId) {
-  event.preventDefault();
-  const form = event.target;
-  const body = {
-    actual_pace_sec_per_km: form.actual_pace_sec_per_km.value ? Number(form.actual_pace_sec_per_km.value) : null,
-    actual_hr: form.actual_hr.value ? Number(form.actual_hr.value) : null,
-  };
-  try {
-    const result = await postJSON(`/api/sessions/${sessionId}/complete`, body);
-    const card = form.closest(".card");
-    form.remove();
-    const didParts = [];
-    const pace = formatPaceSec(body.actual_pace_sec_per_km);
-    if (pace) didParts.push(pace);
-    if (body.actual_hr) didParts.push(`${body.actual_hr} bpm avg`);
-    const coach = buildCoachCard([
-      { label: "Did", cls: "cl-log", text: didParts.length ? didParts.join(" · ") : "Logged, no pace/HR entered" },
-      { label: "Read", cls: "cl-read", text: result.note },
-      { label: "Next", cls: "cl-next", text: RUN_ACTION_LABELS[result.action] || result.action, action: result.action },
-    ]);
-    card.appendChild(coach);
-  } catch (e) {
-    alert("Failed to log session: " + e.message);
+// ---------------------------------------------------------------------------
+// Run logging: prefilled pace/HR steppers, aligned with strength's gym-mode
+// entry pattern (StrengthEntry below) instead of bare number inputs.
+// ---------------------------------------------------------------------------
+const PACE_STEP_SEC = 5;
+const HR_STEP_BPM = 1;
+const DEFAULT_PACE_SEC = 360; // 6:00/km -- used only when the session has no target pace to prefill from
+const DEFAULT_HR_BPM = 140;
+
+function formatPaceVal(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+class RunEntry {
+  constructor(entryEl) {
+    this.el = entryEl;
+    this.sessionId = entryEl.dataset.sessionId;
+    this.pace = Number(entryEl.dataset.targetPace) || DEFAULT_PACE_SEC;
+    this.hr = Number(entryEl.dataset.targetHr) || DEFAULT_HR_BPM;
+
+    this.paceVal = entryEl.querySelector(".paceval");
+    this.hrVal = entryEl.querySelector(".hrval");
+    this.ctaBtn = entryEl.querySelector(".run-log-btn");
+
+    entryEl.querySelectorAll(".stepbtn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const dir = Number(btn.dataset.dir);
+        if (btn.dataset.runStep === "pace") {
+          this.pace = Math.max(120, this.pace + dir * PACE_STEP_SEC);
+        } else {
+          this.hr = Math.max(0, this.hr + dir * HR_STEP_BPM);
+        }
+        this.paint();
+      });
+    });
+    if (this.ctaBtn) this.ctaBtn.addEventListener("click", () => this.submit());
+    this.paint();
   }
-  return false;
+
+  paint() {
+    if (this.paceVal) this.paceVal.textContent = formatPaceVal(this.pace);
+    if (this.hrVal) this.hrVal.textContent = this.hr;
+  }
+
+  async submit() {
+    this.ctaBtn.disabled = true;
+    this.ctaBtn.textContent = "Logging...";
+    const body = { actual_pace_sec_per_km: this.pace, actual_hr: this.hr };
+    try {
+      const result = await postJSON(`/api/sessions/${this.sessionId}/complete`, body);
+      const card = this.el.closest(".card");
+      this.el.remove();
+      const coach = buildCoachCard([
+        { label: "Did", cls: "cl-log", text: `${formatPaceSec(body.actual_pace_sec_per_km)} · ${body.actual_hr} bpm avg` },
+        { label: "Read", cls: "cl-read", text: result.note },
+        { label: "Next", cls: "cl-next", text: RUN_ACTION_LABELS[result.action] || result.action, action: result.action },
+      ]);
+      card.appendChild(coach);
+    } catch (e) {
+      alert("Failed to log session: " + e.message);
+      this.ctaBtn.disabled = false;
+      this.ctaBtn.textContent = "Log complete";
+    }
+  }
+}
+
+function initRunMode() {
+  document.querySelectorAll(".run-entry").forEach((el) => new RunEntry(el));
 }
 
 // ---------------------------------------------------------------------------
@@ -511,6 +556,7 @@ function initGymMode() {
 }
 
 document.addEventListener("DOMContentLoaded", initGymMode);
+document.addEventListener("DOMContentLoaded", initRunMode);
 
 async function toggleSwap(button, sessionId, pattern) {
   const container = button.nextElementSibling;

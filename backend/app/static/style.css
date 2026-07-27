@@ -182,21 +182,6 @@ nav a.active { color: var(--accent); font-weight: 600; }
   background: transparent;
   color: var(--text);
 }
-form.log-form {
-  display: flex;
-  gap: 0.4rem;
-  margin-top: 0.4rem;
-  flex-wrap: wrap;
-}
-form.log-form input {
-  width: 4.5rem;
-  padding: 0.3rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
-}
-
 /* ---------- strength entry: prefilled stepper logging (gym mode) ---------- */
 .entry { margin-top: 0.75rem; }
 .fieldrow { display: flex; gap: 0.75rem; flex-wrap: wrap; }
@@ -797,14 +782,6 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
      tab bar -- float it just above instead. */
   .toast { bottom: calc(4.7rem + env(safe-area-inset-bottom)); }
 
-  form.log-form { gap: 0.5rem; }
-  form.log-form input {
-    flex: 1 1 40%;
-    min-width: 0;
-    padding: 0.6rem;
-    font-size: 1rem;
-    min-height: 44px;
-  }
   button { padding: 0.6rem 1rem; min-height: 44px; font-size: 0.95rem; }
   .swap-picker select { min-height: 44px; }
   .rest .clock { font-size: 3.2rem; }

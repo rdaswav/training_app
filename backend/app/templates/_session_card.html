@@ -33,11 +33,37 @@
       {% endif %}
     {% endfor %}
     {% if s.status.value != "completed" %}
-      <form class="log-form" onsubmit="return submitRunComplete(event, {{ s.id }})">
-        <input name="actual_pace_sec_per_km" type="number" placeholder="pace s/km">
-        <input name="actual_hr" type="number" placeholder="avg HR">
-        <button type="submit">Log complete</button>
-      </form>
+      {% set ns = namespace(pace=None, hr=None) %}
+      {% for step in s.content.get("steps", []) %}
+        {% set candidates = [step.work, step.recovery] if step.get("type") == "repeat" else [step] %}
+        {% for c in candidates %}
+          {% if c and ns.pace is none and c.target_pace_sec_per_km %}{% set ns.pace = c.target_pace_sec_per_km %}{% endif %}
+          {% if c and ns.hr is none and c.hr_ceiling %}{% set ns.hr = c.hr_ceiling %}{% endif %}
+        {% endfor %}
+      {% endfor %}
+      <div class="entry run-entry" data-session-id="{{ s.id }}"
+           data-target-pace="{{ ns.pace or '' }}" data-target-hr="{{ ns.hr or '' }}">
+        <div class="fieldrow">
+          <div class="field">
+            <label for="pace-{{ s.id }}">Pace</label>
+            <div class="val"><span class="paceval" id="pace-{{ s.id }}">&ndash;</span><small>/km</small></div>
+            <div class="step">
+              <button type="button" class="stepbtn" data-run-step="pace" data-dir="-1" aria-label="Decrease pace 5 seconds">&minus;</button>
+              <button type="button" class="stepbtn" data-run-step="pace" data-dir="1" aria-label="Increase pace 5 seconds">+</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="hr-{{ s.id }}">Avg HR</label>
+            <div class="val"><span class="hrval" id="hr-{{ s.id }}">&ndash;</span><small>bpm</small></div>
+            <div class="step">
+              <button type="button" class="stepbtn" data-run-step="hr" data-dir="-1" aria-label="Decrease heart rate 1 bpm">&minus;</button>
+              <button type="button" class="stepbtn" data-run-step="hr" data-dir="1" aria-label="Increase heart rate 1 bpm">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="hint">{% if ns.pace or ns.hr %}Prefilled from your target pace/HR ceiling.{% else %}Adjust to what you actually ran.{% endif %} <b>Tap only if it changed.</b></div>
+        <button type="button" class="cta run-log-btn">Log complete</button>
+      </div>
     {% else %}
       <div class="feedback">Completed</div>
     {% endif %}
