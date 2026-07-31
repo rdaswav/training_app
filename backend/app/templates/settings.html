@@ -17,8 +17,8 @@
     </div>
   {% endif %}
 
-  <div class="card">
-    <h3>Athlete profile</h3>
+  <div class="panel">
+    <h2>Athlete profile</h2>
     <form class="settings-form" onsubmit="return submitAthleteProfile(event)">
       <label>Weekly volume (km)
         <input name="weekly_volume_km" type="number" step="0.1" value="{{ athlete.weekly_volume_km }}" required>
@@ -43,8 +43,8 @@
     </form>
   </div>
 
-  <div class="card">
-    <h3>{% if race %}Race{% else %}Create a race{% endif %}</h3>
+  <div class="panel">
+    <h2>{% if race %}Race{% else %}Create a race{% endif %}</h2>
     <form class="settings-form" onsubmit="return submitRaceForm(event, {{ race.id if race else 'null' }})">
       <label>Name
         <input name="name" type="text" value="{{ race.name if race else '' }}" required>
@@ -81,8 +81,8 @@
     {% endif %}
   </div>
 
-  <div class="card">
-    <h3>Weekly schedule</h3>
+  <div class="panel">
+    <h2>Weekly schedule</h2>
     <p class="note">Choose what each day is for. Needs at least one running day (for the long run) to save.</p>
     <form class="settings-form" onsubmit="return submitScheduleForm(event)">
       <div class="schedule-grid">
@@ -106,8 +106,8 @@
     {% endif %}
   </div>
 
-  <div class="card">
-    <h3>Daily job health</h3>
+  <div class="panel">
+    <h2>Daily job health</h2>
     {% if athlete.last_job_run_at %}
       <p class="meta">Last run: {{ athlete.last_job_run_at.strftime("%Y-%m-%d %H:%M UTC") }}</p>
       {% if athlete.last_job_error %}

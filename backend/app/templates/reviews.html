@@ -35,7 +35,7 @@
             {%- if load.get("run_km_delta_pct") is not none %} &middot; {{ '+' if load.run_km_delta_pct >= 0 else '' }}{{ load.run_km_delta_pct }}%{% endif %}</span>
         {% endif %}
         {% if m.get("hr_ceiling_flags") %}
-          <span class="pill live">{{ m.hr_ceiling_flags|length }} OVER HR CEILING</span>
+          <span class="pill flag">{{ m.hr_ceiling_flags|length }} OVER HR CEILING</span>
         {% endif %}
       </div>
 

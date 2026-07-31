@@ -16,17 +16,52 @@
   --teal-dim: #1f6e64;
   --red: #ff6b6b;
   --violet: #8b7fe8;
+  --violet-hi: #c9c2ff;
 
   --bg: var(--ink);
   --card: var(--slate);
   --accent: var(--teal);
-  --border: var(--line-soft);
-  --good: var(--teal);
   --warn: var(--amber);
 
   --disp: 'Archivo', sans-serif;
   --body: 'Inter', sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* ---------- shared primitives (design consistency pass) ----------
+     Type: one label token (mono, uppercase, small-caps -- was ten
+     variously-sized/spaced versions of the same idea) plus the
+     big-standalone-vs-inline-sentence rule for numeric values.
+     Shape: four radii, tied to element scale, not per-component whim.
+     --line = interactive edges (inputs, controls). --line-soft = static
+     surface boundaries and in-surface dividers. --border was a third
+     name for --line-soft and hid which of the two was actually meant. */
+  --label-font: var(--mono);
+  --label-size: 0.7rem;
+  --label-spacing: 0.08em;
+  --label-color: var(--dim);
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* Chip tones: hue = what kind of thing this is, not what state it's
+     in. "Done" no longer means teal everywhere -- it means whatever hue
+     the surrounding card already carries (see .card.session-strength
+     overrides below). */
+  --chip-neutral-border: var(--line-soft);
+  --chip-neutral-color: var(--muted);
+  --chip-run-border: rgba(53, 196, 174, 0.4);
+  --chip-run-bg: rgba(53, 196, 174, 0.1);
+  --chip-run-color: var(--teal-hi);
+  --chip-strength-border: rgba(139, 127, 232, 0.4);
+  --chip-strength-bg: rgba(139, 127, 232, 0.1);
+  --chip-strength-color: var(--violet-hi);
+  --chip-now-border: rgba(245, 166, 35, 0.45);
+  --chip-now-bg: rgba(245, 166, 35, 0.09);
+  --chip-now-color: var(--amber-hi);
+  --chip-flag-border: rgba(255, 107, 107, 0.4);
+  --chip-flag-bg: rgba(255, 107, 107, 0.1);
+  --chip-flag-color: var(--red);
 }
 * { box-sizing: border-box; }
 :focus-visible { outline: 2px solid var(--teal-hi); outline-offset: 2px; }
@@ -47,12 +82,36 @@ h1, h2, h3 { margin: 0 0 0.5rem; font-family: var(--disp); font-weight: 700; }
   margin-bottom: 1rem;
 }
 .countdown { color: var(--muted); font-size: 0.9rem; font-family: var(--mono); }
+
+/* Label: the one small-caps token, replacing .lmc .k / .eyebrow /
+   .session-type / .field label / .rest .lab / .load-chart-title /
+   .load-col-label / .day-card-date / .disclosure summary .d /
+   .stick .ptn / .weekgrid-label / .metrics-detail summary /
+   .countdown-card .eyebrow -- same mono/uppercase/small-caps job,
+   previously re-sized and re-spaced from scratch on every page. */
+.label,
+.lmc .k, .eyebrow, .session-type, .field label, .rest .lab,
+.load-chart-title, .load-col-label, .day-card-date,
+.disclosure > summary .d, .stick .ptn, .weekgrid-label,
+.metrics-detail summary, .countdown-card .eyebrow {
+  font-family: var(--label-font);
+  font-weight: 400;
+  font-size: var(--label-size);
+  letter-spacing: var(--label-spacing);
+  text-transform: uppercase;
+  color: var(--label-color);
+}
+
+/* nav is chrome, not data -- Inter, not mono (the single biggest
+   contributor to the "different fonts everywhere" feel, since it's on
+   every page at once). */
 nav a {
   color: var(--muted);
   text-decoration: none;
   margin-right: 1rem;
   font-size: 0.9rem;
-  font-family: var(--mono);
+  font-family: var(--body);
+  font-weight: 500;
 }
 nav a.active { color: var(--accent); font-weight: 600; }
 .nav-top { display: flex; align-items: center; }
@@ -74,8 +133,8 @@ nav a.active { color: var(--accent); font-weight: 600; }
 .mobile-brand { display: none; }
 .card {
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
   padding: 1rem;
   margin-bottom: 1rem;
 }
@@ -91,19 +150,19 @@ nav a.active { color: var(--accent); font-weight: 600; }
 .physio-nudge strong { color: var(--amber-hi); display: block; margin-bottom: 0.3rem; }
 
 /* ---------- surface tiers (About restructure): panel/subpanel, additive to .card ---------- */
-.panel { background: var(--slate); border: 1px solid var(--line-soft); border-radius: 16px; padding: 1.4rem 1.5rem; margin-bottom: 1rem; }
+.panel { background: var(--slate); border: 1px solid var(--line-soft); border-radius: var(--r-lg); padding: 1.4rem 1.5rem; margin-bottom: 1rem; }
 .panel h2 { font-family: var(--disp); font-weight: 700; font-size: 1.05rem; margin-bottom: 0.9rem; }
-.subpanel { background: var(--ink); border-radius: 12px; padding: 0.9rem 1rem; }
+.subpanel { background: var(--ink); border-radius: var(--r-md); padding: 0.9rem 1rem; }
 .lede { color: var(--muted); font-size: 0.95rem; margin-top: 0.6rem; max-width: 60ch; }
 
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .two h3 { margin-bottom: 0.55rem; }
 .two p { font-size: 0.9rem; color: var(--muted); }
-.two .mode { background: var(--ink); border-radius: 12px; padding: 0.95rem 1rem; }
+.two .mode { background: var(--ink); border-radius: var(--r-md); padding: 0.95rem 1rem; }
 .two .mode.on { background: var(--slate2); box-shadow: 0 0 0 1px rgba(139, 127, 232, 0.35) inset; }
 
 /* progressive disclosure: everything operational lives behind this on About */
-.disclosure { background: var(--slate); border: 1px solid var(--line-soft); border-radius: 16px; margin-bottom: 1rem; }
+.disclosure { background: var(--slate); border: 1px solid var(--line-soft); border-radius: var(--r-lg); margin-bottom: 1rem; }
 .disclosure > summary {
   cursor: pointer;
   list-style: none;
@@ -116,7 +175,7 @@ nav a.active { color: var(--accent); font-weight: 600; }
 }
 .disclosure > summary::-webkit-details-marker { display: none; }
 .disclosure > summary .t { font-family: var(--disp); font-weight: 700; font-size: 0.95rem; }
-.disclosure > summary .d { font-family: var(--mono); font-size: 0.75rem; color: var(--dim); margin-top: 0.15rem; }
+.disclosure > summary .d { margin-top: 0.15rem; }
 .disclosure > summary .car { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); flex: none; display: inline-block; transition: transform 0.2s ease; }
 .disclosure[open] > summary .car { transform: rotate(90deg); }
 .disclosure .body { padding: 0 1.4rem 1.3rem; }
@@ -128,18 +187,9 @@ nav a.active { color: var(--accent); font-weight: 600; }
 .rows .row .v { font-family: var(--mono); color: var(--text); white-space: nowrap; }
 
 .lm { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
-.lmc { background: var(--ink); border-radius: 10px; padding: 0.65rem 0.7rem; }
-.lmc .k { font-family: var(--mono); font-size: 0.7rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.lmc { background: var(--ink); border-radius: var(--r-sm); padding: 0.65rem 0.7rem; }
 .lmc .n { font-family: var(--mono); font-size: 0.9rem; margin-top: 0.3rem; color: var(--text); }
-.session-type {
-  display: inline-block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--accent);
-  margin-bottom: 0.25rem;
-  font-family: var(--mono);
-}
+.session-type { display: inline-block; margin-bottom: 0.25rem; }
 .cue {
   font-size: 0.85rem;
   color: var(--muted);
@@ -148,30 +198,45 @@ nav a.active { color: var(--accent); font-weight: 600; }
 }
 .step {
   padding: 0.4rem 0;
-  border-bottom: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--line-soft);
   font-size: 0.95rem;
 }
 .step:last-child { border-bottom: none; }
 .step .target { color: var(--muted); font-size: 0.85rem; font-family: var(--mono); }
+/* Inline value: mono, for a number read as part of a sentence -- as
+   opposed to .field .val's big standalone Archivo metric. Was 1.15rem
+   here specifically, 20px on .step .value's Today equivalent: same job,
+   two sizes; both now the one inline-value size. */
 .step .value, .prescription .meta .value {
   font-weight: 700;
   color: var(--text);
-  font-size: 1.15rem;
+  font-size: 0.95rem;
   font-family: var(--mono);
 }
-.sync-status { color: var(--muted); font-size: 0.8rem; margin-top: 0.5rem; font-family: var(--mono); }
-.stat {
+/* Sentences, not data -- Inter sub, not mono. */
+.sync-status { color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; }
+
+/* Chip: one badge component (was .pill/.stat/.dchip/.clab/.session-type,
+   six costumes for one job), status-pill radius, tone = what kind of
+   thing this is (run/strength/now/flag), not what state it's in. */
+.chip, .stat, .pill {
+  display: inline-block;
   font-family: var(--mono);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
+  font-size: var(--label-size);
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--chip-neutral-border);
+  color: var(--chip-neutral-color);
   white-space: nowrap;
 }
-.stat.st-done { background: rgba(53, 196, 174, 0.14); color: var(--good); } /* was an off-palette green (76,175,125); now --teal's rgb at the same alpha */
-.stat.st-flag { background: rgba(255, 107, 107, 0.14); color: var(--red); cursor: help; } /* was amber -- collided with .session-hard/the "now" marker's effort/active meaning; "needs attention" gets its own colour */
-.prescription { padding: 0.6rem 0; border-bottom: 1px dashed var(--border); }
+.stat.st-done { background: var(--chip-run-bg); border-color: var(--chip-run-border); color: var(--chip-run-color); }
+.stat.st-flag { background: var(--chip-flag-bg); border-color: var(--chip-flag-border); color: var(--chip-flag-color); cursor: help; }
+/* A completed item keeps its own discipline's hue instead of turning
+   teal regardless of context -- the strength "Logged" badge was the
+   clearest example of hue silently meaning "done" instead of "strength". */
+.card.session-strength .stat.st-done { background: var(--chip-strength-bg); border-color: var(--chip-strength-border); color: var(--chip-strength-color); }
+.prescription { padding: 0.6rem 0; border-bottom: 1px dashed var(--line-soft); }
 .prescription:last-child { border-bottom: none; }
 .prescription-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .prescription .meta { color: var(--muted); font-size: 0.85rem; }
@@ -184,8 +249,8 @@ nav a.active { color: var(--accent); font-weight: 600; }
 }
 .swap-picker select {
   padding: 0.3rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
   background: transparent;
   color: var(--text);
 }
@@ -193,22 +258,14 @@ nav a.active { color: var(--accent); font-weight: 600; }
 .entry { margin-top: 0.75rem; }
 .fieldrow { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .field { flex: 1 1 auto; text-align: center; min-width: 5.5rem; }
-.field label {
-  display: block;
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 0.4rem;
-}
+.field label { display: block; margin-bottom: 0.4rem; }
 .field .val { font-family: var(--disp); font-weight: 800; font-size: 1.8rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .field .val small { font-size: 0.8rem; color: var(--muted); font-weight: 600; margin-left: 0.15rem; }
 .field .step { display: flex; gap: 0.4rem; margin-top: 0.5rem; justify-content: center; }
 .stepbtn {
   width: 48px;
   height: 48px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   background: var(--raised);
   border: 1px solid var(--line);
   color: var(--text);
@@ -224,38 +281,44 @@ nav a.active { color: var(--accent); font-weight: 600; }
   width: 100%;
   text-align: center;
   padding: 0.6rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
   background: transparent;
   color: var(--text);
   font-size: 1rem;
   min-height: 44px;
 }
-.hint { font-family: var(--mono); font-size: 0.75rem; color: var(--dim); text-align: center; margin-top: 0.7rem; }
+/* Sentence, not data -- Inter sub. */
+.hint { font-size: 0.85rem; color: var(--muted); text-align: center; margin-top: 0.7rem; }
 .hint b { color: var(--muted); }
 
 .done-row { display: flex; gap: 0.4rem; margin-top: 0.7rem; flex-wrap: wrap; align-items: center; }
+/* .dchip is a .chip too (a completed/pending set marker) -- pending is
+   neutral tone, a completed set takes the strength tone directly since
+   this stepper is strength-only (no equivalent exists for runs). */
 .dchip {
   font-family: var(--mono);
-  font-size: 0.8rem;
-  padding: 0.45rem 0.6rem;
-  border-radius: 8px;
-  background: rgba(53, 196, 174, 0.13);
-  color: var(--teal-hi);
-  border: 1px solid rgba(53, 196, 174, 0.22);
+  font-size: var(--label-size);
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--r-pill);
+  background: var(--chip-strength-bg);
+  color: var(--chip-strength-color);
+  border: 1px solid var(--chip-strength-border);
 }
 .dchip.pending { background: transparent; border: 1px dashed var(--line); color: var(--dim); }
 
+/* Buttons: Inter, never mono -- an action is chrome, not data. */
 .cta {
   width: 100%;
   min-height: 52px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   margin-top: 0.85rem;
   background: linear-gradient(90deg, var(--teal), var(--teal-hi));
   color: var(--ink);
   border: none;
-  font-family: var(--disp);
-  font-weight: 800;
+  font-family: var(--body);
+  font-weight: 700;
   font-size: 0.95rem;
   display: flex;
   align-items: center;
@@ -269,10 +332,11 @@ nav a.active { color: var(--accent); font-weight: 600; }
 .swapbtn {
   min-height: 44px;
   padding: 0 0.75rem;
-  border-radius: 9px;
+  border-radius: var(--r-sm);
   border: 1px solid var(--line);
-  font-family: var(--mono);
-  font-size: 0.8rem;
+  font-family: var(--body);
+  font-weight: 500;
+  font-size: 0.85rem;
   color: var(--muted);
   background: var(--slate2);
   margin-top: 0.6rem;
@@ -293,14 +357,13 @@ nav a.active { color: var(--accent); font-weight: 600; }
 }
 .stick.on { display: block; }
 .stick .r1 { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
-.stick .ptn { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--violet); }
+.stick .ptn { color: var(--violet); }
 .stick h4 { font-family: var(--disp); font-weight: 800; font-size: 1.15rem; line-height: 1.1; margin: 0.15rem 0 0; }
 .stick .setof { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); text-align: right; white-space: nowrap; }
 .stick .setof b { display: block; font-family: var(--disp); font-size: 1.2rem; color: var(--text); font-weight: 800; }
 .stick .r2 { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
-.stick .chip { font-family: var(--mono); font-size: 0.75rem; padding: 0.3rem 0.6rem; border-radius: 7px; background: var(--slate2); color: var(--muted); }
 .stick .chip b { color: var(--text); }
-.stick .chip.tgt { background: rgba(139, 127, 232, 0.16); color: #c9c2ff; }
+.stick .chip.tgt { background: var(--chip-strength-bg); border-color: var(--chip-strength-border); color: var(--chip-strength-color); }
 .stick .chip.tgt b { color: #fff; }
 
 /* ---------- rest timer: full-screen overlay ---------- */
@@ -319,14 +382,16 @@ nav a.active { color: var(--accent); font-weight: 600; }
   padding: 1rem;
 }
 .rest.on { display: flex; }
-.rest .lab { font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
 .rest .clock { font-family: var(--disp); font-weight: 800; font-size: 4.2rem; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.05; }
 .rest .ring { width: 210px; height: 6px; background: var(--slate2); border-radius: 4px; overflow: hidden; margin: 0.9rem 0 1.6rem; }
-.rest .ring i { display: block; height: 100%; width: 100%; background: var(--amber); transition: width 1s linear; }
+/* Rest timer only ever runs during strength logging (there's no run
+   equivalent) -- its elapsed-time ring is strength's own hue, not amber
+   ("now" only, everywhere else in the app). */
+.rest .ring i { display: block; height: 100%; width: 100%; background: var(--violet); transition: width 1s linear; }
 .rest .acts { display: flex; gap: 0.6rem; }
-.rest .acts button { min-height: 48px; padding: 0 1.1rem; border-radius: 12px; border: 1px solid var(--line); background: var(--slate); font-family: var(--mono); font-size: 0.85rem; color: var(--text); }
+.rest .acts button { min-height: 48px; padding: 0 1.1rem; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--slate); font-family: var(--body); font-weight: 500; font-size: 0.9rem; color: var(--text); }
 .rest .acts button.go { background: var(--teal); color: var(--ink); border-color: transparent; font-weight: 700; }
-.rest .nextup { font-family: var(--mono); font-size: 0.8rem; color: var(--dim); margin-top: 1.4rem; line-height: 1.6; }
+.rest .nextup { font-size: 0.85rem; color: var(--muted); margin-top: 1.4rem; line-height: 1.6; }
 .rest .nextup b { color: var(--text); }
 
 /* ---------- undo toast: reversible, not a confirm dialog ---------- */
@@ -340,7 +405,7 @@ nav a.active { color: var(--accent); font-weight: 600; }
   margin-inline: auto;
   background: var(--raised);
   border: 1px solid var(--line);
-  border-radius: 13px;
+  border-radius: var(--r-md);
   padding: 0.8rem 0.9rem;
   display: none;
   align-items: center;
@@ -350,47 +415,48 @@ nav a.active { color: var(--accent); font-weight: 600; }
 }
 .toast.on { display: flex; }
 .toast span { font-size: 0.85rem; color: var(--muted); }
-.toast button { font-family: var(--mono); font-size: 0.85rem; color: var(--teal-hi); font-weight: 700; min-height: 40px; padding: 0 0.75rem; border-radius: 9px; background: rgba(53, 196, 174, 0.1); border: none; cursor: pointer; }
+.toast button { font-family: var(--body); font-size: 0.85rem; color: var(--teal-hi); font-weight: 700; min-height: 40px; padding: 0 0.75rem; border-radius: var(--r-sm); background: rgba(53, 196, 174, 0.1); border: none; cursor: pointer; }
 
 button {
   background: var(--accent);
   color: var(--ink); /* was white -- 2.2:1 on teal, fails AA; ink-on-teal is 8.4:1 */
   border: none;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   padding: 0.35rem 0.8rem;
   cursor: pointer;
   font-size: 0.85rem;
+  font-weight: 500;
 }
 .feedback {
   margin-top: 0.5rem;
   font-size: 0.85rem;
-  color: var(--good);
+  color: var(--teal);
 }
 .coach {
   margin-top: 0.75rem;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   overflow: hidden;
   background: linear-gradient(180deg, rgba(53, 196, 174, 0.05), rgba(245, 166, 35, 0.03));
 }
 .coach .hd {
   padding: 0.5rem 0.75rem 0.4rem;
   border-bottom: 1px solid var(--line-soft);
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.14em;
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-spacing);
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--label-color);
 }
 .crow { display: flex; gap: 0.6rem; padding: 0.5rem 0.75rem; }
 .crow + .crow { border-top: 1px solid var(--line-soft); }
 .clab {
   font-family: var(--mono);
-  font-size: 0.6rem;
+  font-size: var(--label-size);
   font-weight: 700;
-  letter-spacing: 0.06em;
-  padding: 0.15rem 0.4rem;
-  border-radius: 5px;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--r-pill);
   height: fit-content;
   white-space: nowrap;
 }
@@ -413,7 +479,7 @@ table.calendar {
   font-size: 0.85rem;
 }
 table.calendar th, table.calendar td {
-  border: 1px solid var(--border);
+  border: 1px solid var(--line-soft);
   padding: 0.4rem;
   text-align: left;
   vertical-align: top;
@@ -428,33 +494,18 @@ table.calendar th, table.calendar td {
   flex-wrap: wrap;
 }
 .status-line { display: flex; gap: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
-.pill {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.04em;
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  color: var(--muted);
-}
-.pill.live { color: var(--amber-hi); border-color: rgba(245, 166, 35, 0.45); background: rgba(245, 166, 35, 0.08); }
-.pill.str { color: #c9c2ff; border-color: rgba(139, 127, 232, 0.4); background: rgba(139, 127, 232, 0.09); }
+.pill.live { background: var(--chip-now-bg); border-color: var(--chip-now-border); color: var(--chip-now-color); }
+.pill.str { background: var(--chip-strength-bg); border-color: var(--chip-strength-border); color: var(--chip-strength-color); }
+.pill.flag { background: var(--chip-flag-bg); border-color: var(--chip-flag-border); color: var(--chip-flag-color); }
 .goal { color: var(--muted); font-size: 0.9rem; margin-top: 0.4rem; }
 .countdown-card {
   background: var(--slate2);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-lg);
   padding: 1rem 1.2rem;
   min-width: 190px;
 }
 .countdown-card .lab { display: flex; }
-.countdown-card .eyebrow {
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--dim);
-}
 .about-brand {
   display: flex;
   align-items: baseline;
@@ -481,28 +532,28 @@ table.calendar th, table.calendar td {
 .countdown-card .num { font-family: var(--disp); font-weight: 800; font-size: 2.2rem; line-height: 1; margin: 0.3rem 0 0.1rem; }
 .countdown-card .num small { font-size: 0.9rem; color: var(--muted); font-weight: 600; margin-left: 0.3rem; }
 .countdown-card .race { font-size: 0.9rem; font-weight: 600; }
-.countdown-card .date { font-family: var(--mono); font-size: 0.75rem; color: var(--dim); margin-top: 0.1rem; }
+.countdown-card .date { font-family: var(--label-font); font-size: var(--label-size); letter-spacing: var(--label-spacing); text-transform: uppercase; color: var(--label-color); margin-top: 0.1rem; }
 
 /* phase-timeline ribbon */
-.ribbon { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.1rem 1.1rem 0.8rem; margin-bottom: 1rem; }
+.ribbon { background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--r-lg); padding: 1.1rem 1.1rem 0.8rem; margin-bottom: 1rem; }
 .phases { display: flex; gap: 6px; }
-.phase-block { position: relative; border-radius: 9px; padding: 0.7rem 0.75rem 0.8rem; min-height: 74px; border: 1px solid var(--border); overflow: hidden; }
+.phase-block { position: relative; border-radius: var(--r-md); padding: 0.7rem 0.75rem 0.8rem; min-height: 74px; border: 1px solid var(--line-soft); overflow: hidden; }
 .phase-block .ph-top { height: 3px; border-radius: 3px; position: absolute; left: 0; right: 0; top: 0; }
 .phase-block h3 { font-size: 0.85rem; margin: 0.15rem 0 0; }
-.phase-block .wk { font-family: var(--mono); font-size: 0.75rem; color: var(--dim); letter-spacing: 0.04em; }
+.phase-block .wk { font-family: var(--label-font); font-size: var(--label-size); color: var(--label-color); letter-spacing: var(--label-spacing); text-transform: uppercase; }
 .phase-block .foc { font-size: 0.7rem; color: var(--muted); margin-top: 0.4rem; line-height: 1.35; }
 .phase-block.active { border-color: rgba(245, 166, 35, 0.5); box-shadow: 0 0 0 1px rgba(245, 166, 35, 0.25) inset; }
 .track { margin-top: 2rem; position: relative; height: 34px; }
-.weeks { display: flex; height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+.weeks { display: flex; height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid var(--line-soft); }
 .weeks i { flex: 1; border-right: 1px solid var(--ink); }
 .weeks i:last-child { border-right: 0; }
 .weeks i.done { background: var(--teal-dim); }
 .weeks i.now { background: var(--amber); }
 .wklabels { display: flex; margin-top: 0.45rem; }
-.wklabels i { flex: 1; text-align: center; font-family: var(--mono); font-size: 0.75rem; color: var(--dim); font-style: normal; }
+.wklabels i { flex: 1; text-align: center; font-family: var(--label-font); font-size: var(--label-size); color: var(--label-color); font-style: normal; }
 .wklabels i.hl { color: var(--amber-hi); }
 .nowmark { position: absolute; top: -6px; width: 2px; height: 20px; background: var(--amber); box-shadow: 0 0 10px rgba(245, 166, 35, 0.8); }
-.flag { position: absolute; top: -1.9rem; transform: translateX(-50%); font-family: var(--mono); font-size: 0.75rem; color: var(--muted); white-space: nowrap; text-align: center; }
+.flag { position: absolute; top: -1.9rem; transform: translateX(-50%); font-family: var(--label-font); font-size: var(--label-size); color: var(--muted); white-space: nowrap; text-align: center; }
 .flag b { display: block; color: var(--text); font-size: 0.75rem; }
 .flag .pin { width: 7px; height: 7px; border-radius: 50%; margin: 0.15rem auto 0; background: var(--muted); }
 .flag.race .pin { background: var(--red); }
@@ -525,29 +576,47 @@ form.settings-form {
   gap: 0.85rem;
   max-width: 420px;
 }
+/* A settings field's label is the same job as a Today stepper field's
+   label ("Weight", "Reps") -- the label token, not bespoke sentence-case
+   muted text. */
 form.settings-form label {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  font-size: 0.85rem;
-  color: var(--muted);
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-spacing);
+  text-transform: uppercase;
+  color: var(--label-color);
 }
 form.settings-form input, form.settings-form select {
   padding: 0.5rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
   background: transparent;
   color: var(--text);
   font-size: 1rem;
+  font-family: var(--body);
+  text-transform: none;
+  letter-spacing: normal;
 }
 form.settings-form button {
   align-self: flex-start;
   margin-top: 0.25rem;
   padding: 0.5rem 1rem;
 }
-.form-status { font-size: 0.85rem; min-height: 1.2em; }
-.form-status.success { color: var(--good); }
-.form-status.error { color: var(--red); }
+.form-status { min-height: 1.6em; }
+.form-status.success, .form-status.error {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: var(--label-size);
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--r-pill);
+  border: 1px solid;
+}
+.form-status.success { background: var(--chip-run-bg); border-color: var(--chip-run-border); color: var(--chip-run-color); }
+.form-status.error { background: var(--chip-flag-bg); border-color: var(--chip-flag-border); color: var(--chip-flag-color); }
 
 .schedule-grid {
   display: grid;
@@ -571,11 +640,11 @@ form.settings-form button {
 }
 .day-card:last-child { margin-bottom: 0; }
 .day-card-date {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-spacing);
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--label-color);
   margin-bottom: 0.3rem;
 }
 .day-card-rest { opacity: 0.7; }
@@ -583,11 +652,11 @@ form.settings-form button {
 .load-chart { margin-bottom: 1rem; }
 .load-chart:last-child { margin-bottom: 0; }
 .load-chart-title {
-  font-family: var(--mono);
-  font-size: 0.75rem;
+  font-family: var(--label-font);
+  font-size: var(--label-size);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  letter-spacing: var(--label-spacing);
+  color: var(--label-color);
   margin-bottom: 0.4rem;
 }
 .load-chart-scroll { overflow-x: auto; }
@@ -616,29 +685,45 @@ form.settings-form button {
   min-height: 2px;
 }
 .load-bar.run-bar { background: var(--accent); }
-.load-bar.tonnage-bar { background: var(--good); }
+/* Was --good, which was just --accent under another name -- tonnage is
+   strength discipline, so it's violet, not "run-bar's colour but for a
+   different metric." The clearest live case of finding 06's bug. */
+.load-bar.tonnage-bar { background: var(--violet); }
 .load-bar-empty {
   width: 100%;
   height: 100%;
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--line-soft);
   border-radius: 3px 3px 0 0;
   box-sizing: border-box;
 }
 .load-col-label {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--muted);
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  color: var(--label-color);
   margin-top: 0.3rem;
   white-space: nowrap;
 }
 
 .review-body { font-size: 0.95rem; line-height: 1.55; }
-.review-body h2, .review-body h3, .review-body h4 {
-  font-size: 0.75rem;
-  font-family: var(--mono);
+/* Three heading levels rendered identically (mono uppercase 0.75rem)
+   read as one flat list. h2 becomes a real title (Archivo, matching
+   .panel h2's in-card heading pattern); h3/h4 take the label token --
+   two visual tiers instead of a flat third repeat of h2. */
+.review-body h2 {
+  font-family: var(--disp);
+  font-weight: 700;
+  font-size: 1.05rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+  margin: 1.1rem 0 0.5rem;
+}
+.review-body h3, .review-body h4 {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  letter-spacing: var(--label-spacing);
+  color: var(--label-color);
   margin: 1rem 0 0.4rem;
 }
 .review-body p { margin: 0 0 0.7rem; }
@@ -648,13 +733,15 @@ form.settings-form button {
 .review-body code { font-family: var(--mono); font-size: 0.85em; color: var(--accent); }
 
 .metrics-detail { margin-top: 0.9rem; border-top: 1px solid var(--line-soft); padding-top: 0.6rem; }
+/* Shared with About's disclosure summary style rather than its own
+   smaller variant. */
 .metrics-detail summary {
   cursor: pointer;
-  font-family: var(--mono);
-  font-size: 0.75rem;
+  font-family: var(--label-font);
+  font-size: var(--label-size);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--dim);
+  letter-spacing: var(--label-spacing);
+  color: var(--label-color);
 }
 .metrics-detail summary:hover { color: var(--muted); }
 table.review-sessions { margin-top: 0.6rem; font-size: 0.8rem; }
@@ -664,7 +751,7 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
   padding: 0.6rem;
   background: var(--ink);
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   font-family: var(--mono);
   font-size: 0.7rem;
   line-height: 1.45;
@@ -678,9 +765,9 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
 .weekgrid-scroll { overflow-x: auto; }
 .weekgrid-row { display: flex; gap: 2px; min-width: min-content; margin-bottom: 4px; }
 .weekgrid-label {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--muted);
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  color: var(--label-color);
   width: 120px; /* was 96px -- too narrow for "Running recovery"/"Strength deload" at the new 12px floor, wrapped to 2 lines */
   flex: none;
   display: flex;
@@ -691,12 +778,15 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
 .wk-cell.recovery { background: var(--teal-dim); }
 
 .numbers-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 0.5rem; }
-.numbers-grid .mrow { padding: 0.3rem 0; border-bottom: 1px dashed var(--border); }
+.numbers-grid .mrow { padding: 0.3rem 0; border-bottom: 1px dashed var(--line-soft); }
 .numbers-grid .mrow:last-child { border-bottom: none; }
+/* Unused by any current template (no page reaches this class today) --
+   kept aligned to the .rows pattern anyway so tabular data would look
+   the same here as About's, if this ever gets used. */
 .landmark-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; margin-top: 0.3rem; }
-.landmark-table th, .landmark-table td { text-align: left; padding: 0.25rem 0.5rem 0.25rem 0; color: var(--muted); }
+.landmark-table th, .landmark-table td { text-align: left; padding: 0.55rem 0; border-bottom: 1px solid var(--line-soft); color: var(--muted); }
 .landmark-table td.v { color: var(--text); font-family: var(--mono); }
-.landmark-table th { font-family: var(--mono); text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em; }
+.landmark-table th { font-family: var(--label-font); text-transform: uppercase; font-size: var(--label-size); letter-spacing: var(--label-spacing); color: var(--label-color); }
 
 /* was max-width: 600px -- widened to 700px to match the reference builds
    (about-redesign.html, gym-mode.html) and the rest of the UI-audit turns,
@@ -738,13 +828,14 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
     min-width: 52px;
     min-height: 48px;
     padding: 0.35rem 0.6rem;
-    border-radius: 12px;
+    border-radius: var(--r-md);
     margin-right: 0;
     background: var(--slate2);
     border: 1px solid transparent;
     color: var(--muted);
     text-decoration: none;
-    font-family: var(--mono);
+    font-family: var(--body);
+    font-weight: 500;
     cursor: pointer;
   }
   .nav-bottom .tab.active {
@@ -764,7 +855,7 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
     right: 0;
     background: var(--raised);
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: var(--r-md);
     padding: 0.4rem;
     display: flex;
     flex-direction: column;
@@ -774,10 +865,11 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
   }
   .tab-more-menu a {
     padding: 0.6rem 0.7rem;
-    border-radius: 8px;
+    border-radius: var(--r-sm);
     color: var(--text);
     text-decoration: none;
     font-size: 0.85rem;
+    font-family: var(--body);
     min-height: 44px;
     display: flex;
     align-items: center;
