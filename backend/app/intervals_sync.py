@@ -13,6 +13,7 @@ from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID
 from app.engines.running import RunRepeatStep, RunSessionPlan, RunStep
 from app.integrations.intervals_icu import IntervalsIcuClient
 from app.models import AthleteProfile, PlannedSession, SessionStatus, SessionType
+from app.timeutil import local_today
 
 DEFAULT_SYNC_WINDOW_DAYS = 10
 
@@ -73,7 +74,7 @@ def sync_upcoming_runs_to_intervals(
     if not intervals_icu_configured():
         return {"skipped": "intervals.icu not configured", "synced": 0, "failed": 0}
 
-    today = today or date.today()
+    today = today or local_today()
     client = client or IntervalsIcuClient()
 
     sessions = (

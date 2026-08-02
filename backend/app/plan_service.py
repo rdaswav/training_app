@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from app.config import DEFAULT_WEEK_TEMPLATE
+from app.timeutil import local_today
 from app.engines import calendar as calendar_engine
 from app.engines import running as running_engine
 from app.engines import strength as strength_engine
@@ -121,7 +122,7 @@ def generate_and_persist_plan(
     Never touches a day that's already completed/missed: only still-`planned`
     sessions from max(plan_start_date, today) forward are replaced, so
     re-running this daily can't erase training history."""
-    today = today or date.today()
+    today = today or local_today()
     if plan_start_date is None:
         plan_start_date = race.macrocycle.start_date if race.macrocycle is not None else today
     regen_from = max(plan_start_date, today)

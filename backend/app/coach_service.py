@@ -18,6 +18,7 @@ from app.engines.running import week_start as monday_of
 from app.integrations.anthropic_coach import generate_review, render_prompt
 from app.jobs.daily_autoregulation import MAX_PACE_DRIFT_SEC_PER_KM
 from app.models import AthleteProfile, CoachReview, CompletedSession, PlannedSession, Race, SessionType
+from app.timeutil import local_today
 from app.plan_service import fitness_from_athlete
 
 # Weeks of load history handed to the model. One week-over-week delta can't tell
@@ -31,7 +32,7 @@ PRIOR_REVIEWS = 3
 
 def last_complete_week(today: date | None = None) -> date:
     """Monday of the most recently finished week."""
-    return monday_of(today or date.today()) - timedelta(days=7)
+    return monday_of(today or local_today()) - timedelta(days=7)
 
 
 def _athlete_metrics(athlete: AthleteProfile, race: Race | None) -> dict:
@@ -118,7 +119,7 @@ def _load_series(db: Session, athlete: AthleteProfile, week_start: date):
         week_starts=week_starts,
         run_km_by_week=load_summary.sum_run_km_by_week(run_rows),
         tonnage_by_week=load_summary.sum_strength_tonnage_by_week(completed_rows),
-        current_week_start=monday_of(date.today()),
+        current_week_start=monday_of(local_today()),
     )
 
 

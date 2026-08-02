@@ -13,6 +13,7 @@ from markupsafe import Markup
 from app.api.routes import get_or_create_athlete, router
 from app.auth_middleware import BasicAuthMiddleware
 from app.config import (
+    ATHLETE_TIMEZONE,
     DAILY_JOB_HOUR,
     DEFAULT_WEEK_TEMPLATE,
     ENABLE_SCHEDULER,
@@ -31,6 +32,7 @@ from app.jobs.weekly_review import run_weekly_review_job
 from app.models import CoachReview, CompletedSession, PlannedSession, Race, SessionType
 from app.plan_service import fitness_from_athlete
 from app.seed import seed_exercise_library
+from app.timeutil import local_today
 
 PHASE_COLORS = {
     "Base": "#6b7280", "Re-base": "#5b9dff", "Build 1": "#2f6fed",
@@ -285,7 +287,7 @@ def _load_series_for_race(
         week_starts=list(weeks.keys()),
         run_km_by_week=load_summary.sum_run_km_by_week(run_rows),
         tonnage_by_week=load_summary.sum_strength_tonnage_by_week(completed_rows),
-        current_week_start=week_start(date.today()),
+        current_week_start=week_start(local_today()),
     )
 
 
@@ -302,10 +304,15 @@ def on_startup():
         db.close()
 
     if ENABLE_SCHEDULER and not scheduler.running:
+        # timezone=ATHLETE_TIMEZONE -- APScheduler's cron trigger otherwise fires
+        # in the server's local time (UTC in a container regardless of where
+        # it's hosted), so DAILY_JOB_HOUR=6/WEEKLY_REVIEW_HOUR=18 would fire at
+        # 6am/6pm UTC, not the athlete's actual local morning/evening.
         scheduler.add_job(
             _run_daily_job_with_own_session,
             "cron",
             hour=DAILY_JOB_HOUR,
+            timezone=ATHLETE_TIMEZONE,
             id="daily_autoregulation",
             replace_existing=True,
         )
@@ -314,6 +321,7 @@ def on_startup():
             "cron",
             day_of_week=WEEKLY_REVIEW_DAY,
             hour=WEEKLY_REVIEW_HOUR,
+            timezone=ATHLETE_TIMEZONE,
             id="weekly_coach_review",
             replace_existing=True,
         )
@@ -331,7 +339,7 @@ def today_view(request: Request):
     db = SessionLocal()
     try:
         athlete = get_or_create_athlete(db)
-        today = date.today()
+        today = local_today()
         sessions = (
             db.query(PlannedSession)
             .filter(PlannedSession.athlete_id == athlete.id, PlannedSession.date == today)
@@ -379,8 +387,8 @@ def plan_view(request: Request):
         athlete = get_or_create_athlete(db)
         race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
         phases = race.macrocycle.phases if race and race.macrocycle else []
-        start = race.macrocycle.start_date if race and race.macrocycle else date.today()
-        end = race.macrocycle.end_date if race and race.macrocycle else date.today() + timedelta(days=7)
+        start = race.macrocycle.start_date if race and race.macrocycle else local_today()
+        end = race.macrocycle.end_date if race and race.macrocycle else local_today() + timedelta(days=7)
 
         total_days = max((end - start).days + 1, 1)
         phase_segments = [
@@ -401,7 +409,7 @@ def plan_view(request: Request):
             .all()
         )
         weeks = _weeks_by_monday(sessions)
-        today = date.today()
+        today = local_today()
         load_series = _load_series_for_race(db, athlete, start, end, weeks)
 
         current_phase = None
@@ -462,7 +470,7 @@ def about_view(request: Request):
     try:
         athlete = get_or_create_athlete(db)
         race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
-        today = date.today()
+        today = local_today()
 
         context = {
             "request": request,

@@ -14,8 +14,19 @@ INTERVALS_ICU_BASE_URL = os.environ.get("INTERVALS_ICU_BASE_URL", "https://inter
 AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "")
 AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "")
 
+# The athlete's IANA timezone name (e.g. "Australia/Sydney"). Everything that
+# means "today"/"now" for the athlete -- the Today view, plan-generation windows,
+# the intervals.icu sync window, and the daily/weekly job trigger times below --
+# is computed in this timezone via app/timeutil.py, not server-local time. A
+# container defaults to UTC regardless of where it's hosted, so leaving this at
+# UTC silently makes "today" wrong (fast-forwarded for timezones west of UTC,
+# stuck on yesterday for timezones east of it, for however many hours the
+# athlete's offset is) for anyone not actually in UTC.
+ATHLETE_TIMEZONE = os.environ.get("ATHLETE_TIMEZONE", "UTC")
+
 # Local hour the daily autoregulation job runs at (spec section 3: pull
-# yesterday's sessions, autoregulate, refresh the next 7-10 days).
+# yesterday's sessions, autoregulate, refresh the next 7-10 days) -- in
+# ATHLETE_TIMEZONE, not server-local time (see scheduler.add_job's timezone= in main.py).
 DAILY_JOB_HOUR = int(os.environ.get("DAILY_JOB_HOUR", "6"))
 ENABLE_SCHEDULER = os.environ.get("ENABLE_SCHEDULER", "true").lower() not in ("false", "0", "")
 
@@ -25,9 +36,9 @@ ENABLE_SCHEDULER = os.environ.get("ENABLE_SCHEDULER", "true").lower() not in ("f
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 COACH_MODEL = os.environ.get("COACH_MODEL", "claude-opus-5")
 
-# When the weekly review job runs (day_of_week as APScheduler's 3-letter form).
-# Sunday evening by default: the training week has just finished, and there's
-# time to act on the review before Monday.
+# When the weekly review job runs (day_of_week as APScheduler's 3-letter form),
+# in ATHLETE_TIMEZONE. Sunday evening by default: the training week has just
+# finished, and there's time to act on the review before Monday.
 WEEKLY_REVIEW_DAY = os.environ.get("WEEKLY_REVIEW_DAY", "sun")
 WEEKLY_REVIEW_HOUR = int(os.environ.get("WEEKLY_REVIEW_HOUR", "18"))
 

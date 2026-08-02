@@ -23,6 +23,7 @@ from app.models import (
     SessionType,
 )
 from app.plan_service import generate_and_persist_plan
+from app.timeutil import local_today
 from app.schemas import (
     AthleteOut,
     AthleteUpdate,
@@ -159,7 +160,7 @@ def get_calendar(start: date, end: date, db: Session = Depends(get_db)):
 @router.get("/today", response_model=list[SessionOut])
 def get_today(db: Session = Depends(get_db)):
     athlete = get_or_create_athlete(db)
-    today = date.today()
+    today = local_today()
     return (
         db.query(PlannedSession)
         .filter(PlannedSession.athlete_id == athlete.id, PlannedSession.date == today)

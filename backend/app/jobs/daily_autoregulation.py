@@ -28,6 +28,7 @@ from app.models import (
     SessionType,
 )
 from app.plan_service import generate_and_persist_plan
+from app.timeutil import local_today
 
 # Hard cap on cumulative autoregulated drift from the athlete's profile-set
 # baseline pace, per macrocycle-ish window -- prevents a run of "progress"
@@ -118,7 +119,7 @@ def _run_daily_job_for_athlete(
     today: date | None = None,
     client: IntervalsIcuClient | None = None,
 ) -> dict:
-    today = today or date.today()
+    today = today or local_today()
     yesterday = today - timedelta(days=1)
     summary = {"athlete_id": athlete.id, "matched": 0, "missed_marked": 0, "regenerated": False, "sync": None}
 

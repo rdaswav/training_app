@@ -85,8 +85,14 @@ Environment variables (see `app/config.py`):
 - `INTERVALS_ICU_API_KEY`, `INTERVALS_ICU_ATHLETE_ID`, `INTERVALS_ICU_BASE_URL` -- needed
   only for the intervals.icu client; every intervals.icu-touching code path no-ops
   safely without them.
-- `DAILY_JOB_HOUR` -- local hour the in-process scheduler runs the daily autoregulation
-  job (default `6`).
+- `ATHLETE_TIMEZONE` -- IANA timezone name (e.g. `Australia/Sydney`), default `UTC`.
+  Everything that means "today" for the athlete (the Today view, plan-generation
+  windows, the intervals.icu sync window, and the job trigger times below) is computed
+  in this timezone, not the server's. Leaving this at the default `UTC` on a non-UTC
+  server makes "today" wrong for however many hours the athlete's offset covers --
+  set it to wherever you actually are.
+- `DAILY_JOB_HOUR` -- local hour (in `ATHLETE_TIMEZONE`) the in-process scheduler runs
+  the daily autoregulation job (default `6`).
 - `ENABLE_SCHEDULER` -- set to `false` to disable the in-process APScheduler entirely
   (e.g. if you'd rather trigger `POST /api/jobs/daily-autoregulation` from an external cron).
 - `AUTH_USERNAME`, `AUTH_PASSWORD` -- if both are set, every route (pages and API) is
@@ -108,6 +114,7 @@ docker run -d \
   -p 8000:8000 \
   -v training_app_data:/app/data \
   -e ENABLE_SCHEDULER=true \
+  -e ATHLETE_TIMEZONE=Australia/Sydney \
   -e DAILY_JOB_HOUR=6 \
   -e INTERVALS_ICU_API_KEY=... \
   -e INTERVALS_ICU_ATHLETE_ID=... \
@@ -161,6 +168,8 @@ app/
   plan_service.py            Wires the engines to persistence for one race (history-safe:
                              only regenerates still-`planned` sessions from today forward)
   intervals_sync.py          Guarded push of upcoming run sessions to intervals.icu
+  timeutil.py                 local_today() -- "today" in ATHLETE_TIMEZONE, not the
+                             server's, used everywhere that means the athlete's actual day
   jobs/
     daily_autoregulation.py  The daily job: pull activities/wellness -> autoregulate ->
                              refresh -> re-sync -> record job health
@@ -171,6 +180,6 @@ app/
 ```
 
 The engines are deliberately pure/dataclass-based with no DB or HTTP dependency, so the
-periodization rules are unit-testable in isolation (`backend/tests/`, 175 passing tests
+periodization rules are unit-testable in isolation (`backend/tests/`, 195 passing tests
 covering the engines, plan regeneration/history preservation, intervals.icu sync, the
 daily job, and a real FastAPI `TestClient` layer over the JSON API).
