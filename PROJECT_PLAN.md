@@ -320,15 +320,16 @@ adjacency-flag decisions.
 
 ## 12. Open items
 
-- **No backup of the SQLite data file** -- `/app/data/training_app.db` on the NAS
-  volume (`training_app_data`) is the only durable state (athlete profile, races,
-  every planned/completed session, strength logs, coach reviews). There's currently
-  no automated backup of it -- a lost/corrupted volume loses everything. Surfaced
-  during the pre-launch debug pass (2026-08-02) right before real daily use started.
-  Options not yet decided between: a cron `docker cp`/`sqlite3 .backup` to another
-  disk on the NAS, syncing the file to cloud storage on a schedule, or Synology's own
-  Hyper Backup/snapshot feature if the NAS supports it. Low urgency day-to-day, but
-  worth closing before too much real training history accumulates only on one disk.
+- **#53 -- No backup of the SQLite data file**: `/app/data/training_app.db` on the
+  NAS volume (`training_app_data`) is the only durable state (athlete profile,
+  races, every planned/completed session, strength logs, coach reviews). There's
+  currently no automated backup of it -- a lost/corrupted volume loses everything.
+  Surfaced during the pre-launch debug pass (2026-08-02) right before real daily use
+  started. Options not yet decided between: a cron `docker cp`/`sqlite3 .backup` to
+  another disk on the NAS, syncing the file to cloud storage on a schedule, or
+  Synology's own Hyper Backup/snapshot feature if the NAS supports it. Low urgency
+  day-to-day, but worth closing before too much real training history accumulates
+  only on one disk.
 
 ---
 
