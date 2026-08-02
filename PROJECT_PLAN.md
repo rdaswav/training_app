@@ -16,8 +16,8 @@ today/plan/settings/history/session-detail views.
 
 Every item below (1-8) is done, and every issue raised after that -- filed and
 tracked directly as GitHub issues (#21-#35) rather than in this file -- is closed
-too (see section 11 near the end). This file is now a complete record of what
-shipped, not a queue of what's left; there is currently nothing open.
+too (see section 11 near the end). This file is mostly a complete record of what
+shipped, not a queue of what's left -- one open item, see section 12.
 
 **Deployment**: self-hosted via Docker on a home NAS. The original Fly.io deployment
 (`training-app-v1.fly.dev`) was decommissioned once the self-hosted instance was
@@ -315,6 +315,20 @@ trustworthy first):**
 Every dependent design question above was resolved via `AskUserQuestion` before its
 implementation started, following the same pattern as items 6-8's goal-time and
 adjacency-flag decisions.
+
+---
+
+## 12. Open items
+
+- **No backup of the SQLite data file** -- `/app/data/training_app.db` on the NAS
+  volume (`training_app_data`) is the only durable state (athlete profile, races,
+  every planned/completed session, strength logs, coach reviews). There's currently
+  no automated backup of it -- a lost/corrupted volume loses everything. Surfaced
+  during the pre-launch debug pass (2026-08-02) right before real daily use started.
+  Options not yet decided between: a cron `docker cp`/`sqlite3 .backup` to another
+  disk on the NAS, syncing the file to cloud storage on a schedule, or Synology's own
+  Hyper Backup/snapshot feature if the NAS supports it. Low urgency day-to-day, but
+  worth closing before too much real training history accumulates only on one disk.
 
 ---
 
