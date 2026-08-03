@@ -602,6 +602,30 @@ function initGymMode() {
 document.addEventListener("DOMContentLoaded", initGymMode);
 document.addEventListener("DOMContentLoaded", initRunMode);
 
+// ---------------------------------------------------------------------------
+// Cold-launch splash (today.html only): shown synchronously by an inline
+// script in the template (sessionStorage-gated, so a repeat visit within the
+// same tab hides it before first paint instead of flashing). This just fades
+// the still-visible one out once the rest of the page has actually loaded,
+// with a minimum display time so it isn't a single-frame flicker on a fast
+// connection -- "fades on first content paint, not a fixed timer."
+// ---------------------------------------------------------------------------
+const SPLASH_MIN_DISPLAY_MS = 500;
+
+function initSplash() {
+  const splash = document.getElementById("splash");
+  if (!splash || splash.style.display === "none") return;
+  const shownAt = Date.now();
+  window.addEventListener("load", () => {
+    const wait = Math.max(0, SPLASH_MIN_DISPLAY_MS - (Date.now() - shownAt));
+    setTimeout(() => {
+      splash.classList.add("hide");
+      setTimeout(() => splash.remove(), 450);
+    }, wait);
+  });
+}
+initSplash();
+
 async function toggleSwap(button, sessionId, pattern) {
   const container = button.nextElementSibling;
   if (container.childElementCount > 0) {

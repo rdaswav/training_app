@@ -1,6 +1,33 @@
 {% extends "base.html" %}
 {% block title %}Today - Parallax{% endblock %}
 {% block content %}
+  <div id="splash" class="splash">
+    <div class="splash-icon">
+      <svg width="104" height="104" viewBox="0 0 100 100" aria-hidden="true">
+        <rect width="100" height="100" rx="22" fill="#131c2b"></rect>
+        <rect x="24" y="30" width="52" height="9" rx="4.5" fill="var(--teal)"></rect>
+        <rect x="24" y="45.5" width="52" height="9" rx="4.5" fill="var(--violet)"></rect>
+        <rect x="34" y="61" width="52" height="9" rx="4.5" fill="var(--teal)"></rect>
+        <circle cx="80" cy="65.5" r="4" fill="var(--amber)"></circle>
+      </svg>
+    </div>
+    <div class="splash-text">
+      <div class="splash-title">Parallax</div>
+      <div class="splash-tagline">See your training from both sides.</div>
+    </div>
+    <div class="splash-bar"><i></i></div>
+  </div>
+  <script>
+    (function () {
+      var splash = document.getElementById("splash");
+      if (sessionStorage.getItem("parallaxSplashShown")) {
+        splash.style.display = "none";
+      } else {
+        sessionStorage.setItem("parallaxSplashShown", "1");
+      }
+    })();
+  </script>
+
   <div class="header">
     <h1>{{ today.strftime("%A %-d %b") }}</h1>
     {% if race %}

@@ -84,6 +84,38 @@ h1, h2, h3 { margin: 0 0 0.5rem; font-family: var(--disp); font-weight: 700; }
 }
 .countdown { color: var(--muted); font-size: 0.9rem; font-family: var(--mono); }
 
+/* Cold-launch splash: Today only, once per browser session (see the
+   sessionStorage guard inline in today.html and initSplash in app.js).
+   The mark's tile bg is #131c2b here specifically -- a touch lighter than
+   the ink it sits on everywhere else, so it doesn't disappear into the
+   full-bleed background at 104px. */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  transition: opacity 0.4s ease;
+}
+.splash.hide { opacity: 0; pointer-events: none; }
+.splash-icon { position: relative; }
+.splash-icon::before {
+  content: "";
+  position: absolute;
+  inset: -60px;
+  z-index: -1;
+  background: radial-gradient(circle, rgba(139, 127, 232, 0.1), transparent 60%);
+}
+.splash-text { text-align: center; }
+.splash-title { font-family: var(--disp); font-weight: 800; font-size: 1.6rem; letter-spacing: -0.01em; }
+.splash-tagline { color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
+.splash-bar { position: absolute; bottom: 34px; width: 26px; height: 3px; border-radius: 2px; background: var(--line-soft); overflow: hidden; }
+.splash-bar i { display: block; width: 60%; height: 100%; background: var(--teal); border-radius: 2px; }
+
 /* Label: the one small-caps token, replacing .lmc .k / .eyebrow /
    .session-type / .field label / .rest .lab / .load-chart-title /
    .load-col-label / .day-card-date / .disclosure summary .d /

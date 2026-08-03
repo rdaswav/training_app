@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">Parallax</h1>
-<p align="center"><i>Run and lift, in the same view.</i></p>
+<p align="center"><i>See your training from both sides.</i></p>
 
 Parallax is a personal training app for people preparing for a race while also lifting.
 It generates a race-driven training block that runs a periodized running plan and an
