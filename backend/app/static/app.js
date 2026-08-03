@@ -407,9 +407,12 @@ function updateStickyBarFor(prescriptionEl) {
   const entry = prescriptionEl._entry;
   const loggedCount = entry ? entry.logged.length : 0;
   const total = Number(prescriptionEl.dataset.sets);
-  const target = prescriptionEl.dataset.suggested
-    ? `${prescriptionEl.dataset.reps} &times; ${prescriptionEl.dataset.suggested}`
-    : `${prescriptionEl.dataset.reps} reps`;
+  const isTimed = prescriptionEl.dataset.movementType === "bodyweight_timed";
+  const target = isTimed
+    ? `${prescriptionEl.dataset.reps}s hold`
+    : prescriptionEl.dataset.suggested
+      ? `${prescriptionEl.dataset.reps} &times; ${prescriptionEl.dataset.suggested}`
+      : `${prescriptionEl.dataset.reps} reps`;
   const lastChip = prescriptionEl.dataset.lastSets
     ? `<span class="chip">Last <b>${prescriptionEl.dataset.lastSets}&times;${prescriptionEl.dataset.lastReps} @ ${prescriptionEl.dataset.lastWeight}</b></span>`
     : "";
@@ -429,6 +432,8 @@ function updateStickyBarFor(prescriptionEl) {
   stick.classList.add("on");
 }
 
+const HOLD_STEP_SEC = 5;
+
 class StrengthEntry {
   constructor(prescriptionEl) {
     this.el = prescriptionEl;
@@ -437,14 +442,29 @@ class StrengthEntry {
     this.pattern = prescriptionEl.dataset.pattern;
     this.totalSets = Number(prescriptionEl.dataset.sets);
     this.rirTarget = prescriptionEl.dataset.rir;
-    this.weight = prescriptionEl.dataset.suggested ? Number(prescriptionEl.dataset.suggested) : 20;
-    this.reps = parseRepDefault(prescriptionEl.dataset.reps);
+    this.movementType = prescriptionEl.dataset.movementType || "weighted";
+    this.isTimed = this.movementType === "bodyweight_timed";
+
+    if (this.isTimed) {
+      // .reps here holds the exercise's own seconds-per-hold range (e.g.
+      // "20-40"), not a rep count -- see Exercise.movement_type/plan_service's
+      // _select_exercises override.
+      this.duration = parseRepDefault(prescriptionEl.dataset.reps);
+    } else {
+      // bodyweight_reps (Pull-up, Push-up, ...) has no e1RM-based suggestion
+      // to prefill -- default to 0 ("no added weight") instead of the
+      // generic weighted-lift fallback.
+      const defaultWeight = this.movementType === "bodyweight_reps" ? 0 : 20;
+      this.weight = prescriptionEl.dataset.suggested ? Number(prescriptionEl.dataset.suggested) : defaultWeight;
+      this.reps = parseRepDefault(prescriptionEl.dataset.reps);
+    }
     this.logged = [];
     this.pendingTimeoutId = null;
 
     this.entryEl = prescriptionEl.querySelector(".entry");
     this.wVal = prescriptionEl.querySelector(".wval");
     this.rVal = prescriptionEl.querySelector(".rval");
+    this.dVal = prescriptionEl.querySelector(".dval");
     this.rirInput = prescriptionEl.querySelector(".rir-input");
     this.doneRow = prescriptionEl.querySelector(".done-row");
     this.ctaBtn = prescriptionEl.querySelector(".log-set-btn");
@@ -454,6 +474,8 @@ class StrengthEntry {
         const dir = Number(btn.dataset.dir);
         if (btn.dataset.step === "w") {
           this.weight = Math.max(0, Math.round((this.weight + dir * WEIGHT_STEP_KG) * 10) / 10);
+        } else if (btn.dataset.step === "d") {
+          this.duration = Math.max(5, this.duration + dir * HOLD_STEP_SEC);
         } else {
           this.reps = Math.max(1, this.reps + dir);
         }
@@ -465,13 +487,14 @@ class StrengthEntry {
   }
 
   paint() {
+    if (this.dVal) this.dVal.textContent = this.duration;
     if (this.wVal) this.wVal.textContent = formatWeight(this.weight);
     if (this.rVal) this.rVal.textContent = this.reps;
     if (this.doneRow) {
       Array.from(this.doneRow.children).forEach((chip, i) => {
         const done = this.logged[i];
         chip.className = done ? "dchip" : "dchip pending";
-        chip.textContent = done ? `${done.reps} × ${formatWeight(done.weight)}` : `set ${i + 1}`;
+        chip.textContent = done ? this._doneText(done) : `set ${i + 1}`;
       });
     }
     if (this.ctaBtn) {
@@ -486,19 +509,21 @@ class StrengthEntry {
     }
   }
 
+  _doneText(done) {
+    return this.isTimed ? `${done.duration}s` : `${done.reps} × ${formatWeight(done.weight)}`;
+  }
+
   logCurrentSet() {
     if (this.logged.length >= this.totalSets) return;
-    const setEntry = { reps: this.reps, weight: this.weight };
+    const setEntry = this.isTimed ? { duration: this.duration } : { reps: this.reps, weight: this.weight };
     this.logged.push(setEntry);
     this.paint();
     const isLast = this.logged.length >= this.totalSets;
+    const doneText = this._doneText(setEntry);
     const nextUpHtml = isLast
       ? nextUpAfter(this.el)
-      : `${this.el.dataset.exerciseName} &middot; set ${this.logged.length + 1} of ${this.totalSets}<br>${this.reps} × ${formatWeight(this.weight)} &middot; RIR ${this.rirTarget}`;
-    showUndoToast(
-      isLast ? `Session logged · ${setEntry.reps} × ${formatWeight(setEntry.weight)}` : `Set logged · ${setEntry.reps} × ${formatWeight(setEntry.weight)}`,
-      () => this.undoLastSet()
-    );
+      : `${this.el.dataset.exerciseName} &middot; set ${this.logged.length + 1} of ${this.totalSets}<br>${doneText} &middot; RIR ${this.rirTarget}`;
+    showUndoToast(isLast ? `Session logged · ${doneText}` : `Set logged · ${doneText}`, () => this.undoLastSet());
     startRestTimer(REST_DURATION_SEC, nextUpHtml);
     updateStickyBarFor(this.el);
     if (isLast) this.scheduleSubmit();
@@ -520,7 +545,9 @@ class StrengthEntry {
     const rirActual = this.rirInput && this.rirInput.value ? Number(this.rirInput.value) : null;
     const payload = {
       pattern: this.pattern,
-      sets: this.logged.map((s) => ({ reps: s.reps, weight_kg: s.weight, rir_actual: rirActual })),
+      sets: this.isTimed
+        ? this.logged.map((s) => ({ duration_sec: s.duration, rir_actual: rirActual }))
+        : this.logged.map((s) => ({ reps: s.reps, weight_kg: s.weight, rir_actual: rirActual })),
     };
     this.pendingTimeoutId = setTimeout(async () => {
       this.pendingTimeoutId = null;

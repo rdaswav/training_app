@@ -76,19 +76,29 @@ def _run_step_dict(step: running_engine.RunStep | running_engine.RunRepeatStep) 
 
 def _select_exercises(db: Session, prescriptions: list[strength_engine.StrengthPrescription], injury_flags: list[str]) -> list[dict]:
     exercises = [
-        {"name": e.name, "pattern": e.pattern, "injury_tags": e.injury_tags}
+        {"name": e.name, "pattern": e.pattern, "injury_tags": e.injury_tags, "movement_type": e.movement_type, "rep_range": e.rep_range}
         for e in db.query(Exercise).all()
     ]
     result = []
     for p in prescriptions:
         exercise = strength_engine.select_exercise(p.pattern, exercises, injury_flags)
+        movement_type = exercise["movement_type"] if exercise else "weighted"
+        # The category-based reps range (prescribe()'s "3-5"/"8-12") assumes
+        # reps -- meaningless for a hold, so a bodyweight_timed exercise's own
+        # rep_range (seconds, see seed.py) overrides it once the actual
+        # exercise is known. Can't decide this earlier in strength.prescribe()
+        # itself: pattern selection happens before exercise selection, and two
+        # exercises sharing a pattern can have different movement_types (core
+        # -> Plank timed, Dead bug reps).
+        reps = exercise["rep_range"] if exercise and movement_type == "bodyweight_timed" else p.reps
         result.append(
             {
                 "pattern": p.pattern,
                 "category": p.category,
                 "exercise_name": exercise["name"] if exercise else None,
+                "movement_type": movement_type,
                 "sets": p.sets,
-                "reps": p.reps,
+                "reps": reps,
                 "rir": p.rir,
                 "note": p.note,
             }

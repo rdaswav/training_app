@@ -68,8 +68,13 @@ class SessionOut(BaseModel):
 
 
 class StrengthSetLog(BaseModel):
-    reps: int
-    weight_kg: float
+    # reps/weight_kg for a normal or bodyweight_reps set; duration_sec for a
+    # bodyweight_timed hold instead -- see Exercise.movement_type. Optional
+    # (rather than two separate request shapes) since which ones apply is
+    # determined by the prescription's movement_type, not the request itself.
+    reps: int | None = None
+    weight_kg: float | None = None
+    duration_sec: int | None = None
     rir_actual: float | None = None
 
 

@@ -46,6 +46,19 @@ _MACROCYCLE_NEW_COLUMNS = {
     "mesocycle_start_week": "INTEGER DEFAULT 0",
 }
 
+_EXERCISE_NEW_COLUMNS = {
+    # NULL here (not DEFAULT 'weighted') so the backfill below can tell
+    # "needs backfilling" apart from "already migrated" -- same reasoning as
+    # athlete_profiles' baseline columns. Most existing rows really are
+    # "weighted" and get that generic backfill; the specific bodyweight/timed
+    # exercise names get their real movement_type instead (see EXERCISE_LIBRARY
+    # in seed.py, which is the source of truth this list is kept in sync with).
+    "movement_type": "TEXT",
+}
+
+_BODYWEIGHT_REPS_EXERCISE_NAMES = ("Push-up", "Pull-up", "Dead bug", "Nordic curl", "Glute bridge", "Single-leg calf raise")
+_BODYWEIGHT_TIMED_EXERCISE_NAMES = ("Plank", "Side plank", "Copenhagen plank")
+
 
 def _add_missing_columns(engine, table: str, columns: dict[str, str]) -> bool:
     """Returns whether `table` already existed (and so may need migrating) --
@@ -83,6 +96,26 @@ def _migrate_macrocycles(engine) -> None:
     _add_missing_columns(engine, "macrocycles", _MACROCYCLE_NEW_COLUMNS)
 
 
+def _migrate_exercises(engine) -> None:
+    if not _add_missing_columns(engine, "exercises", _EXERCISE_NEW_COLUMNS):
+        return
+    with engine.begin() as conn:
+        placeholders = ", ".join(f":n{i}" for i in range(len(_BODYWEIGHT_REPS_EXERCISE_NAMES)))
+        conn.execute(
+            text(f"UPDATE exercises SET movement_type = 'bodyweight_reps' WHERE name IN ({placeholders})"),
+            {f"n{i}": name for i, name in enumerate(_BODYWEIGHT_REPS_EXERCISE_NAMES)},
+        )
+        placeholders = ", ".join(f":n{i}" for i in range(len(_BODYWEIGHT_TIMED_EXERCISE_NAMES)))
+        conn.execute(
+            text(
+                f"UPDATE exercises SET movement_type = 'bodyweight_timed', rep_range = '20-40' "
+                f"WHERE name IN ({placeholders})"
+            ),
+            {f"n{i}": name for i, name in enumerate(_BODYWEIGHT_TIMED_EXERCISE_NAMES)},
+        )
+        conn.execute(text("UPDATE exercises SET movement_type = 'weighted' WHERE movement_type IS NULL"))
+
+
 def init_db():
     from app import models  # noqa: F401 ensure models are registered
 
@@ -90,3 +123,4 @@ def init_db():
     if DATABASE_URL.startswith("sqlite"):
         _migrate_athlete_profiles(engine)
         _migrate_macrocycles(engine)
+        _migrate_exercises(engine)

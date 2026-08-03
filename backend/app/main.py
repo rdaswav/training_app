@@ -252,7 +252,13 @@ def _attach_completed_feedback(db, sessions: list[PlannedSession]) -> None:
                 if not pattern:
                     continue
                 sets = (c.actual or {}).get("sets", [])
-                did_text = ", ".join(f"{st['reps']}×{st['weight_kg']}kg" for st in sets) if sets else "Logged"
+
+                def _set_text(st):
+                    if st.get("duration_sec") is not None:
+                        return f"{st['duration_sec']}s"
+                    return f"{st['reps']}×{st['weight_kg']}kg"
+
+                did_text = ", ".join(_set_text(st) for st in sets) if sets else "Logged"
                 by_pattern[pattern] = {"did_text": did_text, "feedback": c.feedback, "next_label": c.next_instruction}
             s.completed_feedback_by_pattern = by_pattern
 
@@ -307,6 +313,13 @@ def _attach_last_logged_sets(db, athlete, sessions: list[PlannedSession]) -> Non
         sets = row.get("sets") or []
         if not pattern or pattern in last_by_pattern or not sets:
             continue  # rows are latest-first -- first hit per pattern is the most recent
+        # A bodyweight_timed set has no reps/weight_kg (see movement_type on
+        # Exercise) -- skip it here too (same reasoning as
+        # strength_engine.latest_e1rm_by_pattern) so a pattern shared with a
+        # weighted exercise (e.g. "core") doesn't surface "Last: None x Nonekg"
+        # on the sticky bar; falls through to the next, older, usable row.
+        if sets[0].get("weight_kg") is None or sets[0].get("reps") is None:
+            continue
         last_by_pattern[pattern] = {
             "set_count": len(sets),
             "reps": sets[0]["reps"],

@@ -238,7 +238,8 @@ def log_strength_session(session_id: int, payload: StrengthLogRequest, db: Sessi
         note=prescription_dict["note"],
     )
     logged_sets = [autoregulation.StrengthLogSet(**s.model_dump()) for s in payload.sets]
-    result = autoregulation.evaluate_strength_log(prescription, logged_sets)
+    movement_type = prescription_dict.get("movement_type", "weighted")
+    result = autoregulation.evaluate_strength_log(prescription, logged_sets, movement_type=movement_type)
 
     already_logged = {
         c.actual.get("pattern")

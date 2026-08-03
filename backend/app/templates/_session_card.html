@@ -96,12 +96,14 @@
     </div>
   {% elif s.type.value == "strength" %}
     {% for p in s.content.get("prescriptions", []) %}
+      {% set is_timed = p.movement_type == 'bodyweight_timed' %}
+      {% set is_bodyweight = p.movement_type == 'bodyweight_reps' %}
       <div class="prescription"
            data-session-id="{{ s.id }}" data-pattern="{{ p.pattern }}"
            data-exercise-name="{{ p.exercise_name or p.pattern }}" data-sets="{{ p.sets }}"
-           data-reps="{{ p.reps }}" data-rir="{{ p.rir }}"
-           data-suggested="{{ s.suggested_loads.get(p.pattern) if s.suggested_loads and s.suggested_loads.get(p.pattern) else '' }}"
-           {% if s.last_logged and s.last_logged.get(p.pattern) %}
+           data-reps="{{ p.reps }}" data-rir="{{ p.rir }}" data-movement-type="{{ p.movement_type or 'weighted' }}"
+           data-suggested="{{ s.suggested_loads.get(p.pattern) if not is_timed and s.suggested_loads and s.suggested_loads.get(p.pattern) else '' }}"
+           {% if not is_timed and s.last_logged and s.last_logged.get(p.pattern) %}
            data-last-sets="{{ s.last_logged[p.pattern].set_count }}"
            data-last-reps="{{ s.last_logged[p.pattern].reps }}"
            data-last-weight="{{ s.last_logged[p.pattern].weight_kg }}"
@@ -109,7 +111,7 @@
         <div class="prescription-head">
           <div>
             <strong>{{ p.exercise_name or p.pattern }}</strong>
-            <div class="meta">{{ p.pattern }} &middot; {{ p.sets }} x {{ p.reps }} @ RIR <span class="value">{{ p.rir }}</span></div>
+            <div class="meta">{{ p.pattern }} &middot; {{ p.sets }} x {{ p.reps }}{% if is_timed %}s{% endif %} @ RIR <span class="value">{{ p.rir }}</span></div>
           </div>
           {% if p.pattern in s.logged_patterns %}
             <span class="stat st-done">&#10003; Logged</span>
@@ -122,28 +124,39 @@
         {% if p.pattern not in s.logged_patterns %}
           <div class="entry">
             <div class="fieldrow">
-              <div class="field">
-                <label for="w-{{ s.id }}-{{ p.pattern }}">Weight</label>
-                <div class="val"><span class="wval" id="w-{{ s.id }}-{{ p.pattern }}">&ndash;</span><small>kg</small></div>
-                <div class="step">
-                  <button type="button" class="stepbtn" data-step="w" data-dir="-1" aria-label="Decrease weight 2.5 kg">&minus;</button>
-                  <button type="button" class="stepbtn" data-step="w" data-dir="1" aria-label="Increase weight 2.5 kg">+</button>
+              {% if is_timed %}
+                <div class="field">
+                  <label for="d-{{ s.id }}-{{ p.pattern }}">Hold</label>
+                  <div class="val"><span class="dval" id="d-{{ s.id }}-{{ p.pattern }}">&ndash;</span><small>s</small></div>
+                  <div class="step">
+                    <button type="button" class="stepbtn" data-step="d" data-dir="-1" aria-label="Decrease hold 5 seconds">&minus;</button>
+                    <button type="button" class="stepbtn" data-step="d" data-dir="1" aria-label="Increase hold 5 seconds">+</button>
+                  </div>
                 </div>
-              </div>
-              <div class="field">
-                <label for="r-{{ s.id }}-{{ p.pattern }}">Reps</label>
-                <div class="val"><span class="rval" id="r-{{ s.id }}-{{ p.pattern }}">&ndash;</span></div>
-                <div class="step">
-                  <button type="button" class="stepbtn" data-step="r" data-dir="-1" aria-label="Decrease reps">&minus;</button>
-                  <button type="button" class="stepbtn" data-step="r" data-dir="1" aria-label="Increase reps">+</button>
+              {% else %}
+                <div class="field">
+                  <label for="w-{{ s.id }}-{{ p.pattern }}">{% if is_bodyweight %}Added weight{% else %}Weight{% endif %}</label>
+                  <div class="val"><span class="wval" id="w-{{ s.id }}-{{ p.pattern }}">&ndash;</span><small>kg</small></div>
+                  <div class="step">
+                    <button type="button" class="stepbtn" data-step="w" data-dir="-1" aria-label="Decrease weight 2.5 kg">&minus;</button>
+                    <button type="button" class="stepbtn" data-step="w" data-dir="1" aria-label="Increase weight 2.5 kg">+</button>
+                  </div>
                 </div>
-              </div>
+                <div class="field">
+                  <label for="r-{{ s.id }}-{{ p.pattern }}">Reps</label>
+                  <div class="val"><span class="rval" id="r-{{ s.id }}-{{ p.pattern }}">&ndash;</span></div>
+                  <div class="step">
+                    <button type="button" class="stepbtn" data-step="r" data-dir="-1" aria-label="Decrease reps">&minus;</button>
+                    <button type="button" class="stepbtn" data-step="r" data-dir="1" aria-label="Increase reps">+</button>
+                  </div>
+                </div>
+              {% endif %}
               <div class="field field-rir">
                 <label for="rir-{{ s.id }}-{{ p.pattern }}">RIR</label>
                 <input class="rir-input" id="rir-{{ s.id }}-{{ p.pattern }}" type="number" step="0.5" placeholder="{{ p.rir }}">
               </div>
             </div>
-            <div class="hint">Prefilled from your target. <b>Tap only if it changed.</b></div>
+            <div class="hint">{% if is_bodyweight %}Weight is *added* weight (belt/vest) &mdash; leave at 0 for bodyweight only.{% else %}Prefilled from your target.{% endif %} <b>Tap only if it changed.</b></div>
             <div class="done-row">
               {% for i in range(p.sets) %}<span class="dchip pending">set {{ i + 1 }}</span>{% endfor %}
             </div>

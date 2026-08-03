@@ -61,8 +61,9 @@ def evaluate_quality_session(
 
 @dataclass
 class StrengthLogSet:
-    reps: int
-    weight_kg: float
+    reps: int | None = None
+    weight_kg: float | None = None
+    duration_sec: int | None = None
     rir_actual: float | None = None
 
 
@@ -79,10 +80,25 @@ def _parse_rep_range(rep_range: str) -> tuple[int, int]:
     return int(lo), int(hi)
 
 
-def evaluate_strength_log(prescription, logged_sets: list[StrengthLogSet]) -> StrengthAutoregResult:
+def evaluate_strength_log(
+    prescription, logged_sets: list[StrengthLogSet], movement_type: str = "weighted"
+) -> StrengthAutoregResult:
     """prescription is a StrengthPrescription (engines/strength.py)."""
     if not logged_sets:
         return StrengthAutoregResult("No sets logged.", "Nothing to evaluate.", "Log sets next session.", "hold")
+
+    if movement_type == "bodyweight_timed":
+        # No weight axis to run Epley/e1RM against for a hold -- record what
+        # was actually held, no computed load target (decided direction: ship
+        # the duration-logging UI now, duration-based progression later).
+        first = logged_sets[0]
+        summary = f"{len(logged_sets)}x{first.duration_sec}s held for {prescription.pattern}"
+        return StrengthAutoregResult(
+            summary,
+            "Logged.",
+            "Duration-based progression isn't tracked yet -- push the hold a little longer next time it feels easy.",
+            "hold",
+        )
 
     from app.engines.strength import best_e1rm_from_sets, prescribe_next_load
 

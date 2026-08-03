@@ -227,7 +227,12 @@ def latest_e1rm_by_pattern(completed_rows: list[dict]) -> dict[str, float]:
         pattern = row.get("pattern")
         if not pattern or pattern in result:
             continue  # rows are latest-first -- first hit per pattern is the most recent
-        sets = row.get("sets") or []
+        # A pattern can mix movement_types across exercises (e.g. "core" ->
+        # Plank timed, Dead bug reps) -- a bodyweight_timed row has no
+        # weight_kg/reps at all, so skip it rather than crash/pollute the
+        # e1RM with None, falling through to the next (older, usable) row
+        # for this same pattern instead of stopping here.
+        sets = [s for s in (row.get("sets") or []) if s.get("weight_kg") is not None and s.get("reps") is not None]
         if not sets:
             continue
         result[pattern] = max(estimate_e1rm(s["weight_kg"], s["reps"]) for s in sets)

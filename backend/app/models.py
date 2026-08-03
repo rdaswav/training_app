@@ -160,6 +160,15 @@ class Exercise(Base):
     rep_range: Mapped[str] = mapped_column(String, default="6-10")  # e.g. "3-5" for compounds
     is_compound: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # "weighted" (default): logged as reps + external kg, e1RM/load-progression
+    # applies as-is. "bodyweight_reps" (Pull-up, Push-up, ...): same reps/RIR
+    # logging, but the weight field means *added* weight (belt/vest), starts
+    # from 0 instead of a bogus e1RM-derived suggestion. "bodyweight_timed"
+    # (Plank, Side plank, ...): no weight at all, logged as a held duration
+    # instead of reps -- e1RM/load progression doesn't apply, see
+    # engines/autoregulation.py's evaluate_strength_log movement_type branch.
+    movement_type: Mapped[str] = mapped_column(String, default="weighted")
+
 
 class PlannedSession(Base):
     __tablename__ = "planned_sessions"
