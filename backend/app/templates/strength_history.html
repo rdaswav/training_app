@@ -10,26 +10,44 @@
   {% for pattern, entries in by_pattern %}
     <div class="card">
       <h3>{{ pattern.replace("_", " ")|title }}</h3>
-      <table class="calendar">
-        <thead>
-          <tr><th>Date</th><th>Exercise</th><th>Sets</th><th>Feedback</th><th>Next</th></tr>
-        </thead>
-        <tbody>
-          {% for entry in entries %}
-            <tr>
-              <td>{{ entry.date.strftime("%-d %b") }}</td>
-              <td>{{ entry.exercise_name or "-" }}</td>
-              <td>
-                {% for set in entry.sets %}
-                  {{ set.reps }}x{{ set.weight_kg }}kg{% if set.rir_actual is not none %} @ RIR {{ set.rir_actual }}{% endif %}{% if not loop.last %}, {% endif %}
-                {% endfor %}
-              </td>
-              <td>{{ entry.feedback }}</td>
-              <td>{{ entry.next_instruction }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div class="calendar-table-wrap calendar-scroll">
+        <table class="calendar">
+          <thead>
+            <tr><th>Date</th><th>Exercise</th><th>Sets</th><th>Feedback</th><th>Next</th></tr>
+          </thead>
+          <tbody>
+            {% for entry in entries %}
+              <tr>
+                <td>{{ entry.date.strftime("%-d %b") }}</td>
+                <td>{{ entry.exercise_name or "-" }}</td>
+                <td>
+                  {% for set in entry.sets %}
+                    {{ set.reps }}x{{ set.weight_kg }}kg{% if set.rir_actual is not none %} @ RIR {{ set.rir_actual }}{% endif %}{% if not loop.last %}, {% endif %}
+                  {% endfor %}
+                </td>
+                <td>{{ entry.feedback }}</td>
+                <td>{{ entry.next_instruction }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="calendar-cards">
+        {% for entry in entries %}
+          <div class="card day-card">
+            <div class="day-card-date">{{ entry.date.strftime("%-d %b") }}</div>
+            <strong>{{ entry.exercise_name or "-" }}</strong>
+            <div class="meta">
+              {% for set in entry.sets %}
+                {{ set.reps }}x{{ set.weight_kg }}kg{% if set.rir_actual is not none %} @ RIR {{ set.rir_actual }}{% endif %}{% if not loop.last %}, {% endif %}
+              {% endfor %}
+            </div>
+            {% if entry.feedback %}<div class="meta">{{ entry.feedback }}</div>{% endif %}
+            {% if entry.next_instruction %}<div class="meta">{{ entry.next_instruction }}</div>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
     </div>
   {% endfor %}
 {% endblock %}
