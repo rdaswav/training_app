@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID
 from app.engines.running import RunRepeatStep, RunSessionPlan, RunStep
 from app.integrations.intervals_icu import IntervalsIcuClient
-from app.models import AthleteProfile, PlannedSession, SessionStatus, SessionType
+from app.models import AthleteProfile, Macrocycle, PlannedSession, Race, SessionStatus, SessionType
 from app.timeutil import local_today
 
 DEFAULT_SYNC_WINDOW_DAYS = 10
@@ -48,16 +48,28 @@ def _step_from_dict(d: dict) -> RunStep | RunRepeatStep:
     return _leaf_from_dict(d)
 
 
-def _to_run_session_plan(session: PlannedSession) -> RunSessionPlan:
+def _to_run_session_plan(session: PlannedSession, week: int | None = None) -> RunSessionPlan:
     steps = [_step_from_dict(s) for s in session.content.get("steps", [])]
+    name = f"Wk {week} · {session.name}" if week else session.name
     return RunSessionPlan(
         date=session.date,
-        name=session.name,
+        name=name,
         phase_name=session.phase_name or "",
         steps=steps,
         total_distance_km=session.content.get("total_distance_km", 0.0),
         role=session.content.get("role", ""),
     )
+
+
+def _week_number(session_date: date, macrocycles: list[Macrocycle]) -> int | None:
+    """1-indexed week-of-plan for whichever of the athlete's macrocycles
+    covers this date, so the same-named session repeated every week (e.g.
+    "Easy run") is distinguishable on the watch/Strava/intervals.icu calendar
+    instead of looking identical for the whole block."""
+    for mc in macrocycles:
+        if mc.start_date <= session_date <= mc.end_date:
+            return (session_date - mc.start_date).days // 7 + 1
+    return None
 
 
 def sync_upcoming_runs_to_intervals(
@@ -88,11 +100,14 @@ def sync_upcoming_runs_to_intervals(
         )
         .all()
     )
+    macrocycles = (
+        db.query(Macrocycle).join(Race, Macrocycle.race_id == Race.id).filter(Race.athlete_id == athlete.id).all()
+    )
 
     synced, failures = 0, []
     for session in sessions:
         try:
-            plan = _to_run_session_plan(session)
+            plan = _to_run_session_plan(session, week=_week_number(session.date, macrocycles))
             result = client.upsert_planned_workout(
                 plan, existing_event_id=session.intervals_icu_event_id, max_hr=athlete.max_hr
             )

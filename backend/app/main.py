@@ -188,6 +188,75 @@ def _attach_logged_patterns(db, sessions: list[PlannedSession]) -> None:
             s.logged_patterns = by_session.get(s.id, set())
 
 
+# RUN CompletedSession.next_instruction stores the terse autoregulation action
+# token (progress/hold/soften) -- these translate it to the same copy/direction
+# app.js's ephemeral coach card used, so a reload shows the identical thing.
+RUN_ACTION_LABELS = {
+    "progress": "Progress pace next session",
+    "hold": "Hold your current paces",
+    "soften": "Ease off next time",
+}
+ACTION_DIRECTION = {"progress": "up", "hold": "steady", "soften": "down", "back_off": "down"}
+
+
+def _attach_completed_feedback(db, sessions: list[PlannedSession]) -> None:
+    """Persisted Did/Read/Next coach feedback for completed sessions, so it
+    survives a page reload instead of only ever existing in the DOM right
+    after logging -- previously a completed run showed a bare "Completed"
+    and a logged strength pattern a bare "Logged" badge, even though the
+    CompletedSession.feedback/next_instruction that built the original coach
+    card was sitting in the DB the whole time, just never read back.
+
+    Attaches `completed_feedback` (dict or None) on RUN sessions and
+    `completed_feedback_by_pattern` (dict, pattern -> dict) on STRENGTH ones.
+    Strength's `next_instruction` is already descriptive text (unlike run's
+    terse action token), and its `action` field for the direction arrow was
+    never persisted -- so a reloaded strength coach card shows Next without
+    the up/down arrow rather than guessing a direction from text."""
+    session_ids = [s.id for s in sessions]
+    if not session_ids:
+        return
+    completed = (
+        db.query(CompletedSession)
+        .filter(CompletedSession.planned_session_id.in_(session_ids))
+        .order_by(CompletedSession.id)
+        .all()
+    )
+    by_session: dict[int, list[CompletedSession]] = {}
+    for c in completed:
+        by_session.setdefault(c.planned_session_id, []).append(c)
+
+    for s in sessions:
+        rows = by_session.get(s.id, [])
+        if s.type == SessionType.RUN:
+            s.completed_feedback = None
+            if rows:
+                c = rows[-1]
+                actual = c.actual or {}
+                did_parts = []
+                pace = actual.get("actual_pace_sec_per_km")
+                if pace:
+                    did_parts.append(format_pace(pace))
+                if actual.get("actual_hr"):
+                    did_parts.append(f"{actual['actual_hr']} bpm avg")
+                s.completed_feedback = {
+                    "did_text": " · ".join(did_parts) if did_parts else "Logged, no pace/HR entered",
+                    "feedback": c.feedback,
+                    "next_label": RUN_ACTION_LABELS.get(c.next_instruction, c.next_instruction),
+                    "dir": ACTION_DIRECTION.get(c.next_instruction, "steady"),
+                }
+        elif s.type == SessionType.STRENGTH:
+            by_pattern = {}
+            for c in rows:
+                pattern = (c.actual or {}).get("pattern")
+                if not pattern:
+                    continue
+                sets = (c.actual or {}).get("sets", [])
+                did_text = ", ".join(f"{st['reps']}×{st['weight_kg']}kg" for st in sets) if sets else "Logged"
+                by_pattern[pattern] = {"did_text": did_text, "feedback": c.feedback, "next_label": c.next_instruction}
+            s.completed_feedback_by_pattern = by_pattern
+
+
 def _recent_strength_completed_rows(db, athlete) -> list[dict]:
     """Most recent 200 logged strength sets, most-recent-first, shaped for
     strength_engine.latest_e1rm_by_pattern -- shared by the suggested-load
@@ -348,6 +417,7 @@ def today_view(request: Request):
         _attach_logged_patterns(db, sessions)
         _attach_suggested_loads(db, athlete, sessions)
         _attach_last_logged_sets(db, athlete, sessions)
+        _attach_completed_feedback(db, sessions)
         race = db.query(Race).filter(Race.athlete_id == athlete.id).order_by(Race.race_date).first()
         days_to_race = (race.race_date - today).days if race else None
 
@@ -635,6 +705,7 @@ def session_view(session_id: int, request: Request):
         _attach_logged_patterns(db, [session])
         _attach_suggested_loads(db, athlete, [session])
         _attach_last_logged_sets(db, athlete, [session])
+        _attach_completed_feedback(db, [session])
         return templates.TemplateResponse("session.html", {"request": request, "s": session, "active": None})
     finally:
         db.close()

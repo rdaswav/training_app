@@ -1,5 +1,19 @@
 {% macro _leaf_summary(step) %}{% if step.distance_km %}{{ step.distance_km }} km{% elif step.duration_min %}{{ step.duration_min|duration }}{% endif %}{% if step.target_pace_sec_per_km %} @ <span class="value">{{ step.target_pace_sec_per_km|pace }}</span>{% endif %}{% if step.hr_ceiling %} &middot; HR ceiling <span class="value">{{ step.hr_ceiling }}</span>{% endif %}{% endmacro %}
 
+{% macro _coach_card(did_text, feedback, next_label, dir=None) %}
+<div class="coach">
+  <div class="hd">Coach</div>
+  <div class="crow"><span class="clab cl-log">Did</span><span class="ctxt">{{ did_text }}</span></div>
+  {% if feedback %}<div class="crow"><span class="clab cl-read">Read</span><span class="ctxt">{{ feedback }}</span></div>{% endif %}
+  {% if next_label %}
+    <div class="crow">
+      <span class="clab cl-next{% if dir %} dir-{{ dir }}{% endif %}">{% if dir == 'up' %}&#9650; {% elif dir == 'down' %}&#9660; {% elif dir %}&#9679; {% endif %}Next</span>
+      <span class="ctxt">{{ next_label }}</span>
+    </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
 {% macro session_card(s, show_date=False, cue=None) %}
 {% set intensity = "session-strength" if s.type.value == "strength" else ("session-hard" if s.content.get("role") == "quality" else "session-easy") %}
 <div class="card {{ intensity }}" data-session-id="{{ s.id }}">
@@ -46,7 +60,11 @@
         <div class="fieldrow">
           <div class="field">
             <label for="pace-{{ s.id }}">Pace</label>
-            <div class="val"><span class="paceval" id="pace-{{ s.id }}">&ndash;</span><small>/km</small></div>
+            <div class="val">
+              <span class="paceval tap-edit" id="pace-{{ s.id }}" role="button" tabindex="0" aria-label="Tap to enter exact pace">&ndash;</span>
+              <input class="edit-input pace-edit-input" type="text" inputmode="numeric" aria-label="Enter pace as M:SS" style="display:none">
+              <small>/km</small>
+            </div>
             <div class="step">
               <button type="button" class="stepbtn" data-run-step="pace" data-dir="-1" aria-label="Decrease pace 5 seconds">&minus;</button>
               <button type="button" class="stepbtn" data-run-step="pace" data-dir="1" aria-label="Increase pace 5 seconds">+</button>
@@ -54,7 +72,11 @@
           </div>
           <div class="field">
             <label for="hr-{{ s.id }}">Avg HR</label>
-            <div class="val"><span class="hrval" id="hr-{{ s.id }}">&ndash;</span><small>bpm</small></div>
+            <div class="val">
+              <span class="hrval tap-edit" id="hr-{{ s.id }}" role="button" tabindex="0" aria-label="Tap to enter exact heart rate">&ndash;</span>
+              <input class="edit-input hr-edit-input" type="number" inputmode="numeric" aria-label="Enter average heart rate" style="display:none">
+              <small>bpm</small>
+            </div>
             <div class="step">
               <button type="button" class="stepbtn" data-run-step="hr" data-dir="-1" aria-label="Decrease heart rate 1 bpm">&minus;</button>
               <button type="button" class="stepbtn" data-run-step="hr" data-dir="1" aria-label="Increase heart rate 1 bpm">+</button>
@@ -64,6 +86,8 @@
         <div class="hint">{% if ns.pace or ns.hr %}Prefilled from your target pace/HR ceiling.{% else %}Adjust to what you actually ran.{% endif %} <b>Tap only if it changed.</b></div>
         <button type="button" class="cta run-log-btn">Log complete</button>
       </div>
+    {% elif s.completed_feedback %}
+      {{ _coach_card(s.completed_feedback.did_text, s.completed_feedback.feedback, s.completed_feedback.next_label, s.completed_feedback.dir) }}
     {% else %}
       <div class="feedback">Completed</div>
     {% endif %}
@@ -91,6 +115,10 @@
             <span class="stat st-done">&#10003; Logged</span>
           {% endif %}
         </div>
+        {% if p.pattern in s.logged_patterns and s.completed_feedback_by_pattern is defined and s.completed_feedback_by_pattern.get(p.pattern) %}
+          {% set cf = s.completed_feedback_by_pattern[p.pattern] %}
+          {{ _coach_card(cf.did_text, cf.feedback, cf.next_label) }}
+        {% endif %}
         {% if p.pattern not in s.logged_patterns %}
           <div class="entry">
             <div class="fieldrow">

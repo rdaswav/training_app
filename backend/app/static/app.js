@@ -221,6 +221,8 @@ class RunEntry {
 
     this.paceVal = entryEl.querySelector(".paceval");
     this.hrVal = entryEl.querySelector(".hrval");
+    this.paceInput = entryEl.querySelector(".pace-edit-input");
+    this.hrInput = entryEl.querySelector(".hr-edit-input");
     this.ctaBtn = entryEl.querySelector(".run-log-btn");
 
     entryEl.querySelectorAll(".stepbtn").forEach((btn) => {
@@ -234,8 +236,50 @@ class RunEntry {
         this.paint();
       });
     });
+    this._wireTapEdit(this.paceVal, this.paceInput, "pace");
+    this._wireTapEdit(this.hrVal, this.hrInput, "hr");
     if (this.ctaBtn) this.ctaBtn.addEventListener("click", () => this.submit());
     this.paint();
+  }
+
+  // Steppers are fine for nudging a value close to the prefilled target, but
+  // painful for reaching a far-off actual -- tapping the number swaps it for
+  // a real input so an exact value can be typed directly.
+  _wireTapEdit(displayEl, inputEl, kind) {
+    if (!displayEl || !inputEl) return;
+    const open = () => {
+      inputEl.value = kind === "pace" ? formatPaceVal(this.pace) : String(this.hr);
+      displayEl.style.display = "none";
+      inputEl.style.display = "";
+      inputEl.focus();
+      inputEl.select();
+    };
+    const commit = () => {
+      if (kind === "pace") {
+        const parsed = paceToSeconds(inputEl.value);
+        if (parsed !== null && parsed >= 120) this.pace = parsed;
+      } else {
+        const parsed = parseInt(inputEl.value, 10);
+        if (!Number.isNaN(parsed) && parsed > 0) this.hr = parsed;
+      }
+      inputEl.style.display = "none";
+      displayEl.style.display = "";
+      this.paint();
+    };
+    displayEl.addEventListener("click", open);
+    displayEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        open();
+      }
+    });
+    inputEl.addEventListener("blur", commit);
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        inputEl.blur();
+      }
+    });
   }
 
   paint() {

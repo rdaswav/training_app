@@ -290,6 +290,26 @@ nav a.active { color: var(--accent); font-weight: 600; }
 .field label { display: block; margin-bottom: 0.4rem; }
 .field .val { font-family: var(--disp); font-weight: 800; font-size: 1.8rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .field .val small { font-size: 0.8rem; color: var(--muted); font-weight: 600; margin-left: 0.15rem; }
+/* Tap-to-edit: the stepper is fine for nudging a close value, but painful
+   for reaching a far-off actual (e.g. 25 taps to move HR 25bpm) -- tapping
+   the number swaps it for a real input so an exact value can be typed
+   directly, steppers stay for small nudges. */
+.tap-edit { cursor: pointer; border-bottom: 1px dashed var(--dim); }
+.edit-input {
+  font-family: var(--disp);
+  font-weight: 800;
+  font-size: 1.8rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  width: 3.2em;
+  text-align: center;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  padding: 0;
+}
+.edit-input:focus { outline: none; border-bottom-color: var(--teal-hi); }
 .field .step { display: flex; gap: 0.4rem; margin-top: 0.5rem; justify-content: center; }
 .stepbtn {
   width: 48px;
