@@ -610,7 +610,7 @@ document.addEventListener("DOMContentLoaded", initRunMode);
 // with a minimum display time so it isn't a single-frame flicker on a fast
 // connection -- "fades on first content paint, not a fixed timer."
 // ---------------------------------------------------------------------------
-const SPLASH_MIN_DISPLAY_MS = 500;
+const SPLASH_MIN_DISPLAY_MS = 1000;
 
 function initSplash() {
   const splash = document.getElementById("splash");
