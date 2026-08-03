@@ -117,10 +117,6 @@
             <span class="stat st-done">&#10003; Logged</span>
           {% endif %}
         </div>
-        {% if p.pattern in s.logged_patterns and s.completed_feedback_by_pattern is defined and s.completed_feedback_by_pattern.get(p.pattern) %}
-          {% set cf = s.completed_feedback_by_pattern[p.pattern] %}
-          {{ _coach_card(cf.did_text, cf.feedback, cf.next_label) }}
-        {% endif %}
         {% if p.pattern not in s.logged_patterns %}
           <div class="entry">
             <div class="fieldrow">

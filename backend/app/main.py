@@ -200,25 +200,25 @@ ACTION_DIRECTION = {"progress": "up", "hold": "steady", "soften": "down", "back_
 
 
 def _attach_completed_feedback(db, sessions: list[PlannedSession]) -> None:
-    """Persisted Did/Read/Next coach feedback for completed sessions, so it
-    survives a page reload instead of only ever existing in the DOM right
-    after logging -- previously a completed run showed a bare "Completed"
-    and a logged strength pattern a bare "Logged" badge, even though the
-    CompletedSession.feedback/next_instruction that built the original coach
-    card was sitting in the DB the whole time, just never read back.
+    """Persisted Did/Read/Next coach feedback for completed RUN sessions, so
+    it survives a page reload instead of only ever existing in the DOM right
+    after logging -- previously a completed run showed a bare "Completed",
+    even though the CompletedSession.feedback/next_instruction that built the
+    original coach card was sitting in the DB the whole time, just never read
+    back. Attaches `completed_feedback` (dict or None) on RUN sessions.
 
-    Attaches `completed_feedback` (dict or None) on RUN sessions and
-    `completed_feedback_by_pattern` (dict, pattern -> dict) on STRENGTH ones.
-    Strength's `next_instruction` is already descriptive text (unlike run's
-    terse action token), and its `action` field for the direction arrow was
-    never persisted -- so a reloaded strength coach card shows Next without
-    the up/down arrow rather than guessing a direction from text."""
-    session_ids = [s.id for s in sessions]
-    if not session_ids:
+    RUN-only, deliberately: STRENGTH used to get the same treatment
+    (`completed_feedback_by_pattern`), but it was reverted as redundant --
+    /strength-history already shows the identical Date/Exercise/Sets/Feedback/
+    Next detail, so the session card just needs the "Logged" badge it already
+    has. Run has no equivalent history page (see main.py's own lack of a
+    run-history route), so its persistence stays."""
+    run_ids = [s.id for s in sessions if s.type == SessionType.RUN]
+    if not run_ids:
         return
     completed = (
         db.query(CompletedSession)
-        .filter(CompletedSession.planned_session_id.in_(session_ids))
+        .filter(CompletedSession.planned_session_id.in_(run_ids))
         .order_by(CompletedSession.id)
         .all()
     )
@@ -227,40 +227,25 @@ def _attach_completed_feedback(db, sessions: list[PlannedSession]) -> None:
         by_session.setdefault(c.planned_session_id, []).append(c)
 
     for s in sessions:
+        if s.type != SessionType.RUN:
+            continue
         rows = by_session.get(s.id, [])
-        if s.type == SessionType.RUN:
-            s.completed_feedback = None
-            if rows:
-                c = rows[-1]
-                actual = c.actual or {}
-                did_parts = []
-                pace = actual.get("actual_pace_sec_per_km")
-                if pace:
-                    did_parts.append(format_pace(pace))
-                if actual.get("actual_hr"):
-                    did_parts.append(f"{actual['actual_hr']} bpm avg")
-                s.completed_feedback = {
-                    "did_text": " · ".join(did_parts) if did_parts else "Logged, no pace/HR entered",
-                    "feedback": c.feedback,
-                    "next_label": RUN_ACTION_LABELS.get(c.next_instruction, c.next_instruction),
-                    "dir": ACTION_DIRECTION.get(c.next_instruction, "steady"),
-                }
-        elif s.type == SessionType.STRENGTH:
-            by_pattern = {}
-            for c in rows:
-                pattern = (c.actual or {}).get("pattern")
-                if not pattern:
-                    continue
-                sets = (c.actual or {}).get("sets", [])
-
-                def _set_text(st):
-                    if st.get("duration_sec") is not None:
-                        return f"{st['duration_sec']}s"
-                    return f"{st['reps']}×{st['weight_kg']}kg"
-
-                did_text = ", ".join(_set_text(st) for st in sets) if sets else "Logged"
-                by_pattern[pattern] = {"did_text": did_text, "feedback": c.feedback, "next_label": c.next_instruction}
-            s.completed_feedback_by_pattern = by_pattern
+        s.completed_feedback = None
+        if rows:
+            c = rows[-1]
+            actual = c.actual or {}
+            did_parts = []
+            pace = actual.get("actual_pace_sec_per_km")
+            if pace:
+                did_parts.append(format_pace(pace))
+            if actual.get("actual_hr"):
+                did_parts.append(f"{actual['actual_hr']} bpm avg")
+            s.completed_feedback = {
+                "did_text": " · ".join(did_parts) if did_parts else "Logged, no pace/HR entered",
+                "feedback": c.feedback,
+                "next_label": RUN_ACTION_LABELS.get(c.next_instruction, c.next_instruction),
+                "dir": ACTION_DIRECTION.get(c.next_instruction, "steady"),
+            }
 
 
 def _recent_strength_completed_rows(db, athlete) -> list[dict]:
