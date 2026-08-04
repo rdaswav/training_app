@@ -1,19 +1,23 @@
 # User Guide
 
 Day-to-day usage of a running deployment. Everything below assumes a self-hosted
-instance (see `README.md`'s "Hosting" section) reachable at some base URL --
+instance (see `README.md`'s "Deployment" section) reachable at some base URL --
 substitute your own, e.g. `http://<your-nas-ip>:8000`. If you've set
 `AUTH_USERNAME`/`AUTH_PASSWORD`, your browser will prompt for them the first time it
 hits the site; `curl` examples below need `-u username:password` added if auth is on.
 
 ## 1. Set your current fitness and create a race (via the UI)
 
-Open `/settings`. Two forms live there:
+Open `/settings`. Three forms live there:
 
 - **Athlete profile**: weekly volume, easy/threshold pace (entered as `M:SS`, e.g.
   `6:30`), aerobic HR ceiling, max HR, injury flags (comma-separated, e.g.
-  `knee, lower_back` -- excludes matching strength exercises from selection, see
-  `backend/app/seed.py` for the tagged exercise library).
+  `knee, lower_back` -- excludes matching strength exercises from initial
+  selection, see `backend/app/seed.py` for the tagged exercise library). Every
+  ~12 weeks (`PHYSIOLOGY_REVIEW_INTERVAL_DAYS`) the page shows a "Confirm your
+  HR/pace numbers" nudge above this form, since fitness changes over a training
+  block and nothing re-tests these automatically -- re-saving the form (even with
+  unchanged values) clears it.
 - **Race**: name, date, distance (`21.1` half, `42.195` full, `10`, `5`, etc.),
   an optional **goal time** (`H:MM:SS` or `M:SS`, e.g. `1:45:00`) -- if set, this
   overrides the race-pace target used in race-pace-specific segments (Build 2's
@@ -22,6 +26,9 @@ Open `/settings`. Two forms live there:
   push you into paces harder than you've earned, it only sets the aspirational
   target for the segments that are explicitly about racing that goal. Priority
   (`A`/`B`/tune-up), and an optional plan start date (leave blank to start today).
+- **Weekly schedule**: which day of the week is for running, strength, or rest --
+  editable any time, needs at least one running day (for the long run) to save.
+  Changing it only moves future sessions; completed/missed history is untouched.
 
 Creating a race immediately generates the full phase sequence and every planned
 session from today through race week, and (if intervals.icu credentials are set)
@@ -65,13 +72,20 @@ All fields are optional in `PUT /api/athlete` -- only send what you want to chan
   movement pattern before, the log form pre-fills a suggested working weight and
   shows it in the prescription's meta line -- computed from your most recent log
   for that pattern (Epley e1RM projected at this session's rep/RIR target), not
-  just a guess.
-- **Log a strength set**: fill in reps/weight/RIR per set (add/remove rows as
-  needed) and hit "Log sets" -- you'll get an inline coach response (what you did /
-  how it read / what's next), and "progress"/"back off" now include an actual kg
-  target for next time, not just the label.
-- **Complete a run**: fill in actual pace/HR and hit "Log complete" -- same
-  three-row coach response (progress/hold/soften).
+  just a guess. Bodyweight exercises (pull-ups, planks) prefill from 0kg, not a
+  guessed bodyweight number -- the weight field is *added* weight only. Timed
+  holds (planks, dead hangs) get a duration stepper in seconds instead of a
+  reps/weight pair.
+- **Log a strength set**: adjust with the steppers (or tap a value to type it
+  directly) and hit "Log set 1" -- the button counts up per set within an
+  exercise. You'll get an inline coach response (what you did / how it read /
+  what's next), and "progress"/"back off" now include an actual kg target for
+  next time, not just the label. A rest timer overlay appears between sets with
+  a "+30s" / "skip to next set" pair, so you're not eyeballing a phone clock
+  mid-set.
+- **Complete a run**: tap the pace/HR value to adjust it if what you actually did
+  differed from target, then hit "Log complete" -- same three-row coach response
+  (progress/hold/soften).
 - **Full plan view**: `/plan` -- hero/countdown card (race name, distance, goal
   time if set, days to race), phase timeline ribbon, weekly load dashboard (run
   volume + strength tonnage), a strength-mesocycle status card, and the full
@@ -81,12 +95,22 @@ All fields are optional in `PUT /api/athlete` -- only send what you want to chan
   always-visible warning paragraph.
 - **Strength history**: `/strength-history` -- past completed strength sessions
   grouped by movement pattern.
+- **Weekly coach reviews**: `/reviews` -- an automatic Sunday-evening writeup per
+  week (compliance %, run volume trend, any HR-ceiling breaches), with the raw
+  per-session numbers it was computed from behind a "The numbers this was written
+  from" disclosure. Needs `ANTHROPIC_API_KEY` set for the written analysis; without
+  it, reviews still record the computed metrics, just without the prose.
+- **About**: `/about` -- explains how the two engines actually work (why the plan
+  moves the way it does, current e1RM/pace numbers, strength volume landmarks),
+  for when "why did today change" needs more than a glance.
 - **Any past/present/future session's detail**: `/session/{id}` (linked from every
   day on `/plan`) -- works for logging retroactively too, not just today.
 
-If a day shows no session, that's expected sometimes -- the adjacency guardrail
-occasionally shuffles a strength day to rest (see the README's "known tension in
-the fixed weekly template").
+If a day shows no session, that's expected sometimes -- your weekly schedule
+(Settings) fixes which days are run/strength/rest, and the adjacency guardrail
+will shuffle a strength day to rest rather than leave a hard lower-body session
+sitting the day before a key run, if there's no other free rest day that week to
+move it into instead.
 
 ## 3. Check the daily job's health
 
@@ -135,8 +159,9 @@ docker run -d ... \
 ```
 
 Without these set, the app works standalone -- every intervals.icu-touching code
-path no-ops safely (see README's "intervals.icu spike" section for the confirmed
-wire format and known limitations). `GET /api/config-check` confirms whether a
+path no-ops safely (see `PROJECT_PLAN.md`'s section 4, "intervals.icu polish," for
+the confirmed wire format and known limitations, including the `%HR` basis
+spot-check). `GET /api/config-check` confirms whether a
 running instance actually sees both env vars as non-empty (never returns the
 values themselves).
 

@@ -8,20 +8,23 @@ it's kept as the historical record of what shipped and why, in the order it ship
 ## Where things stand
 
 All ten of the spec's build-sequence steps (section 10) are implemented and tested
-(175 passing tests): data model, running periodization engine, RP-style strength
+(195 passing tests): data model, running periodization engine, RP-style strength
 engine, exercise library + substitution, unified calendar with the adjacency
 guardrail, run/strength autoregulation, a confirmed-working intervals.icu
 integration, the daily autoregulation job, a FastAPI backend, and a web UI covering
-today/plan/settings/history/session-detail views.
+today/plan/settings/history/reviews/about/session-detail views.
 
-Every item below (1-8) is done, and every issue raised after that -- filed and
-tracked directly as GitHub issues (#21-#35, #53) rather than in this file -- is
-closed too (see sections 11-12 near the end). This file is now a complete record
-of what shipped, not a queue of what's left; there is currently nothing open.
+Every item below (1-13) is done, and every issue raised after that -- filed and
+tracked directly as GitHub issues rather than in this file -- is closed too, except
+five still open (#46-#50, filed 2026-07-11: a swap-picker injury-flag gap, silent
+data loss on a failed log submit, two smaller strength-logging UX items, and a
+native-`confirm()` replacement). This file is a complete record of what shipped,
+not a queue of what's left, but it isn't a substitute for `gh issue list` when you
+want the current open count.
 
 **Deployment**: self-hosted via Docker on a home NAS. The original Fly.io deployment
 (`training-app-v1.fly.dev`) was decommissioned once the self-hosted instance was
-confirmed working -- see `README.md`'s "Hosting" section.
+confirmed working -- see `README.md`'s "Deployment" section.
 
 ---
 
@@ -229,7 +232,7 @@ Shipped:
   specifically (an intercepting proxy without a trusted CA broke `pip install`'s HTTPS
   calls) -- the Dockerfile itself was already structurally valid. It has since been
   built and run for real on the athlete's home NAS (self-hosted deployment, see
-  `README.md`'s "Hosting" section) -- fully confirmed working, no longer a caveat.
+  `README.md`'s "Deployment" section) -- fully confirmed working, no longer a caveat.
 
 ---
 
@@ -336,6 +339,64 @@ nothing to maintain here.
 
 ---
 
+## 13. End-to-end design consistency pass (Tier 1-3) -- DONE
+
+A round of claude.ai/design docs (`Logo`, `Design Consistency Spec`, `Bottom Nav
+Options`, `App Design Improvements`, `E2E Design Review`) diagnosed the app as
+"drifted because each page invented its own answer to how to title a page, show a
+phase, lay out a list, and mark state" rather than a token problem -- the token
+system from item 3 below was already consistent, templates just didn't lean on it
+uniformly. Reviewed each doc's claims against the actual code before implementing rather than
+executing them as written: two were stale by the time they were read (the About
+restructure and the new logo mark were already shipped, despite both docs listing
+them as still pending), and one repeated a feature already explicitly rejected
+once this same session -- a persistent strength coach card, redundant with
+Strength History. Declined again rather than silently rebuilt.
+
+Shipped in three tiers:
+
+- **Tier 1 (CSS/markup only):** bottom nav rebuilt as a flat "Tick Bar" -- a 2px
+  active-state tick instead of a `.chip`-style tinted box per tab, real stroke
+  icons instead of unrelated unicode glyphs (`●▢↺⋮`). Session-type badges
+  (`_session_card.html`) get matching icons instead of `▸`/`■`. Every button in the
+  app collapsed from five separately-coded recipes down to exactly two shared
+  classes, `.cta` (primary) and `.btn-quiet` (secondary). Empty states get a quiet
+  dashed placeholder; genuine errors (e.g. Reviews' "not generated") get the same
+  red chip-flag tone as everywhere else instead of looking identical to "nothing
+  scheduled."
+- **Tier 2 (shared components):** Reviews and Strength History both dropped their
+  table + `.calendar-cards` mobile-fallback pair for one `.rows.sessions`
+  primitive, same fields at every width. Reviews' bespoke `.metrics-detail`
+  collapsed into About's `.disclosure` component. Plan's hero got its own
+  gradient/shadow treatment (it had none before); the ribbon and stat cards below
+  it step down a radius size and dim slightly to read as secondary. The hero's
+  phase pill ("Build 1 · Week 4") was dropped as redundant with the ribbon
+  directly below it and every session card in the list -- kept the per-session
+  phase label since it's the one placement that also covers Today and
+  session-detail, which have no ribbon to lean on.
+- **Tier 3:** the rest-timer overlay's clock/ring now sit in the standard
+  `--r-lg`/`--line-soft` card frame instead of floating bare on the backdrop --
+  it was the one full-screen surface sharing no chrome with the rest of the app.
+  The splash screen was deliberately left full-bleed (a brand launch moment, not a
+  data surface -- framing it would undercut the point of it).
+
+**Bug found and fixed mid-rollout:** the new icon `<svg>`s initially carried only a
+`viewBox`, no `width`/`height`. `StaticFiles` sends `etag`/`last-modified` but no
+`Cache-Control`, so a browser holding a stale `style.css` after a deploy had no
+sizing rule for them -- they rendered at full container width. Fixed by giving
+every icon explicit dimensions (correct with zero CSS) and adding an mtime-based
+`?v=` query param to `/static/style.css` and `/static/app.js` so a changed asset is
+always a new URL (`main.py`'s `_static_version()`).
+
+Two things from the design docs were deliberately *not* built: the strength coach
+card (rejected twice, as above), and extending the `.rows.sessions` primitive to
+Plan's weekly calendar grid -- scoped down to Reviews + Strength History only,
+since Plan's calendar is a genuinely different shape (a 7-day grid, not a
+chronological list) and the E2E doc's own case for unifying it was weaker than for
+the other two pages, which really were near-duplicates of each other.
+
+---
+
 ## Suggested order
 
 1. ~~Athlete/race management UI~~ -- done
@@ -355,6 +416,11 @@ nothing to maintain here.
 11. ~~Post-roadmap bug/feature batch (GitHub issues #21-#35)~~ -- done, including
     #31 (strength mesocycle/running-phase coupling) and #28 (strength
     load/progression model)
+12. ~~Backup the SQLite data file (GitHub issue #53)~~ -- done, via Synology Hyper
+    Backup, no code
+13. ~~End-to-end design consistency pass (Tier 1-3)~~ -- done
 
-**Nothing is currently open.** Further work would start as a new GitHub issue or a
+**Open GitHub issues: #46-#50** (filed 2026-07-11, not yet picked up -- see section
+"Where things stand" above for a one-line summary of each). Further work beyond
+those would start as a new GitHub issue or a
 new section here, not a resumption of this list.

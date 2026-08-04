@@ -36,11 +36,23 @@ actual pace/HR, strength loads progress or back off off actual reps/RIR.
 - **A daily job that keeps itself honest.** Once a day it pulls yesterday's activities,
   matches them to planned sessions, marks sessions completed or missed, autoregulates,
   and regenerates the plan forward -- with its own health status visible in Settings.
-- **A UI built for actually using it day to day**: a phone-first "Today" view, a desktop
-  planning view (phase timeline, weekly load chart, mesocycle status), session history,
-  and a settings page for athlete profile and race management.
+- **A UI built for actually using it day to day**: a phone-first "Today" view; a
+  desktop planning view with a phase timeline, weekly load chart, and mesocycle
+  status; strength history grouped by movement pattern; automatic weekly coach
+  reviews; an "About" page explaining how the two engines actually work; and a
+  settings page for athlete profile, race, and weekly-schedule management.
 - **Self-hosted, single-user.** Optional HTTP Basic Auth gates every route; no accounts,
   no multi-tenancy -- this is a training log for one person, not a SaaS product.
+
+<!--
+  Screenshots: add a few here once captured -- Today (mobile), Plan (desktop),
+  and one strength-logging shot are the ones worth leading with. Save under
+  docs/screenshots/ and reference like:
+    <p align="center">
+      <img src="docs/screenshots/today.png" width="280" alt="Today view">
+      <img src="docs/screenshots/plan.png" width="520" alt="Plan view">
+    </p>
+-->
 
 See [`USER_GUIDE.md`](USER_GUIDE.md) for a walkthrough of actually using it day to day
 (creating a race, logging sessions, editing the plan). [`SPEC.md`](SPEC.md) and
@@ -99,6 +111,10 @@ Environment variables (see `app/config.py`):
   gated behind HTTP Basic Auth (`app/auth_middleware.py`). Unset by default. Basic Auth
   sends credentials base64-encoded, not encrypted, so put a reverse proxy with HTTPS in
   front before exposing this beyond a LAN.
+- `ANTHROPIC_API_KEY` -- optional, powers the written analysis on the automatic weekly
+  `/reviews`. Without it, reviews still record their computed metrics (compliance, load
+  trend, HR-ceiling breaches), just without the prose (`app/integrations/anthropic_coach.py`
+  degrades to a safe no-op). `COACH_MODEL` overrides the model used (default `claude-opus-5`).
 
 ## Deployment
 
@@ -162,9 +178,17 @@ app/
     autoregulation.py         Run and strength feedback loops (pure functions)
     dashboard_summary.py      Phase-timeline ribbon + strength-mesocycle status for /plan
     load_summary.py           Weekly run-km/strength-tonnage aggregation for /plan
+    weekly_review.py          Computes the metrics a weekly review is built from
+                             (compliance, load trend, HR-ceiling breaches)
+    coaching_copy.py          Shared Did/Read/Next feedback strings for run and
+                             strength completion
   integrations/
     intervals_icu.py        intervals.icu client (read activities/wellness, write planned
                              workouts)
+    anthropic_coach.py      Weekly review write-up via the Anthropic API; no-ops
+                             safely without ANTHROPIC_API_KEY
+  coach_service.py            Weekly review generation -- computed metrics always,
+                             an Anthropic-written summary if ANTHROPIC_API_KEY is set
   plan_service.py            Wires the engines to persistence for one race (history-safe:
                              only regenerates still-`planned` sessions from today forward)
   intervals_sync.py          Guarded push of upcoming run sessions to intervals.icu
@@ -174,8 +198,8 @@ app/
     daily_autoregulation.py  The daily job: pull activities/wellness -> autoregulate ->
                              refresh -> re-sync -> record job health
   api/routes.py               FastAPI routes
-  main.py                     App wiring, today/plan/settings/history/session HTML views,
-                             APScheduler cron
+  main.py                     App wiring, today/plan/settings/history/reviews/about/
+                             session HTML views, APScheduler cron
   templates/, static/         Jinja2 + vanilla JS/CSS, no build step
 ```
 

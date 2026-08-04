@@ -286,8 +286,8 @@ def _attach_last_logged_sets(db, athlete, sessions: list[PlannedSession]) -> Non
     """For each strength session, attach a `last_logged` dict (pattern ->
     {set_count, reps, weight_kg}) -- the athlete's most recent *actual* logged
     sets for that pattern, distinct from suggested_loads' derived e1RM target.
-    This is the "Last: 3x5 @ 70" inline reference on the gym-mode sticky bar
-    (UI_AUDIT.md suggestion #4), not a training recommendation."""
+    This is the "Last: 3x5 @ 70" inline reference on the gym-mode sticky bar,
+    not a training recommendation."""
     strength_sessions = [s for s in sessions if s.type == SessionType.STRENGTH]
     if not strength_sessions:
         return
