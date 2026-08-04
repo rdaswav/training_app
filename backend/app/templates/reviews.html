@@ -47,58 +47,37 @@
         <div class="review-body">{{ r.markdown|markdown }}</div>
       {% endif %}
 
-      <details class="metrics-detail">
-        <summary>The numbers this was written from</summary>
+      <details class="disclosure">
+        <summary>
+          <span><span class="t">The numbers this was written from</span><span class="d">Per-session prescribed vs. actual, and the raw metrics JSON</span></span>
+          <span class="car">&#9656;</span>
+        </summary>
+        <div class="body">
         {% if m.get("sessions") %}
-          <div class="calendar-table-wrap calendar-scroll">
-            <table class="calendar review-sessions">
-              <thead>
-                <tr><th>Date</th><th>Session</th><th>Status</th><th>Prescribed</th><th>Actual</th></tr>
-              </thead>
-              <tbody>
-                {% for s in m.sessions %}
-                  <tr>
-                    <td>{{ s.date }}</td>
-                    <td>{{ s.name }}{% if s.role %} <span class="meta">({{ s.role }})</span>{% endif %}</td>
-                    <td>{{ s.status }}</td>
-                    <td>
-                      {% if s.prescribed_pace_sec_per_km %}{{ s.prescribed_pace_sec_per_km|pace }}{% endif %}
-                      {% if s.prescribed_hr_ceiling %} &middot; HR &le;{{ s.prescribed_hr_ceiling }}{% endif %}
-                    </td>
-                    <td>
-                      {% if s.actual_pace_sec_per_km %}{{ s.actual_pace_sec_per_km|pace }}{% endif %}
-                      {% if s.actual_hr %} &middot; HR {{ s.actual_hr }}{% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-
-          <div class="calendar-cards">
+          <div class="rows sessions">
             {% for s in m.sessions %}
-              <div class="card day-card">
-                <div class="day-card-date">{{ s.date }} &middot; {{ s.status }}</div>
-                <strong>{{ s.name }}{% if s.role %} <span class="meta">({{ s.role }})</span>{% endif %}</strong>
-                {% if s.prescribed_pace_sec_per_km or s.prescribed_hr_ceiling %}
-                  <div class="meta">
+              <div class="row">
+                <span class="r-date">{{ s.date }}</span>
+                <span class="r-name">{{ s.name }}{% if s.role %} <span class="meta">({{ s.role }})</span>{% endif %}</span>
+                <span class="stat{% if s.status == 'completed' %} st-done{% endif %}">{{ s.status }}</span>
+                <div class="r-meta">
+                  {% if s.prescribed_pace_sec_per_km or s.prescribed_hr_ceiling %}
                     Target
-                    {% if s.prescribed_pace_sec_per_km %} {{ s.prescribed_pace_sec_per_km|pace }}{% endif %}
-                    {% if s.prescribed_hr_ceiling %} &middot; HR &le;{{ s.prescribed_hr_ceiling }}{% endif %}
-                  </div>
-                {% endif %}
-                {% if s.actual_pace_sec_per_km or s.actual_hr %}
-                  <div class="meta">
-                    Actual
-                    {% if s.actual_pace_sec_per_km %} {{ s.actual_pace_sec_per_km|pace }}{% endif %}
-                    {% if s.actual_hr %} &middot; HR {{ s.actual_hr }}{% endif %}
-                  </div>
-                {% endif %}
+                    {%- if s.prescribed_pace_sec_per_km %} {{ s.prescribed_pace_sec_per_km|pace }}{% endif %}
+                    {%- if s.prescribed_hr_ceiling %} &middot; HR &le;{{ s.prescribed_hr_ceiling }}{% endif %}
+                  {% endif %}
+                  {% if s.actual_pace_sec_per_km or s.actual_hr %}
+                    &middot; Actual
+                    {%- if s.actual_pace_sec_per_km %} {{ s.actual_pace_sec_per_km|pace }}{% endif %}
+                    {%- if s.actual_hr %} &middot; HR {{ s.actual_hr }}{% endif %}
+                  {% endif %}
+                </div>
               </div>
             {% endfor %}
           </div>
         {% endif %}
-        <pre class="metrics-json">{{ r.metrics|tojson(indent=2) }}</pre>
+          <pre class="metrics-json">{{ r.metrics|tojson(indent=2) }}</pre>
+        </div>
       </details>
 
       <div class="sync-status">

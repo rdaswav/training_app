@@ -601,9 +601,11 @@ function initGymMode() {
     rest.id = "gymRest";
     rest.className = "rest";
     rest.innerHTML = `
-      <div class="lab">Rest</div>
-      <div class="clock" id="gymRestClock">2:30</div>
-      <div class="ring"><i id="gymRestRing"></i></div>
+      <div class="rest-card">
+        <div class="lab">Rest</div>
+        <div class="clock" id="gymRestClock">2:30</div>
+        <div class="ring"><i id="gymRestRing"></i></div>
+      </div>
       <div class="acts">
         <button type="button" class="btn-quiet" id="gymRestAdd30">+30s</button>
         <button type="button" class="cta go" id="gymRestSkip">Skip &rarr; next set</button>

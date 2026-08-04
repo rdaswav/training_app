@@ -126,7 +126,7 @@ h1, h2, h3 { margin: 0 0 0.5rem; font-family: var(--disp); font-weight: 700; }
 .eyebrow, .session-type, .field label, .rest .lab,
 .load-chart-title, .load-col-label, .day-card-date,
 .disclosure > summary .d, .stick .ptn, .weekgrid-label,
-.metrics-detail summary, .countdown-card .eyebrow {
+.rows.sessions .r-date, .countdown-card .eyebrow {
   font-family: var(--label-font);
   font-weight: 400;
   font-size: var(--label-size);
@@ -235,6 +235,24 @@ nav a.active { color: var(--accent); font-weight: 600; }
 /* numbers as rows, not a table */
 .rows { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.6rem; }
 .rows .row { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.55rem 0; border-bottom: 1px solid var(--line-soft); font-size: 0.9rem; }
+
+/* One session-list primitive. Reviews and Strength History are the same
+   job -- "past sessions in order" -- but each shipped a table plus a
+   separate .calendar-cards fallback, so the field set silently changed at
+   700px. This row reflows instead of dropping anything: name and status
+   sit inline while there's room, the detail line wraps underneath, and
+   every field is present at every width. */
+.rows.sessions .row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 0.3rem 0.7rem;
+  padding: 0.7rem 0;
+}
+.rows.sessions .r-name { flex: 1 1 10rem; font-weight: 600; color: var(--text); }
+.rows.sessions .r-meta { flex: 1 1 100%; font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+.rows.sessions .chip, .rows.sessions .stat { flex: none; }
 .rows .row .l { color: var(--muted); }
 .rows .row .v { font-family: var(--mono); color: var(--text); white-space: nowrap; }
 
@@ -468,13 +486,27 @@ nav a.active { color: var(--accent); font-weight: 600; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
+  gap: 1.1rem;
   text-align: center;
   padding: 1rem;
 }
 .rest.on { display: flex; }
+/* Was a bare clock floating on the backdrop with no chrome at all --
+   the app's one full-screen overlay that shared none of the standard
+   card frame. Same --r-lg/--line-soft language, just on the dark
+   backdrop instead of the page background. */
+.rest-card {
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-lg);
+  padding: 1.5rem 2.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
 .rest .clock { font-family: var(--disp); font-weight: 800; font-size: 4.2rem; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.05; }
-.rest .ring { width: 210px; height: 6px; background: var(--slate2); border-radius: 4px; overflow: hidden; margin: 0.9rem 0 1.6rem; }
+.rest .ring { width: 210px; height: 6px; background: var(--slate2); border-radius: 4px; overflow: hidden; margin: 0.9rem 0 0.2rem; }
 /* Rest timer only ever runs during strength logging (there's no run
    equivalent) -- its elapsed-time ring is strength's own hue, not amber
    ("now" only, everywhere else in the app). */
@@ -597,6 +629,11 @@ table.calendar th, table.calendar td {
   vertical-align: top;
 }
 /* hero + countdown */
+/* The hero, ribbon, and stat cards used to share one flat card treatment
+   -- same border, radius, weight -- with nothing signalling "look here
+   first." Hero now leads (gradient, its own shadow); ribbon and stats
+   below step down a radius size and dim slightly to read as supporting,
+   not competing. */
 .hero {
   display: flex;
   justify-content: space-between;
@@ -604,6 +641,11 @@ table.calendar th, table.calendar td {
   gap: 1.5rem;
   margin-bottom: 1.25rem;
   flex-wrap: wrap;
+  background: linear-gradient(160deg, var(--card), var(--slate));
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-lg);
+  padding: 1.3rem 1.4rem;
+  box-shadow: 0 14px 32px -16px rgba(0, 0, 0, 0.5);
 }
 .status-line { display: flex; gap: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
 .pill.live { background: var(--chip-now-bg); border-color: var(--chip-now-border); color: var(--chip-now-color); }
@@ -631,7 +673,7 @@ table.calendar th, table.calendar td {
 .countdown-card .date { font-family: var(--label-font); font-size: var(--label-size); letter-spacing: var(--label-spacing); text-transform: uppercase; color: var(--label-color); margin-top: 0.1rem; }
 
 /* phase-timeline ribbon */
-.ribbon { background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--r-lg); padding: 1.1rem 1.1rem 0.8rem; margin-bottom: 1rem; }
+.ribbon { background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--r-md); padding: 1.1rem 1.1rem 0.8rem; margin-bottom: 1rem; opacity: 0.92; }
 .phases { display: flex; gap: 6px; }
 .phase-block { position: relative; border-radius: var(--r-md); padding: 0.7rem 0.75rem 0.8rem; min-height: 74px; border: 1px solid var(--line-soft); overflow: hidden; }
 .phase-block .ph-top { height: 3px; border-radius: 3px; position: absolute; left: 0; right: 0; top: 0; }
@@ -657,7 +699,7 @@ table.calendar th, table.calendar td {
 
 /* stat cards row */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
-.stats .card { margin-bottom: 0; }
+.stats .card { margin-bottom: 0; opacity: 0.92; }
 .mrow { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.5rem; }
 .mrow .l { color: var(--muted); }
 .mrow .v { font-family: var(--mono); color: var(--text); }
@@ -830,20 +872,10 @@ form.settings-form .cta {
 .review-body strong { color: var(--text); font-weight: 600; }
 .review-body code { font-family: var(--mono); font-size: 0.85em; color: var(--accent); }
 
-.metrics-detail { margin-top: 0.9rem; border-top: 1px solid var(--line-soft); padding-top: 0.6rem; }
-/* Shared with About's disclosure summary style rather than its own
-   smaller variant. */
-.metrics-detail summary {
-  cursor: pointer;
-  font-family: var(--label-font);
-  font-size: var(--label-size);
-  text-transform: uppercase;
-  letter-spacing: var(--label-spacing);
-  color: var(--label-color);
-}
-.metrics-detail summary:hover { color: var(--muted); }
-table.review-sessions { margin-top: 0.6rem; font-size: 0.8rem; }
-table.review-sessions td, table.review-sessions th { white-space: nowrap; }
+/* .metrics-detail is gone -- Reviews now uses the same .disclosure
+   component as About, so "there's more here" looks identical wherever it
+   appears rather than being a card-with-chevron in one place and a bare
+   mono summary line in the other. */
 .metrics-json {
   margin-top: 0.6rem;
   padding: 0.6rem;

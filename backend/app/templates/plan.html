@@ -6,8 +6,11 @@
   {% if race %}
     <div class="hero">
       <div>
+        <!-- Phase + week is deliberately not restated here -- the ribbon
+             immediately below already shows current phase (highlighted
+             block + now-mark), and every session card in the list below
+             that shows it per-session. One fact, shown once per page. -->
         <div class="status-line">
-          {% if current_phase %}<span class="pill live">{{ current_phase.name|upper }} &middot; WEEK {{ week_idx + 1 }} OF {{ total_weeks_count }}</span>{% endif %}
           <span class="pill">PRIORITY {{ race.priority.value|upper }}</span>
         </div>
         <h1>{{ race.name }}</h1>
