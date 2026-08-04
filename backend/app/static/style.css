@@ -251,6 +251,11 @@ nav a.active { color: var(--accent); font-weight: 600; }
   letter-spacing: var(--label-spacing); text-transform: uppercase; color: var(--label-color);
 }
 .session-type { display: inline-block; margin-bottom: 0.25rem; }
+/* Same stroke-icon language as the bottom nav -- run reuses the clock
+   (pace/duration are its whole job), strength gets a small dumbbell.
+   One icon vocabulary instead of nav glyphs + session glyphs + coach
+   triangles all meaning something different. */
+.type-icon { width: 13px; height: 13px; vertical-align: -2px; margin-right: 0.15rem; }
 .cue {
   font-size: 0.85rem;
   color: var(--muted);
@@ -410,7 +415,12 @@ nav a.active { color: var(--accent); font-weight: 600; }
 .cta:active { transform: scale(0.985); filter: brightness(0.94); }
 .cta:disabled { opacity: 0.6; cursor: default; }
 
-.swapbtn {
+/* Two button variants app-wide: .cta (primary, teal) and .btn-quiet
+   (secondary -- swap exercise, rest-timer +30s, toast undo). Was five
+   separately-coded recipes (cta gradient, bare button flat-teal, rest
+   slate-outline, toast transparent-text-link, swapbtn slate2) for what
+   were really only ever two jobs. */
+.btn-quiet {
   min-height: 44px;
   padding: 0 0.75rem;
   border-radius: var(--r-sm);
@@ -420,9 +430,9 @@ nav a.active { color: var(--accent); font-weight: 600; }
   font-size: 0.85rem;
   color: var(--muted);
   background: var(--slate2);
-  margin-top: 0.6rem;
   cursor: pointer;
 }
+.swapbtn { margin-top: 0.6rem; }
 
 /* ---------- sticky target bar: pinned while scrolling a multi-exercise session ---------- */
 .stick {
@@ -470,8 +480,7 @@ nav a.active { color: var(--accent); font-weight: 600; }
    ("now" only, everywhere else in the app). */
 .rest .ring i { display: block; height: 100%; width: 100%; background: var(--violet); transition: width 1s linear; }
 .rest .acts { display: flex; gap: 0.6rem; }
-.rest .acts button { min-height: 48px; padding: 0 1.1rem; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--slate); font-family: var(--body); font-weight: 500; font-size: 0.9rem; color: var(--text); }
-.rest .acts button.go { background: var(--teal); color: var(--ink); border-color: transparent; font-weight: 700; }
+.rest .acts .cta, .rest .acts .btn-quiet { width: auto; min-height: 48px; padding: 0 1.1rem; margin-top: 0; }
 .rest .nextup { font-size: 0.85rem; color: var(--muted); margin-top: 1.4rem; line-height: 1.6; }
 .rest .nextup b { color: var(--text); }
 
@@ -496,7 +505,6 @@ nav a.active { color: var(--accent); font-weight: 600; }
 }
 .toast.on { display: flex; }
 .toast span { font-size: 0.85rem; color: var(--muted); }
-.toast button { font-family: var(--body); font-size: 0.85rem; color: var(--teal-hi); font-weight: 700; min-height: 40px; padding: 0 0.75rem; border-radius: var(--r-sm); background: rgba(53, 196, 174, 0.1); border: none; cursor: pointer; }
 
 button {
   background: var(--accent);
@@ -554,6 +562,29 @@ button {
   margin-top: 0.4rem;
 }
 .empty { color: var(--muted); font-style: italic; }
+/* "Nothing here yet" reads as a quiet placeholder, not an error -- scoped
+   to block-level empty states (p.empty); the inline "Rest" badge inside
+   compact calendar cells (span.empty) keeps the plain text treatment. */
+p.empty {
+  border: 1px dashed var(--line-soft);
+  border-radius: var(--r-md);
+  padding: 0.9rem 1rem;
+  text-align: center;
+  font-style: normal;
+}
+/* Genuine failures (job errored, review not generated) get the same red
+   chip tone as .form-status.error and .stat.st-flag, not .note's plain
+   warn-colored text -- so "nothing scheduled" and "sync failed" stop
+   reading with identical urgency. */
+.note-error {
+  background: var(--chip-flag-bg);
+  border: 1px solid var(--chip-flag-border);
+  color: var(--chip-flag-color);
+  border-radius: var(--r-md);
+  padding: 0.7rem 0.9rem;
+  font-size: 0.85rem;
+  margin-top: 0.4rem;
+}
 table.calendar {
   width: 100%;
   border-collapse: collapse;
@@ -665,10 +696,12 @@ form.settings-form input, form.settings-form select {
   text-transform: none;
   letter-spacing: normal;
 }
-form.settings-form button {
+form.settings-form .cta {
   align-self: flex-start;
+  width: auto;
+  min-height: 44px;
   margin-top: 0.25rem;
-  padding: 0.5rem 1rem;
+  padding: 0 1.1rem;
 }
 .form-status { min-height: 1.6em; }
 .form-status.success, .form-status.error {
@@ -889,27 +922,34 @@ table.review-sessions td, table.review-sessions th { white-space: nowrap; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.15rem;
+    gap: 0.3rem;
     min-width: 52px;
     min-height: 48px;
-    padding: 0.35rem 0.6rem;
-    border-radius: var(--r-md);
+    padding: 0.5rem 0.6rem 0.35rem;
+    position: relative;
     margin-right: 0;
-    background: var(--slate2);
-    border: 1px solid transparent;
+    background: none;
+    border: none;
     color: var(--muted);
     text-decoration: none;
     font-family: var(--body);
     font-weight: 500;
     cursor: pointer;
   }
-  .nav-bottom .tab.active {
-    color: var(--accent);
-    font-weight: 600;
-    background: rgba(53, 196, 174, 0.14);
-    border-color: rgba(53, 196, 174, 0.3);
+  /* Active state is a tick, not a chip -- echoes the phase-ribbon's own
+     "now" mark instead of borrowing .chip.st-done's tinted-box treatment
+     (rule 4: chips carry state, nothing else does). */
+  .nav-bottom .tab-tick {
+    position: absolute;
+    top: 0;
+    width: 20px;
+    height: 2px;
+    border-radius: 2px;
+    background: transparent;
   }
-  .nav-bottom .tab-ic { font-size: 1.1rem; line-height: 1; }
+  .nav-bottom .tab.active { color: var(--accent); font-weight: 600; }
+  .nav-bottom .tab.active .tab-tick { background: var(--accent); }
+  .nav-bottom .tab-ic { width: 20px; height: 20px; line-height: 1; }
   .nav-bottom .tab-lab { font-size: 0.65rem; letter-spacing: 0.02em; }
   .tab-more { position: relative; }
   .tab-more > summary { list-style: none; }

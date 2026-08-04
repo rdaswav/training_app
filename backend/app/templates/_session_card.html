@@ -1,3 +1,5 @@
+{% macro _type_icon(type) %}{% if type == 'run' %}<svg class="type-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><path d="M12 9v3l2 2"></path></svg>{% else %}<svg class="type-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="9" width="4" height="6" rx="1.5"></rect><rect x="18" y="9" width="4" height="6" rx="1.5"></rect><path d="M6 12h12"></path></svg>{% endif %}{% endmacro %}
+
 {% macro _leaf_summary(step) %}{% if step.distance_km %}{{ step.distance_km }} km{% elif step.duration_min %}{{ step.duration_min|duration }}{% endif %}{% if step.target_pace_sec_per_km %} @ <span class="value">{{ step.target_pace_sec_per_km|pace }}</span>{% endif %}{% if step.hr_ceiling %} &middot; HR ceiling <span class="value">{{ step.hr_ceiling }}</span>{% endif %}{% endmacro %}
 
 {% macro _coach_card(did_text, feedback, next_label, dir=None) %}
@@ -18,7 +20,7 @@
 {% set intensity = "session-strength" if s.type.value == "strength" else ("session-hard" if s.content.get("role") == "quality" else "session-easy") %}
 <div class="card {{ intensity }}" data-session-id="{{ s.id }}">
   <div class="session-type">
-    <span class="type-icon">{{ "▸" if s.type.value == "run" else "■" }}</span> {{ s.type.value }} &middot; {{ s.phase_name or "" }}
+    {{ _type_icon(s.type.value) }} {{ s.type.value }} &middot; {{ s.phase_name or "" }}
     {% if show_date %} &middot; {{ s.date.strftime("%a %-d %b") }}{% endif %}
     {% if s.status.value != "planned" %} &middot; {{ s.status.value }}{% endif %}
   </div>
@@ -158,7 +160,7 @@
             </div>
             <button type="button" class="cta log-set-btn">Log set 1</button>
           </div>
-          <button type="button" class="swapbtn swap-toggle" onclick="toggleSwap(this, {{ s.id }}, '{{ p.pattern }}')">&#8644; Swap exercise</button>
+          <button type="button" class="btn-quiet swapbtn swap-toggle" onclick="toggleSwap(this, {{ s.id }}, '{{ p.pattern }}')">&#8644; Swap exercise</button>
           <div class="swap-picker"></div>
         {% endif %}
       </div>

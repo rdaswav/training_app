@@ -593,7 +593,7 @@ function initGymMode() {
     const toast = document.createElement("div");
     toast.id = "gymToast";
     toast.className = "toast";
-    toast.innerHTML = '<span></span><button type="button">Undo</button>';
+    toast.innerHTML = '<span></span><button type="button" class="btn-quiet">Undo</button>';
     document.body.appendChild(toast);
   }
   if (!document.getElementById("gymRest")) {
@@ -605,8 +605,8 @@ function initGymMode() {
       <div class="clock" id="gymRestClock">2:30</div>
       <div class="ring"><i id="gymRestRing"></i></div>
       <div class="acts">
-        <button type="button" id="gymRestAdd30">+30s</button>
-        <button type="button" class="go" id="gymRestSkip">Skip &rarr; next set</button>
+        <button type="button" class="btn-quiet" id="gymRestAdd30">+30s</button>
+        <button type="button" class="cta go" id="gymRestSkip">Skip &rarr; next set</button>
       </div>
       <div class="nextup" id="gymRestNext"></div>`;
     document.body.appendChild(rest);
@@ -675,6 +675,7 @@ async function toggleSwap(button, sessionId, pattern) {
   }
   const confirmBtn = document.createElement("button");
   confirmBtn.type = "button";
+  confirmBtn.className = "cta";
   confirmBtn.textContent = "Confirm swap";
   confirmBtn.onclick = async () => {
     try {

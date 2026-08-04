@@ -38,7 +38,7 @@
       <label>Injury flags (comma-separated, e.g. knee, lower_back)
         <input name="injury_flags" type="text" value="{{ athlete.injury_flags|join(', ') }}">
       </label>
-      <button type="submit">Save profile</button>
+      <button type="submit" class="cta">Save profile</button>
       <div id="athlete-status" class="form-status"></div>
     </form>
   </div>
@@ -71,7 +71,7 @@
       <label>Plan start date (leave blank to start today)
         <input name="plan_start_date" type="date" value="{{ macrocycle_start if macrocycle_start else '' }}">
       </label>
-      <button type="submit">{% if race %}Save changes{% else %}Create race{% endif %}</button>
+      <button type="submit" class="cta">{% if race %}Save changes{% else %}Create race{% endif %}</button>
       <div id="race-status" class="form-status"></div>
     </form>
     {% if race %}
@@ -98,7 +98,7 @@
           </label>
         {% endfor %}
       </div>
-      <button type="submit">Save schedule</button>
+      <button type="submit" class="cta">Save schedule</button>
       <div id="schedule-status" class="form-status"></div>
     </form>
     {% if race %}
