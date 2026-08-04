@@ -1,4 +1,8 @@
-{% macro _type_icon(type) %}{% if type == 'run' %}<svg class="type-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><path d="M12 9v3l2 2"></path></svg>{% else %}<svg class="type-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="9" width="4" height="6" rx="1.5"></rect><rect x="18" y="9" width="4" height="6" rx="1.5"></rect><path d="M6 12h12"></path></svg>{% endif %}{% endmacro %}
+{# Icon SVGs carry explicit width/height as well as the CSS rule: an inline
+   <svg> with only a viewBox expands to fill its container when the stylesheet
+   is missing or stale, which renders as a full-card-width icon rather than a
+   slightly-wrong one. #}
+{% macro _type_icon(type) %}{% if type == 'run' %}<svg class="type-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><path d="M12 9v3l2 2"></path></svg>{% else %}<svg class="type-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="9" width="4" height="6" rx="1.5"></rect><rect x="18" y="9" width="4" height="6" rx="1.5"></rect><path d="M6 12h12"></path></svg>{% endif %}{% endmacro %}
 
 {% macro _leaf_summary(step) %}{% if step.distance_km %}{{ step.distance_km }} km{% elif step.duration_min %}{{ step.duration_min|duration }}{% endif %}{% if step.target_pace_sec_per_km %} @ <span class="value">{{ step.target_pace_sec_per_km|pace }}</span>{% endif %}{% if step.hr_ceiling %} &middot; HR ceiling <span class="value">{{ step.hr_ceiling }}</span>{% endif %}{% endmacro %}
 

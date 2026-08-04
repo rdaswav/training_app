@@ -361,6 +361,29 @@ def _load_series_for_race(
 templates.env.globals["timedelta"] = timedelta
 
 
+def _static_version() -> str:
+    """Cache-busting token for /static assets.
+
+    StaticFiles sends etag/last-modified but no Cache-Control, so browsers
+    apply heuristic freshness and can hold a stale style.css for a long
+    while after a deploy. That's not merely cosmetic: templates and CSS ship
+    together, so a stale stylesheet against fresh markup renders wrong (icon
+    SVGs sized by CSS blow up to container width). Versioning by mtime makes
+    a changed asset a different URL, so the browser has to fetch it.
+    """
+    newest = 0.0
+    static_dir = BASE_DIR / "static"
+    for name in ("style.css", "app.js"):
+        try:
+            newest = max(newest, (static_dir / name).stat().st_mtime)
+        except OSError:
+            continue
+    return str(int(newest))
+
+
+templates.env.globals["static_v"] = _static_version()
+
+
 @app.on_event("startup")
 def on_startup():
     init_db()
