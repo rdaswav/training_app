@@ -127,8 +127,10 @@ def test_sync_handles_repeat_step_sessions(db_session, monkeypatch):
 
     assert result["failed"] == 0
     # The Re-base "Strides" quality session (6x repeat block) should fall within
-    # the 10-day window and produce an "Nx" line in its synced description.
-    assert any("6x" in d for d in descriptions)
+    # the 10-day window and expand to 6 literal "20s" stride lines in its
+    # synced description -- not an "Nx" count line, which intervals.icu's
+    # parser silently drops (see integrations/intervals_icu.py's docstring).
+    assert any(d.count("- 20s") == 6 for d in descriptions)
 
 
 def test_sync_backward_compatible_with_legacy_flat_step_rows(db_session, monkeypatch):

@@ -48,20 +48,27 @@ step 1 -- see README "Confirm before relying on this" for the full writeup):
   decomposed into a repeat-block form: a standalone count line ("Nx")
   followed by nested dashed work/recovery lines (see `repeat_step_to_lines`).
 
-Repeat-block syntax confirmed 2026-07-09 (follow-up spike, same session as the
-above): posted a real event with a 3x repeat block, inspected the returned
-`workout_doc.steps[0]`, and confirmed intervals.icu correctly parses the
-standalone "Nx" line as a `{"reps": N, "steps": [...]}` group containing every
-subsequent dashed line up to the next non-dashed line, in order -- work leg
-first, then recovery leg. `REPEAT_BLOCK_SYNTAX_CONFIRMED` is now True.
+Repeat-block "Nx" syntax: initially confirmed working 2026-07-09 (a 3x repeat
+block parsed into a `{"reps": N, "steps": [...]}` group, verified via the
+returned `workout_doc.steps[0]`). REGRESSED sometime before 2026-08-03 --
+confirmed live by pulling back a real synced event (a 6x 20s-stride session
+that reportedly ran as a single un-repeated rep on the actual watch): the
+pushed description's "6x" line was silently dropped entirely, and
+`workout_doc.steps` came back as a flat list containing exactly ONE copy of
+the work+recovery pair, no `"reps"` field anywhere. Same description text
+that passed the original spike; only intervals.icu's parsing behavior changed.
 
-The first attempt at this spike appeared to show the recovery leg silently
-dropped from the group; root cause was the pre-existing decimal-duration bug
-documented above (`"1.5m"` and `"0.3333333333333333m"` both failed to parse),
-not the repeat-block structure itself -- once the recovery/work duration
-tokens were expressed in whole seconds, both legs parsed correctly as sibling
-steps inside the `"reps"` group with distance/duration correctly summed
-across all N reps.
+Rather than depend on a third-party shorthand with no versioned contract that
+already broke once with no visible changelog, `repeat_step_to_lines` no longer
+emits an "Nx" line at all -- it expands a repeat block into N literal copies
+of the work/recovery dashed lines. This uses only the plain single-step
+format, which the same live pull confirmed still parses correctly (the one
+surviving work step and one surviving recovery step both landed in
+`workout_doc.steps` with the right pace/duration, just not repeated). The
+cost is losing the "6x stride" grouped look in intervals.icu's own UI --
+it'll show N separate steps instead of one collapsed block -- which is a
+worthwhile trade for the workout actually being correct at the one point that
+matters, on the watch, mid-run, with no way to notice or fix it live.
 """
 from __future__ import annotations
 
@@ -73,7 +80,6 @@ import httpx
 from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID, INTERVALS_ICU_BASE_URL
 from app.engines.running import RunRepeatStep, RunSessionPlan, RunStep
 
-REPEAT_BLOCK_SYNTAX_CONFIRMED = True  # confirmed live 2026-07-09 -- see module docstring
 
 
 def _format_pace(sec_per_km: int) -> str:
@@ -106,12 +112,18 @@ def step_to_line(step: RunStep, max_hr: int | None = None) -> str:
 
 
 def repeat_step_to_lines(step: RunRepeatStep, max_hr: int | None = None) -> list[str]:
-    """Confirmed wire format -- see module docstring. A standalone count line
-    ("Nx") followed by the work leg's dashed line, then (if present) the
-    recovery leg's dashed line."""
-    lines = [f"{step.repeat_count}x", step_to_line(step.work, max_hr)]
-    if step.recovery is not None:
-        lines.append(step_to_line(step.recovery, max_hr))
+    """Expands to N literal copies of the work (+ recovery, if present) dashed
+    line -- not the "Nx" count-line shorthand, which intervals.icu's parser
+    silently drops instead of grouping/multiplying (regressed since it was
+    confirmed working 2026-07-09; see module docstring for the live evidence).
+    Plain dashed lines are the one format confirmed still reliable."""
+    work_line = step_to_line(step.work, max_hr)
+    recovery_line = step_to_line(step.recovery, max_hr) if step.recovery is not None else None
+    lines: list[str] = []
+    for _ in range(step.repeat_count):
+        lines.append(work_line)
+        if recovery_line is not None:
+            lines.append(recovery_line)
     return lines
 
 

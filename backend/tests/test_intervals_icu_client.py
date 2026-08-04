@@ -1,7 +1,8 @@
 """Tests the client's request construction and workout formatting against a
 mock transport. The token syntax asserted here (`<mm:ss>/km Pace`, `<pct>% HR`,
-the `Nx` repeat-block structure, and the whole-seconds duration format) was
-verified against a live intervals.icu account on 2026-07-09 -- see
+and the whole-seconds duration format) was verified against a live
+intervals.icu account on 2026-07-09; repeat blocks expand to literal repeated
+lines rather than the "Nx" shorthand, which regressed in production -- see
 integrations/intervals_icu.py's module docstring for the full writeup."""
 import json
 from datetime import date
@@ -10,7 +11,6 @@ import httpx
 
 from app.engines.running import RunRepeatStep, RunSessionPlan, RunStep
 from app.integrations.intervals_icu import (
-    REPEAT_BLOCK_SYNTAX_CONFIRMED,
     IntervalsIcuClient,
     _format_duration,
     repeat_step_to_lines,
@@ -87,14 +87,21 @@ def test_get_activities_sends_date_range():
     assert activities == [{"id": "a1"}]
 
 
-def test_repeat_step_to_lines_emits_count_then_work_then_recovery():
+def test_repeat_step_to_lines_expands_work_and_recovery_n_times():
     step = RunRepeatStep(
         label="Cruise interval",
         repeat_count=3,
         work=RunStep("Cruise interval", distance_km=1.6, target_pace_sec_per_km=330),
         recovery=RunStep("Jog", duration_min=1.5),
     )
-    assert repeat_step_to_lines(step) == ["3x", "- 1.6km 5:30/km Pace", "- 90s"]
+    assert repeat_step_to_lines(step) == [
+        "- 1.6km 5:30/km Pace",
+        "- 90s",
+        "- 1.6km 5:30/km Pace",
+        "- 90s",
+        "- 1.6km 5:30/km Pace",
+        "- 90s",
+    ]
 
 
 def test_repeat_step_to_lines_omits_recovery_line_when_none():
@@ -105,8 +112,7 @@ def test_repeat_step_to_lines_omits_recovery_line_when_none():
         recovery=None,
     )
     lines = repeat_step_to_lines(step)
-    assert len(lines) == 2
-    assert lines[0] == "4x"
+    assert lines == ["- 0.4km 5:00/km Pace"] * 4
 
 
 def test_session_to_description_interleaves_repeat_and_plain_steps():
@@ -129,14 +135,13 @@ def test_session_to_description_interleaves_repeat_and_plain_steps():
     )
     lines = session_to_description(session).split("\n")
     assert lines[0] == "- 15m 6:30/km Pace"
-    assert lines[1] == "3x"
-    assert lines[2] == "- 1.6km 5:30/km Pace"
-    assert lines[3] == "- 90s"
-    assert lines[4] == "- 10m 6:30/km Pace"
-
-
-def test_repeat_block_syntax_flagged_confirmed():
-    assert REPEAT_BLOCK_SYNTAX_CONFIRMED is True
+    assert lines[1] == "- 1.6km 5:30/km Pace"
+    assert lines[2] == "- 90s"
+    assert lines[3] == "- 1.6km 5:30/km Pace"
+    assert lines[4] == "- 90s"
+    assert lines[5] == "- 1.6km 5:30/km Pace"
+    assert lines[6] == "- 90s"
+    assert lines[7] == "- 10m 6:30/km Pace"
 
 
 def test_format_duration_whole_minutes():
