@@ -209,7 +209,7 @@ def _attach_completed_feedback(db, sessions: list[PlannedSession]) -> None:
 
     RUN-only, deliberately: STRENGTH used to get the same treatment
     (`completed_feedback_by_pattern`), but it was reverted as redundant --
-    /strength-history (now "Progression") already shows each pattern's
+    /strength-history (now "Trends") already shows each pattern's
     logged sessions with date/exercise/sets/feedback in its expandable row,
     so the session card just needs the "Logged" badge it already has. Run
     has no equivalent history page (see main.py's own lack of a run-history
@@ -602,7 +602,6 @@ def about_view(request: Request):
             "race_pace_from_goal": False,
             "landmarks": strength_engine.DEFAULT_LANDMARKS,
             "e1rm_by_pattern": {},
-            "e1rm_source_date_by_pattern": {},
             "athlete": athlete,
             "max_pace_drift": MAX_PACE_DRIFT_SEC_PER_KM,
             "active": "about",
@@ -614,11 +613,6 @@ def about_view(request: Request):
 
             completed_rows = _recent_strength_completed_rows(db, athlete)
             e1rm_by_pattern = strength_engine.latest_e1rm_by_pattern(completed_rows)
-            e1rm_source_date_by_pattern = {}
-            for row in completed_rows:  # latest-first already
-                p = row["pattern"]
-                if p and p in e1rm_by_pattern and p not in e1rm_source_date_by_pattern:
-                    e1rm_source_date_by_pattern[p] = row["date"]
 
             context.update(
                 {
@@ -626,7 +620,6 @@ def about_view(request: Request):
                     "race_pace_sec_per_km": fitness.race_pace_sec_per_km,
                     "race_pace_from_goal": bool(race.goal_time_sec),
                     "e1rm_by_pattern": e1rm_by_pattern,
-                    "e1rm_source_date_by_pattern": e1rm_source_date_by_pattern,
                 }
             )
 
@@ -726,7 +719,10 @@ def _sparkline_points(series: list[float]) -> str:
 
 @app.get("/strength-history")
 def strength_history_view(request: Request):
-    """"Progression" (Consolidated Pages.dc.html, option A) -- once loads are
+    """"Trends" (built from Consolidated Pages.dc.html's "Progression" option
+    A, renamed after a naming-clarity pass -- "Progression" is ambiguous in a
+    fitness context, where it often means "a harder exercise variant" rather
+    than "a trend over time") -- once loads are
     prescribed automatically, the question this page answers isn't "what did
     I log" (the session screen already showed that) but "am I getting
     stronger": one row per movement pattern with its current est. 1RM, the
@@ -777,9 +773,10 @@ def strength_history_view(request: Request):
                 }
             )
 
+        has_any_trend = any(p["trend"]["delta"] is not None for p in patterns)
         return templates.TemplateResponse(
             "strength_history.html",
-            {"request": request, "patterns": patterns, "active": "history"},
+            {"request": request, "patterns": patterns, "has_any_trend": has_any_trend, "active": "history"},
         )
     finally:
         db.close()

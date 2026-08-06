@@ -185,6 +185,12 @@ nav a.active { color: var(--accent); font-weight: 600; }
 /* ---------- surface tiers (About restructure): panel/subpanel, additive to .card ---------- */
 .panel { background: var(--slate); border: 1px solid var(--line-soft); border-radius: var(--r-lg); padding: 1.4rem 1.5rem; margin-bottom: 1rem; }
 .panel h2, .panel h3 { font-family: var(--disp); font-weight: 700; font-size: 1.05rem; margin-bottom: 0.9rem; }
+/* A panel that's a teaser for a fuller page elsewhere (Numbers' Strength
+   panel -> Trends) names that explicitly instead of leaving it to a buried
+   note link, so the handoff between pages actually gets used. */
+.panel-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.9rem; }
+.panel-head-row h3 { margin-bottom: 0; }
+.panel-link { font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
 .subpanel { background: var(--ink); border-radius: var(--r-md); padding: 0.9rem 1rem; }
 .lede { color: var(--muted); font-size: 0.95rem; margin-top: 0.6rem; max-width: 60ch; }
 

@@ -18,23 +18,26 @@
         <div class="row"><span class="l">Baseline threshold</span><span class="v">{{ athlete.threshold_pace_baseline_sec_per_km|pace }}</span><span class="v src">set by you</span></div>
         <div class="row"><span class="l">Drift bound</span><span class="v">&plusmn;{{ max_pace_drift }} s/km</span><span class="v src">set by you</span></div>
       </div>
-      <p class="note">Threshold and easy pace autoregulate off real sessions, but only within &plusmn;{{ max_pace_drift }} s/km of your baseline before the plan stops adjusting further.</p>
+      <p class="note">Threshold and easy pace autoregulate off real sessions, but only within &plusmn;{{ max_pace_drift }} s/km of your baseline before the plan stops adjusting further. This is a live readout, not an input &mdash; <a href="/settings">change what they're set from in Settings &rarr;</a></p>
     </div>
 
     <div class="panel">
-      <h3>Strength</h3>
+      <div class="panel-head-row">
+        <h3>Strength</h3>
+        {% if e1rm_by_pattern %}<a class="panel-link" href="/strength-history">Trends &rarr;</a>{% endif %}
+      </div>
       {% if e1rm_by_pattern %}
-        <div class="rows cols numbers-table">
-          <div class="row head"><span class="l">Pattern</span><span class="v">Est. 1RM</span><span class="v src">Source</span></div>
+        <!-- Deliberately just pattern + 1RM here, not the fuller pattern/1RM/source
+             table Paces above gets: this is a quick-lookup teaser, not the answer.
+             "How is this changing" is Trends' job (the link above), not this panel's --
+             a full table here would let this page fully answer that question itself
+             and the link would go unused. -->
+        <div class="rows">
           {% for pattern, e1rm in e1rm_by_pattern.items() %}
-            <div class="row">
-              <span class="l">{{ pattern.replace("_", " ")|title }}</span>
-              <span class="v">{{ e1rm|round(1) }} kg</span>
-              <span class="v src">{% if e1rm_source_date_by_pattern.get(pattern) %}measured &middot; {{ e1rm_source_date_by_pattern[pattern].strftime("%-d %b") }}{% else %}measured{% endif %}</span>
-            </div>
+            <div class="row"><span class="l">{{ pattern.replace("_", " ")|title }}</span><span class="v">{{ e1rm|round(1) }} kg</span></div>
           {% endfor %}
         </div>
-        <p class="note">Working weight comes from each pattern&rsquo;s own most recent estimated 1RM (Epley), not a generic percentage table &mdash; it updates the moment you log a set. <a href="/strength-history">See how these are trending &rarr;</a></p>
+        <p class="note">Working weight comes from each pattern&rsquo;s own most recent estimated 1RM (Epley), not a generic percentage table &mdash; it updates the moment you log a set.</p>
       {% else %}
         <p class="empty">No strength sets logged yet &mdash; estimated 1RM per pattern will appear here once you do.</p>
       {% endif %}

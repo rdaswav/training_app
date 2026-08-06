@@ -1,14 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Progression - Parallax{% endblock %}
+{% block title %}Trends - Parallax{% endblock %}
 {% block content %}
   <div class="header">
-    <h1>Progression</h1>
+    <h1>Trends</h1>
     <p class="lede">Estimated 1RM per pattern across this mesocycle. Open a row for its sessions.</p>
   </div>
 
   {% if not patterns %}
     <p class="empty">No strength sessions logged yet.</p>
   {% else %}
+    {% if not has_any_trend %}
+      <p class="note">Every pattern below reads &ldquo;&mdash;&rdquo; because each has only been logged once so far &mdash; the 8-week change and sparkline need a second log within that window to have anything to compare. Keep training and these will fill in.</p>
+    {% endif %}
     <div class="panel">
       <div class="progression">
         <div class="prow-head">
