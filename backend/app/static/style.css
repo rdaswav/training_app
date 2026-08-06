@@ -871,7 +871,13 @@ form.settings-form .cta {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 28px;
+  width: 44px; /* was 28px -- too narrow for a "11 Aug"-length label at the
+                  12px label-size floor, so it overflowed into the next
+                  column instead of wrapping or clipping. Also why the row
+                  stopped short of the card's own width: min-width:
+                  min-content sizes .load-chart-row to its columns' actual
+                  width, so undersized columns left the chart looking like
+                  it didn't fill the card. */
   flex: none;
 }
 .load-col-bars {
