@@ -6,6 +6,7 @@ from app.engines.strength import (
     all_prescriptions_logged,
     best_e1rm_from_sets,
     best_mesocycle_offset,
+    e1rm_trend_by_pattern,
     estimate_e1rm,
     generate_strength_session,
     is_deload_week,
@@ -228,6 +229,55 @@ def test_latest_e1rm_by_pattern_takes_the_first_row_per_pattern():
 def test_latest_e1rm_by_pattern_skips_rows_with_no_sets_or_no_pattern():
     rows = [{"pattern": None, "sets": [{"reps": 5, "weight_kg": 100}]}, {"pattern": "squat", "sets": []}]
     assert latest_e1rm_by_pattern(rows) == {}
+
+
+def test_e1rm_trend_by_pattern_computes_delta_across_window():
+    today = date(2026, 8, 5)
+    entries = {
+        "squat": [
+            {"date": date(2026, 7, 1), "sets": [{"reps": 5, "weight_kg": 100}]},  # 35 days out -- in window
+            {"date": date(2026, 7, 22), "sets": [{"reps": 5, "weight_kg": 105}]},  # in window
+            {"date": date(2026, 8, 3), "sets": [{"reps": 5, "weight_kg": 110}]},  # in window, latest
+        ]
+    }
+    result = e1rm_trend_by_pattern(entries, today, window_days=56)
+    trend = result["squat"]
+    assert trend["latest"] == round(estimate_e1rm(110, 5), 1)
+    assert trend["series"] == [
+        round(estimate_e1rm(100, 5), 1),
+        round(estimate_e1rm(105, 5), 1),
+        round(estimate_e1rm(110, 5), 1),
+    ]
+    # Computed from the already-rounded series values, not the raw floats --
+    # a displayed delta must reconcile with the two displayed numbers it's
+    # between, not a more-precise number a user can't see.
+    assert trend["delta"] == round(round(estimate_e1rm(110, 5), 1) - round(estimate_e1rm(100, 5), 1), 1)
+
+
+def test_e1rm_trend_by_pattern_latest_survives_outside_window_with_no_delta():
+    """A pattern last logged 20 weeks ago still reports its real current
+    number -- just with an empty series and no delta, since there's nothing
+    in the 8-week window to compare against."""
+    today = date(2026, 8, 5)
+    entries = {"hinge": [{"date": date(2026, 3, 20), "sets": [{"reps": 5, "weight_kg": 120}]}]}
+    result = e1rm_trend_by_pattern(entries, today, window_days=56)
+    assert result["hinge"] == {"latest": round(estimate_e1rm(120, 5), 1), "series": [], "delta": None}
+
+
+def test_e1rm_trend_by_pattern_single_point_in_window_has_no_delta():
+    today = date(2026, 8, 5)
+    entries = {"squat": [{"date": date(2026, 8, 1), "sets": [{"reps": 5, "weight_kg": 100}]}]}
+    result = e1rm_trend_by_pattern(entries, today, window_days=56)
+    assert result["squat"]["delta"] is None
+    assert len(result["squat"]["series"]) == 1
+
+
+def test_e1rm_trend_by_pattern_skips_unusable_sets_and_empty_patterns():
+    today = date(2026, 8, 5)
+    entries = {
+        "core": [{"date": date(2026, 8, 1), "sets": [{"reps": None, "weight_kg": None}]}],  # bodyweight_timed
+    }
+    assert e1rm_trend_by_pattern(entries, today) == {}
 
 
 def test_prescribe_next_load_projects_e1rm_at_the_target_rep_rir():

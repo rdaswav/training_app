@@ -1,30 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Strength History - Parallax{% endblock %}
+{% block title %}Progression - Parallax{% endblock %}
 {% block content %}
-  <h1>Strength history</h1>
+  <div class="header">
+    <h1>Progression</h1>
+    <p class="lede">Estimated 1RM per pattern across this mesocycle. Open a row for its sessions.</p>
+  </div>
 
-  {% if not by_pattern %}
+  {% if not patterns %}
     <p class="empty">No strength sessions logged yet.</p>
-  {% endif %}
-
-  {% for pattern, entries in by_pattern %}
-    <div class="card">
-      <h3>{{ pattern.replace("_", " ")|title }}</h3>
-      <div class="rows sessions">
-        {% for entry in entries %}
-          <div class="row">
-            <span class="r-date">{{ entry.date.strftime("%-d %b") }}</span>
-            <span class="r-name">{{ entry.exercise_name or "-" }}</span>
-            <div class="r-meta">
-              {% for set in entry.sets %}
-                {{ set.reps }}x{{ set.weight_kg }}kg{% if set.rir_actual is not none %} @ RIR {{ set.rir_actual }}{% endif %}{% if not loop.last %}, {% endif %}
+  {% else %}
+    <div class="panel">
+      <div class="progression">
+        <div class="prow-head">
+          <span class="l">Pattern</span><span class="v">Est. 1RM</span><span class="v">8 wk</span><span class="v spark">Trend</span><span class="car-sp"></span>
+        </div>
+        {% for p in patterns %}
+          {% set trend = p.trend %}
+          {% set dir = 'up' if trend.delta and trend.delta > 0 else ('down' if trend.delta and trend.delta < 0 else 'flat') %}
+          <details class="prow">
+            <summary>
+              <span class="l">
+                {{ p.pattern.replace("_", " ")|title }}
+                {% if trend.delta is not none and trend.delta <= -2 %}<span class="chip falling">falling</span>{% endif %}
+              </span>
+              <span class="v">{{ trend.latest }} kg</span>
+              <span class="v delta-{{ dir }}">{% if trend.delta is not none %}{{ "+%.1f"|format(trend.delta) if trend.delta > 0 else trend.delta }}{% else %}&mdash;{% endif %}</span>
+              <span class="v spark delta-{{ dir }}">{% if trend.points %}<svg viewBox="0 0 100 24" preserveAspectRatio="none"><polyline points="{{ trend.points }}" fill="none" stroke="currentColor" stroke-width="1.8" vector-effect="non-scaling-stroke"></polyline></svg>{% endif %}</span>
+              <span class="car">&#9656;</span>
+            </summary>
+            <div class="body">
+              {% for entry in p.entries[:5] %}
+                <div class="prow-entry">
+                  <span class="r-date">{{ entry.date.strftime("%-d %b") }}</span>
+                  <span class="prow-name">{{ entry.exercise_name or p.pattern.replace("_", " ")|title }}</span>
+                  <span class="prow-sets">
+                    {% for set in entry.sets %}{{ set.reps }}&times;{{ set.weight_kg }}kg{% if set.rir_actual is not none %} @ RIR {{ set.rir_actual }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}
+                    {%- if entry.feedback %} &middot; {{ entry.feedback }}{% endif %}
+                  </span>
+                </div>
               {% endfor %}
-              {% if entry.feedback %} &middot; {{ entry.feedback }}{% endif %}
-              {% if entry.next_instruction %} &middot; {{ entry.next_instruction }}{% endif %}
             </div>
-          </div>
+          </details>
         {% endfor %}
       </div>
     </div>
-  {% endfor %}
+  {% endif %}
 {% endblock %}

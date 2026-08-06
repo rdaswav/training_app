@@ -239,6 +239,56 @@ def latest_e1rm_by_pattern(completed_rows: list[dict]) -> dict[str, float]:
     return result
 
 
+def _best_e1rm_from_set_dicts(sets: list[dict]) -> float | None:
+    """Same guard as `latest_e1rm_by_pattern`: skip sets with no weight/reps
+    (bodyweight_timed rows) rather than crash, since a pattern's history can
+    mix movement types across exercises."""
+    usable = [s for s in sets if s.get("weight_kg") is not None and s.get("reps") is not None]
+    if not usable:
+        return None
+    return max(estimate_e1rm(s["weight_kg"], s["reps"]) for s in usable)
+
+
+def e1rm_trend_by_pattern(
+    entries_by_pattern: dict[str, list[dict]], today: date, window_days: int = 56
+) -> dict[str, dict]:
+    """entries_by_pattern: pattern -> list of {"date": date, "sets": [...]}, any
+    order -- for /strength-history's Progression view (backend for `Consolidated
+    Pages.dc.html`'s "Progression" page).
+
+    For each pattern with at least one usable logged e1RM, returns:
+      - "latest": the single most recent usable e1RM, regardless of whether it
+        falls inside the window -- a pattern you haven't trained in 10 weeks
+        still shows its real current number rather than nothing.
+      - "series": chronological (oldest-first) usable e1RMs from sessions
+        logged within the last `window_days` (default 8 weeks -- 56 days) --
+        the sparkline/trend data. Can be shorter than the full history, or
+        empty if nothing was logged in-window.
+      - "delta": series[-1] - series[0], only when the window has at least 2
+        points (a single point has no trend to report); None otherwise.
+    Patterns with no usable e1RM anywhere in `entries_by_pattern` are omitted
+    entirely, not returned with empty/None values.
+    """
+    cutoff = today - timedelta(days=window_days)
+    result: dict[str, dict] = {}
+    for pattern, entries in entries_by_pattern.items():
+        dated = sorted(
+            (
+                (e["date"], v)
+                for e in entries
+                if (v := _best_e1rm_from_set_dicts(e.get("sets") or [])) is not None
+            ),
+            key=lambda t: t[0],
+        )
+        if not dated:
+            continue
+        latest = dated[-1][1]
+        series = [round(v, 1) for d, v in dated if d >= cutoff]
+        delta = round(series[-1] - series[0], 1) if len(series) >= 2 else None
+        result[pattern] = {"latest": round(latest, 1), "series": series, "delta": delta}
+    return result
+
+
 def prescribe_next_load(e1rm: float, reps: str, rir: float) -> float:
     """Given an e1RM (per movement pattern) and a target rep-range/RIR
     prescription, back out an actual kg working-weight target via Epley:

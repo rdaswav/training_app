@@ -46,6 +46,33 @@
       </div>
     </div>
 
+    {% if week_grid %}
+      <div class="panel two-clocks">
+        <h3>Two clocks</h3>
+        <div class="weekgrid-scroll">
+          <div class="weekgrid-row">
+            <span class="weekgrid-label">Phase</span>
+            {% for wk in week_grid %}
+              <div class="wk-cell" style="background: {{ phase_colors.get(wk.phase_name, '#888') }};" title="Week {{ wk.week_num }}: {{ wk.phase_name }}"></div>
+            {% endfor %}
+          </div>
+          <div class="weekgrid-row">
+            <span class="weekgrid-label">Running recovery</span>
+            {% for wk in week_grid %}
+              <div class="wk-cell{% if wk.is_running_recovery %} recovery{% endif %}" title="Week {{ wk.week_num }}: {{ 'down-week/taper' if wk.is_running_recovery else 'normal load' }}"></div>
+            {% endfor %}
+          </div>
+          <div class="weekgrid-row">
+            <span class="weekgrid-label">Strength deload</span>
+            {% for wk in week_grid %}
+              <div class="wk-cell{% if wk.is_strength_deload %} on{% endif %}" title="Week {{ wk.week_num }}: {{ 'deload' if wk.is_strength_deload else 'accumulating' }}"></div>
+            {% endfor %}
+          </div>
+        </div>
+        <p class="note">Deloads and down-weeks run on different periods, so they only occasionally coincide. The offset is chosen to land them close, not to force a match.</p>
+      </div>
+    {% endif %}
+
     <div class="stats">
       {% if load_series %}
       <div class="card load-summary">
