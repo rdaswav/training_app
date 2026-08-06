@@ -760,7 +760,13 @@ table.calendar th, table.calendar td {
 
 /* stat cards row */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
-.stats .card { margin-bottom: 0; opacity: 0.92; }
+/* Grid items default to min-width: auto, so a wide min-content child (the
+   load chart's row, min-width: min-content) forces the grid track -- and
+   the whole card, and the page -- wider than the viewport instead of
+   scrolling inside .load-chart-scroll's overflow-x. min-width: 0 lets the
+   track shrink to the grid's actual sizing and hands overflow back to the
+   chart's own scroll container, where it belongs. */
+.stats .card { margin-bottom: 0; opacity: 0.92; min-width: 0; }
 .mrow { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.5rem; }
 .mrow .l { color: var(--muted); }
 .mrow .v { font-family: var(--mono); color: var(--text); }
