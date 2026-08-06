@@ -182,6 +182,48 @@ nav a.active { color: var(--accent); font-weight: 600; }
 }
 .physio-nudge strong { color: var(--amber-hi); display: block; margin-bottom: 0.3rem; }
 
+/* ---------- Today's "Two Clocks" cards (Parallax Redesign.dc.html, 1b) ----------
+   Run and strength load as equal-weight partners, not a session card plus an
+   afterthought stat -- the app's actual thesis (one calendar, two engines)
+   stated on the page that gets opened every day, not just on About/Plan. */
+.clocks { display: flex; gap: 0.7rem; margin-bottom: 1rem; }
+.clock-card {
+  flex: 1;
+  min-width: 0; /* flex items default to min-width:auto -- without this a long
+                   clock-note can force the card (and the row) wider than the
+                   viewport instead of wrapping, the same class of bug fixed
+                   on the /plan load chart. */
+  background: var(--slate);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-lg);
+  padding: 0.95rem 1.05rem;
+}
+.clock-card.run { border-color: rgba(53, 196, 174, 0.28); }
+.clock-card.strength { border-color: rgba(139, 127, 232, 0.28); }
+.clock-label {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-spacing);
+  text-transform: uppercase;
+}
+.clock-card.run .clock-label { color: var(--teal-hi); }
+.clock-card.strength .clock-label { color: var(--violet-hi); }
+.clock-num {
+  font-family: var(--disp);
+  font-weight: 800;
+  font-size: 1.6rem;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0.55rem 0 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+.clock-num span { font-family: var(--body); font-weight: 600; font-size: 0.8rem; color: var(--muted); }
+.clock-bar { height: 5px; border-radius: 3px; background: var(--slate2); overflow: hidden; margin-bottom: 0.55rem; }
+.clock-bar i { display: block; height: 100%; }
+.clock-card.run .clock-bar i { background: var(--teal); }
+.clock-card.strength .clock-bar i { background: var(--violet); }
+.clock-note { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+
 /* ---------- surface tiers (About restructure): panel/subpanel, additive to .card ---------- */
 .panel { background: var(--slate); border: 1px solid var(--line-soft); border-radius: var(--r-lg); padding: 1.4rem 1.5rem; margin-bottom: 1rem; }
 .panel h2, .panel h3 { font-family: var(--disp); font-weight: 700; font-size: 1.05rem; margin-bottom: 0.9rem; }
@@ -858,6 +900,9 @@ form.settings-form .cta {
 
 .load-chart { margin-bottom: 1rem; }
 .load-chart:last-child { margin-bottom: 0; }
+.trade-note { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--line-soft); }
+.trade-note .label { display: block; margin-bottom: 0.4rem; }
+.trade-note p { margin: 0; font-size: 0.85rem; line-height: 1.55; color: var(--text); }
 .load-chart-title {
   font-family: var(--label-font);
   font-size: var(--label-size);
@@ -1109,6 +1154,9 @@ form.settings-form .cta {
   .two, .rows { grid-template-columns: 1fr; }
   .lm { grid-template-columns: 1fr 1fr; }
   .panel { padding: 1.1rem 1.1rem; }
+  .clocks { gap: 0.5rem; }
+  .clock-card { padding: 0.8rem 0.85rem; }
+  .clock-num { font-size: 1.35rem; }
   .disclosure > summary { padding: 0.9rem 1.1rem; }
   .disclosure .body { padding: 0 1.1rem 1.1rem; }
 

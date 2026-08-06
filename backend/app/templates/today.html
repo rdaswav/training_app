@@ -35,6 +35,23 @@
     {% endif %}
   </div>
 
+  {% if clocks %}
+    <div class="clocks">
+      <div class="clock-card run">
+        <div class="clock-label">Run clock</div>
+        <div class="clock-num">{{ clocks.run_done_km }}<span> / {{ clocks.run_target_km }} km</span></div>
+        <div class="clock-bar"><i style="width: {{ clocks.run_pct }}%;"></i></div>
+        <div class="clock-note">{{ clocks.run_sessions_done }} of {{ clocks.run_sessions_total }} runs done this week.</div>
+      </div>
+      <div class="clock-card strength">
+        <div class="clock-label">Strength clock</div>
+        <div class="clock-num">{{ clocks.tonnage_done_kg|round|int }}<span> / {{ clocks.tonnage_target_kg|round|int }} kg</span></div>
+        <div class="clock-bar"><i style="width: {{ clocks.tonnage_pct }}%;"></i></div>
+        <div class="clock-note">{% if mesocycle_status %}{{ mesocycle_status.mode|title }} &middot; RIR {{ mesocycle_status.current_rir }}{% endif %}</div>
+      </div>
+    </div>
+  {% endif %}
+
   {% if not sessions %}
     <p class="empty">No sessions scheduled today.</p>
   {% endif %}

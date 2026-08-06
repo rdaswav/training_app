@@ -78,6 +78,12 @@
       <div class="card load-summary">
         <h3>Weekly Load</h3>
         {{ load_chart(load_series, volume_delta_pct) }}
+        {% if trade_note %}
+          <div class="trade-note">
+            <span class="label">The trade, in words</span>
+            <p>{{ trade_note }}</p>
+          </div>
+        {% endif %}
       </div>
       {% endif %}
 

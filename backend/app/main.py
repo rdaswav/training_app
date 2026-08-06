@@ -29,7 +29,7 @@ from app.engines.running import week_start
 from app.integrations.anthropic_coach import coach_configured
 from app.jobs.daily_autoregulation import MAX_PACE_DRIFT_SEC_PER_KM, run_daily_job
 from app.jobs.weekly_review import run_weekly_review_job
-from app.models import CoachReview, CompletedSession, PlannedSession, Race, SessionType
+from app.models import CoachReview, CompletedSession, PlannedSession, Race, SessionStatus, SessionType
 from app.plan_service import fitness_from_athlete
 from app.seed import seed_exercise_library
 from app.timeutil import local_today
@@ -266,6 +266,80 @@ def _recent_strength_completed_rows(db, athlete) -> list[dict]:
     return [{"pattern": c.actual.get("pattern"), "sets": c.actual.get("sets", []), "date": c.date} for c in completed]
 
 
+def _weekly_clocks(db, athlete, today: date) -> dict:
+    """This week's run-km and strength-tonnage progress against target, for
+    Today's "Two Clocks" cards (Parallax Redesign.dc.html, direction 1b).
+
+    Run target = sum of this week's planned RUN session distances -- the
+    same number the /plan load chart already treats as the week's volume.
+    Run done = the same, but only for sessions actually marked completed.
+    There's no reliably-captured *actual* distance yet (manual completion
+    only takes pace/HR; the daily job's intervals.icu match only extracts
+    pace from the activity's distance, never stores the distance itself --
+    see _extract_run_actuals in jobs/daily_autoregulation.py), so "planned
+    distance of a now-completed session" is the honest proxy available
+    today, not a stand-in for something better that already exists.
+
+    Strength target = each prescribed pattern's suggested working load
+    (the same e1RM-projected number that prefills the logging form) times
+    sets times the rep range's midpoint, summed across this week's
+    strength sessions. Strength done = actual tonnage from sets already
+    logged this week (reps x weight_kg, same as the /plan load chart)."""
+    wk_start = week_start(today)
+    wk_end = wk_start + timedelta(days=6)
+    sessions = (
+        db.query(PlannedSession)
+        .filter(PlannedSession.athlete_id == athlete.id, PlannedSession.date >= wk_start, PlannedSession.date <= wk_end)
+        .all()
+    )
+
+    run_sessions = [s for s in sessions if s.type == SessionType.RUN]
+    run_target = sum((s.content.get("total_distance_km") or 0.0) for s in run_sessions)
+    completed_runs = [s for s in run_sessions if s.status == SessionStatus.COMPLETED]
+    run_done = sum((s.content.get("total_distance_km") or 0.0) for s in completed_runs)
+
+    completed_rows = _recent_strength_completed_rows(db, athlete)
+    e1rm_by_pattern = strength_engine.latest_e1rm_by_pattern(completed_rows)
+    tonnage_target = 0.0
+    for s in sessions:
+        if s.type != SessionType.STRENGTH:
+            continue
+        for p in s.content.get("prescriptions", []):
+            e1rm = e1rm_by_pattern.get(p["pattern"])
+            if not e1rm:
+                continue
+            load = strength_engine.prescribe_next_load(e1rm, p["reps"], p["rir"])
+            lo, hi = p["reps"].split("-")
+            avg_reps = (int(lo) + int(hi)) / 2
+            tonnage_target += load * p["sets"] * avg_reps
+
+    completed_strength = (
+        db.query(CompletedSession)
+        .join(PlannedSession, CompletedSession.planned_session_id == PlannedSession.id)
+        .filter(
+            PlannedSession.athlete_id == athlete.id,
+            PlannedSession.type == SessionType.STRENGTH,
+            PlannedSession.date >= wk_start,
+            PlannedSession.date <= wk_end,
+        )
+        .all()
+    )
+    tonnage_done = sum(
+        (st.get("reps") or 0) * (st.get("weight_kg") or 0) for c in completed_strength for st in c.actual.get("sets", [])
+    )
+
+    return {
+        "run_done_km": round(run_done, 1),
+        "run_target_km": round(run_target, 1),
+        "run_pct": round(min(run_done / run_target * 100, 100), 1) if run_target else 0.0,
+        "run_sessions_done": len(completed_runs),
+        "run_sessions_total": len(run_sessions),
+        "tonnage_done_kg": round(tonnage_done, 1),
+        "tonnage_target_kg": round(tonnage_target, 1),
+        "tonnage_pct": round(min(tonnage_done / tonnage_target * 100, 100), 1) if tonnage_target else 0.0,
+    }
+
+
 def _attach_suggested_loads(db, athlete, sessions: list[PlannedSession]) -> None:
     """For each strength session, attach a `suggested_loads` dict (pattern ->
     kg) computed from the athlete's most recent logged session for that
@@ -446,6 +520,7 @@ def today_view(request: Request):
 
         current_phase_name = None
         mesocycle_mode = None
+        mesocycle_status = None
         if race and race.macrocycle:
             phases = [{"name": p.name, "start_date": p.start_date, "end_date": p.end_date} for p in race.macrocycle.phases]
             current_phase = dashboard_summary.active_phase(phases, today)
@@ -456,6 +531,7 @@ def today_view(request: Request):
             )
             mesocycle_mode = mesocycle_status.mode
         cues = {s.id: coaching_copy.session_cue(s.type, current_phase_name, mesocycle_mode) for s in sessions}
+        clocks = _weekly_clocks(db, athlete, today) if race else None
 
         return templates.TemplateResponse(
             "today.html",
@@ -464,6 +540,8 @@ def today_view(request: Request):
                 "sessions": sessions,
                 "today": today,
                 "race": race,
+                "clocks": clocks,
+                "mesocycle_status": mesocycle_status,
                 "days_to_race": days_to_race,
                 "cues": cues,
                 "active": "today",
@@ -548,6 +626,26 @@ def plan_view(request: Request):
                 mesocycle_start_week,
             )
 
+        # "The trade, in words" (Parallax Redesign.dc.html, 1b) -- the same
+        # accumulate/maintenance transition race_proximity_mode already
+        # encodes (see engines/strength.py), stated as a sentence next to
+        # the chart it's describing instead of left implicit in the numbers.
+        trade_note = None
+        if race and phases:
+            build2 = next((p for p in phases if p.name == "Build 2"), None)
+            if build2:
+                build2_week = dashboard_summary.global_week_index(start, build2.start_date) + 1
+                if today < build2.start_date:
+                    trade_note = (
+                        f"Strength keeps accumulating through week {build2_week - 1}, then steps down to "
+                        f"maintenance from Build 2 (week {build2_week}) as running takes the fatigue budget."
+                    )
+                else:
+                    trade_note = (
+                        f"Strength moved to maintenance in Build 2 (week {build2_week}) so running could take "
+                        "the fatigue budget from here to race day."
+                    )
+
         volume_delta_pct = None
         current_week_load = next((pt for pt in load_series if pt.week_start == week_start(today)), None)
         prior_week_load = next((pt for pt in load_series if pt.week_start == week_start(today) - timedelta(days=7)), None)
@@ -573,6 +671,7 @@ def plan_view(request: Request):
                 "days_to_race": days_to_race,
                 "week_grid": week_grid,
                 "phase_colors": PHASE_COLORS,
+                "trade_note": trade_note,
                 "active": "plan",
             },
         )
