@@ -84,6 +84,18 @@ h1, h2, h3 { margin: 0 0 0.5rem; font-family: var(--disp); font-weight: 700; }
 }
 .countdown { color: var(--muted); font-size: 0.9rem; font-family: var(--mono); }
 
+/* Page header: title with an optional eyebrow above and lede below, all
+   stacked -- distinct from .header (title + a short fact meant to sit
+   side by side, e.g. Today's date + countdown). .header's flex/
+   space-between was being reused on Trends/Numbers/Reviews for pages that
+   actually wanted a subtitle, which pushed it beside the h1 instead of
+   under it -- Reviews visibly broke this (eyebrow-before-h1 shoved the
+   title itself to the right edge). One component per job instead. */
+.page-header { margin-bottom: 1.25rem; }
+.page-header .eyebrow { display: block; margin-bottom: 0.4rem; }
+.page-header h1 { margin: 0; }
+.page-header .lede { margin: 0.4rem 0 0; }
+
 /* Cold-launch splash: Today only, once per browser session (see the
    sessionStorage guard inline in today.html and initSplash in app.js).
    The mark's tile bg is #131c2b here specifically -- a touch lighter than
