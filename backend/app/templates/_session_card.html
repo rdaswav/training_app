@@ -177,5 +177,20 @@
   {% elif s.content.get("note") %}
     <div class="note">{{ s.content.get("note") }}</div>
   {% endif %}
+
+  <!-- Athlete's own note (PlannedSession.note), distinct from the engine's
+       content.note above -- always available regardless of status, since a
+       missed session otherwise has no interaction point at all. Read by the
+       weekly coach review; see anthropic_coach.py's SYSTEM_PROMPT. -->
+  <div class="session-note" data-session-id="{{ s.id }}">
+    <button type="button" class="note-toggle{% if s.note %} has-note{% endif %}">{% if s.note %}&#9998; Edit note{% else %}+ Add a note{% endif %}</button>
+    <div class="note-editor"{% if not s.note %} style="display:none;"{% endif %}>
+      <textarea class="note-input" placeholder="Why this happened, or how it felt -- the coach reads this.">{{ s.note or '' }}</textarea>
+      <div class="note-editor-acts">
+        <button type="button" class="btn-quiet note-save-btn">Save</button>
+        <span class="note-status"></span>
+      </div>
+    </div>
+  </div>
 </div>
 {% endmacro %}

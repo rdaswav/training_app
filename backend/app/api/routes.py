@@ -36,6 +36,7 @@ from app.schemas import (
     RaceCreate,
     RaceOut,
     RunCompleteRequest,
+    SessionNoteRequest,
     SessionOut,
     StrengthLogRequest,
 )
@@ -296,6 +297,18 @@ def swap_exercise(session_id: int, payload: ExerciseSwapRequest, db: Session = D
     session.content = {**session.content, "prescriptions": new_prescriptions}
     db.commit()
     return {"status": "updated"}
+
+
+@router.patch("/sessions/{session_id}/note")
+def set_session_note(session_id: int, payload: SessionNoteRequest, db: Session = Depends(get_db)):
+    """Editable regardless of status -- a missed session has no other athlete
+    interaction point at all otherwise. Surfaced in the weekly review's
+    metrics (see coach_service.build_metrics / weekly_review.session_lines)
+    so the coach reads it, not just a human looking at the calendar."""
+    session = _get_planned_session(db, session_id)
+    session.note = payload.note or None
+    db.commit()
+    return {"status": "updated", "note": session.note}
 
 
 @router.get("/plan/export")

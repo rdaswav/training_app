@@ -60,6 +60,13 @@ running was genuinely easy.
 - `sessions[].feedback` and `next_instruction` are the app's own autoregulation \
 output, already applied to the plan. Read them as context for what the plan has \
 done, not as recommendations you need to repeat.
+- `sessions[].note` is the athlete's own written context for that specific \
+session -- most often why it was missed (illness, travel, life), sometimes how a \
+completed one actually felt. When present, treat it as authoritative and read a \
+miss through it: illness is not a compliance problem to fix, it is not evidence \
+of anything about fitness or motivation, and it should not be moralized about. \
+Do not recommend "making up" missed volume. A pattern of misses with no note \
+attached is worth naming as a gap; a miss with a note explaining it is not.
 - Running is the primary goal; strength serves it. Flag strength only where it \
 affects the running.
 

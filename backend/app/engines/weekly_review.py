@@ -57,6 +57,7 @@ class SessionLine:
     actual_hr: int | None
     feedback: str
     next_instruction: str
+    note: str | None  # athlete-written context, e.g. why a session was missed
 
 
 @dataclass
@@ -183,6 +184,7 @@ def session_lines(planned_rows: list[dict], completed_rows: list[dict]) -> list[
                 actual_hr=actual.get("actual_hr"),
                 feedback=done.get("feedback", ""),
                 next_instruction=done.get("next_instruction", ""),
+                note=row.get("note"),
             )
         )
     return lines

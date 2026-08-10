@@ -20,7 +20,7 @@ from app.engines.weekly_review import (
 MONDAY = date(2026, 7, 20)
 
 
-def _planned(session_id, day_offset, name, session_type, status, content=None):
+def _planned(session_id, day_offset, name, session_type, status, content=None, note=None):
     return {
         "id": session_id,
         "date": date(2026, 7, 20 + day_offset),
@@ -28,6 +28,7 @@ def _planned(session_id, day_offset, name, session_type, status, content=None):
         "type": session_type,
         "status": status,
         "content": content or {},
+        "note": note,
     }
 
 
@@ -146,6 +147,21 @@ def test_session_lines_leaves_actuals_empty_for_a_missed_session():
     assert line.status == "missed"
     assert line.actual_pace_sec_per_km is None and line.actual_hr is None
     assert line.feedback == ""
+
+
+def test_session_lines_carries_the_athletes_note_through_for_a_missed_session():
+    """The whole point of a session note is surfacing context the coach has no
+    other way to see -- it has to survive into the metrics the model reads,
+    not just live in the DB."""
+    planned = [_planned(1, 0, "Long run", "run", "missed", {"role": "long"}, note="Sick, stayed home.")]
+    (line,) = session_lines(planned, [])
+    assert line.note == "Sick, stayed home."
+
+
+def test_session_lines_note_is_none_when_never_set():
+    planned = [_planned(1, 0, "Easy run", "run", "completed")]
+    (line,) = session_lines(planned, [])
+    assert line.note is None
 
 
 def _line_rows(role, actual_hr, ceiling):

@@ -143,6 +143,7 @@ def build_metrics(db: Session, athlete: AthleteProfile, week_start: date) -> dic
             "type": s.type.value,
             "status": s.status.value,
             "content": s.content or {},
+            "note": s.note,
         }
         for s in planned
     ]

@@ -187,6 +187,14 @@ class PlannedSession(Base):
     phase_name: Mapped[str | None] = mapped_column(String, nullable=True)
     intervals_icu_event_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    # Athlete-written context for this specific session -- why a session was
+    # missed (sick, travel), or anything about a completed one worth the coach
+    # knowing that the logged numbers don't capture. Free text, always
+    # editable regardless of status (a missed session has no other athlete
+    # interaction point at all otherwise). Surfaced in the weekly review's
+    # metrics so the LLM sees it, not just a human reading the calendar.
+    note: Mapped[str | None] = mapped_column(String, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     completed: Mapped["CompletedSession | None"] = relationship(

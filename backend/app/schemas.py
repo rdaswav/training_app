@@ -129,6 +129,16 @@ class CoachReviewRequest(BaseModel):
     week_start: date | None = None
 
 
+class SessionNoteRequest(BaseModel):
+    """Athlete-written context for one session -- why it was missed, or
+    anything about it worth the weekly coach review knowing that the logged
+    numbers don't capture. Empty string clears the note (distinct from
+    omitting the field, which this endpoint doesn't support -- note is
+    always the whole replacement value, not a patch)."""
+
+    note: str
+
+
 class CoachReviewExternalRequest(BaseModel):
     """For a review authored outside this app (e.g. a scheduled routine running
     its own Claude session against Strava) -- no ANTHROPIC_API_KEY call, no

@@ -555,6 +555,42 @@ nav a.active { color: var(--accent); font-weight: 600; }
 }
 .swapbtn { margin-top: 0.6rem; }
 
+/* Athlete's own note on a session -- distinct from .note (the engine's own
+   scheduling explanation, content.note). A quiet text toggle rather than a
+   button, since it's a low-frequency, low-emphasis action present on every
+   single session card; .has-note shifts to the accent so a session that
+   already carries context is visually distinguishable while scanning. */
+.note-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 0.6rem;
+  font-family: var(--body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+}
+.note-toggle.has-note { color: var(--teal-hi); }
+.note-editor { margin-top: 0.5rem; }
+.note-input {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.note-editor-acts { display: flex; align-items: center; gap: 0.7rem; margin-top: 0.5rem; }
+.note-editor-acts .btn-quiet { min-height: 38px; padding: 0 0.9rem; }
+.note-status { font-size: 0.78rem; color: var(--muted); }
+
 /* ---------- sticky target bar: pinned while scrolling a multi-exercise session ---------- */
 .stick {
   position: sticky;

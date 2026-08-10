@@ -632,6 +632,44 @@ document.addEventListener("DOMContentLoaded", initGymMode);
 document.addEventListener("DOMContentLoaded", initRunMode);
 
 // ---------------------------------------------------------------------------
+// Session notes: athlete-written context (why a session was missed, how a
+// completed one felt), editable regardless of status. Delegated on document
+// since .session-note appears inside every session_card, on both Today and
+// the session detail page.
+document.addEventListener("click", async (e) => {
+  const toggle = e.target.closest(".note-toggle");
+  if (toggle) {
+    const editor = toggle.nextElementSibling;
+    editor.style.display = editor.style.display === "none" ? "block" : "none";
+    if (editor.style.display === "block") editor.querySelector(".note-input").focus();
+    return;
+  }
+
+  const saveBtn = e.target.closest(".note-save-btn");
+  if (saveBtn) {
+    const wrap = saveBtn.closest(".session-note");
+    const sessionId = wrap.dataset.sessionId;
+    const input = wrap.querySelector(".note-input");
+    const status = wrap.querySelector(".note-status");
+    const toggleBtn = wrap.querySelector(".note-toggle");
+    saveBtn.disabled = true;
+    status.textContent = "Saving...";
+    try {
+      await postJSON(`/api/sessions/${sessionId}/note`, { note: input.value.trim() }, "PATCH");
+      status.textContent = "Saved";
+      const hasNote = input.value.trim().length > 0;
+      toggleBtn.textContent = hasNote ? "✎ Edit note" : "+ Add a note";
+      toggleBtn.classList.toggle("has-note", hasNote);
+      setTimeout(() => { status.textContent = ""; }, 2000);
+    } catch (err) {
+      status.textContent = "Failed to save";
+    } finally {
+      saveBtn.disabled = false;
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Cold-launch splash (today.html only): shown synchronously by an inline
 // script in the template (sessionStorage-gated, so a repeat visit within the
 // same tab hides it before first paint instead of flashing). This just fades

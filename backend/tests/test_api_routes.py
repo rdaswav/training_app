@@ -257,6 +257,39 @@ def test_trigger_daily_job_runs_without_error(client):
     assert resp.status_code == 200
 
 
+def test_session_note_is_settable_and_clearable_regardless_of_status(client):
+    """A missed session has no other athlete interaction point -- the note
+    endpoint has to work on it same as a completed one, and an empty string
+    has to actually clear a previously-set note rather than being ignored."""
+    resp = client.post(
+        "/api/races",
+        json={"name": "Test Half", "race_date": "2026-10-11", "distance_km": 21.1, "priority": "A", "plan_start_date": "2026-07-09"},
+    )
+    assert resp.status_code == 200
+
+    from app.db import SessionLocal
+    from app.models import PlannedSession
+
+    db = SessionLocal()
+    try:
+        session_id = db.query(PlannedSession).first().id
+    finally:
+        db.close()
+
+    resp = client.patch(f"/api/sessions/{session_id}/note", json={"note": "Sick, stayed home."})
+    assert resp.status_code == 200
+    assert resp.json()["note"] == "Sick, stayed home."
+
+    resp = client.patch(f"/api/sessions/{session_id}/note", json={"note": ""})
+    assert resp.status_code == 200
+    assert resp.json()["note"] is None
+
+
+def test_session_note_404s_for_an_unknown_session(client):
+    resp = client.patch("/api/sessions/999999/note", json={"note": "test"})
+    assert resp.status_code == 404
+
+
 def test_external_weekly_review_records_markdown_without_calling_the_model(client):
     """The scheduled Strava-coach routine posts prose here instead of through
     /coach/weekly-review, so this must never touch ANTHROPIC_API_KEY -- model

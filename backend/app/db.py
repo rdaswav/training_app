@@ -56,6 +56,12 @@ _EXERCISE_NEW_COLUMNS = {
     "movement_type": "TEXT",
 }
 
+_PLANNED_SESSION_NEW_COLUMNS = {
+    # NULL means "no note" -- no backfill needed, that's the correct meaning
+    # for every pre-existing row.
+    "note": "TEXT",
+}
+
 _BODYWEIGHT_REPS_EXERCISE_NAMES = ("Push-up", "Pull-up", "Dead bug", "Nordic curl", "Glute bridge", "Single-leg calf raise")
 _BODYWEIGHT_TIMED_EXERCISE_NAMES = ("Plank", "Side plank", "Copenhagen plank")
 
@@ -116,6 +122,10 @@ def _migrate_exercises(engine) -> None:
         conn.execute(text("UPDATE exercises SET movement_type = 'weighted' WHERE movement_type IS NULL"))
 
 
+def _migrate_planned_sessions(engine) -> None:
+    _add_missing_columns(engine, "planned_sessions", _PLANNED_SESSION_NEW_COLUMNS)
+
+
 def init_db():
     from app import models  # noqa: F401 ensure models are registered
 
@@ -124,3 +134,4 @@ def init_db():
         _migrate_athlete_profiles(engine)
         _migrate_macrocycles(engine)
         _migrate_exercises(engine)
+        _migrate_planned_sessions(engine)

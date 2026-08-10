@@ -34,7 +34,7 @@ ENABLE_SCHEDULER = os.environ.get("ENABLE_SCHEDULER", "true").lower() not in ("f
 # safely without a key (same opt-in-via-env-var pattern as intervals.icu), so
 # the deterministic metrics half still runs and gets persisted.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-COACH_MODEL = os.environ.get("COACH_MODEL", "claude-opus-5")
+COACH_MODEL = os.environ.get("COACH_MODEL", "claude-sonnet-5")
 
 # When the weekly review job runs (day_of_week as APScheduler's 3-letter form),
 # in ATHLETE_TIMEZONE. Sunday evening by default: the training week has just
