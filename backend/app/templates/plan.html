@@ -4,29 +4,20 @@
   {% from "_phase_strip.html" import phase_strip %}
   {% from "_load_chart.html" import load_chart %}
   {% if race %}
-    <div class="hero">
-      <div>
-        <!-- Phase + week is deliberately not restated here -- the ribbon
-             immediately below already shows current phase (highlighted
-             block + now-mark), and every session card in the list below
-             that shows it per-session. One fact, shown once per page. -->
-        <div class="status-line">
-          <span class="pill">PRIORITY {{ race.priority.value|upper }}</span>
-        </div>
-        <h1>{{ race.name }}</h1>
-        <p class="goal">
-          {{ race.distance_km }} km
-          {% if race.goal_time_sec %} &middot; Goal {{ race.goal_time_sec|goal_time }}{% endif %}
-          {% if current_phase %} &middot; {{ current_phase.focus }}{% endif %}
-        </p>
-      </div>
-      <div class="countdown-card">
-        <div class="lab"><span class="eyebrow">Race day</span></div>
-        <div class="num">{{ days_to_race }}<small>days</small></div>
-        <div class="race">{{ race.name }}</div>
-        <div class="date">{{ race.race_date.strftime("%a %-d %b %Y") }}</div>
-      </div>
+    <!-- Phase + week is deliberately not restated here -- the ribbon
+         immediately below already shows current phase (highlighted block +
+         now-mark), and every session card in the list below shows it
+         per-session too. One fact, shown once per page. -->
+    <div class="header">
+      <h1>{{ race.name }}</h1>
+      <div class="countdown">{{ days_to_race }} days to go</div>
     </div>
+    <p class="lede">
+      {{ race.distance_km }} km
+      {% if race.goal_time_sec %} &middot; Goal {{ race.goal_time_sec|goal_time }}{% endif %}
+      {% if current_phase %} &middot; {{ current_phase.focus }}{% endif %}
+      &middot; Priority {{ race.priority.value|upper }}
+    </p>
 
     <div class="ribbon">
       {{ phase_strip(phase_segments, current_phase.name if current_phase else none) }}
