@@ -3,7 +3,7 @@ from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.coach_service import generate_weekly_review
+from app.coach_service import generate_weekly_review, record_external_review
 from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID
 from app.db import get_db
 from app.engines import autoregulation
@@ -27,6 +27,7 @@ from app.timeutil import local_today
 from app.schemas import (
     AthleteOut,
     AthleteUpdate,
+    CoachReviewExternalRequest,
     CoachReviewOut,
     CoachReviewRequest,
     ExerciseOut,
@@ -361,6 +362,17 @@ def create_weekly_review(payload: CoachReviewRequest, db: Session = Depends(get_
     athlete = get_or_create_athlete(db)
     week = monday_of(payload.week_start) if payload.week_start else None
     return generate_weekly_review(db, athlete, week_start=week)
+
+
+@router.post("/coach/weekly-review/external", response_model=CoachReviewOut)
+def create_external_weekly_review(payload: CoachReviewExternalRequest, db: Session = Depends(get_db)):
+    """Record a weekly review authored outside this app -- e.g. the scheduled
+    Strava-coach routine, which runs its own Claude session rather than this
+    app's ANTHROPIC_API_KEY -- into the same Reviews slot at zero token cost
+    to this instance."""
+    athlete = get_or_create_athlete(db)
+    week = monday_of(payload.week_start) if payload.week_start else None
+    return record_external_review(db, athlete, payload.markdown, week_start=week)
 
 
 @router.get("/coach/reviews", response_model=list[CoachReviewOut])

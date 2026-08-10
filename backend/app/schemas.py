@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models import RacePriority
 
@@ -127,6 +127,15 @@ class CoachReviewRequest(BaseModel):
     that week's Monday. Defaults to the most recently finished week."""
 
     week_start: date | None = None
+
+
+class CoachReviewExternalRequest(BaseModel):
+    """For a review authored outside this app (e.g. a scheduled routine running
+    its own Claude session against Strava) -- no ANTHROPIC_API_KEY call, no
+    token cost, same week_start normalization as CoachReviewRequest."""
+
+    week_start: date | None = None
+    markdown: str = Field(min_length=1)
 
 
 class CoachReviewOut(BaseModel):

@@ -246,3 +246,36 @@ def generate_weekly_review(
     db.commit()
     db.refresh(review)
     return review
+
+
+def record_external_review(db: Session, athlete: AthleteProfile, markdown: str, week_start: date | None = None) -> CoachReview:
+    """Same idempotent upsert as generate_weekly_review, but for prose written
+    outside this app (a scheduled routine running its own Claude session
+    against Strava, not this app's ANTHROPIC_API_KEY) -- same slot on the
+    Reviews page, zero token cost to this instance. Metrics are still computed
+    and stored (deterministic, free) so "the numbers this was written from"
+    keeps working; only the authored prose skips generate_review entirely."""
+    week_start = week_start or last_complete_week()
+    metrics = build_metrics(db, athlete, week_start)
+
+    review = (
+        db.query(CoachReview)
+        .filter(CoachReview.athlete_id == athlete.id, CoachReview.week_start == week_start)
+        .first()
+    )
+    if review is None:
+        review = CoachReview(athlete_id=athlete.id, week_start=week_start)
+        db.add(review)
+
+    review.metrics = metrics
+    review.prompt = ""
+    review.markdown = markdown
+    review.model = "external"
+    review.input_tokens = 0
+    review.output_tokens = 0
+    review.error = None
+    review.created_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(review)
+    return review

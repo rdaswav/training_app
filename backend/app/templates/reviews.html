@@ -81,7 +81,7 @@
       </details>
 
       <div class="sync-status">
-        {% if r.model %}{{ r.model }} &middot; {{ r.input_tokens }} in / {{ r.output_tokens }} out &middot; {% endif %}
+        {% if r.model == "external" %}written outside this app &middot; {% elif r.model %}{{ r.model }} &middot; {{ r.input_tokens }} in / {{ r.output_tokens }} out &middot; {% endif %}
         generated {{ r.created_at.strftime("%-d %b %H:%M") }}
       </div>
     </div>

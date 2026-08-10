@@ -257,6 +257,42 @@ def test_trigger_daily_job_runs_without_error(client):
     assert resp.status_code == 200
 
 
+def test_external_weekly_review_records_markdown_without_calling_the_model(client):
+    """The scheduled Strava-coach routine posts prose here instead of through
+    /coach/weekly-review, so this must never touch ANTHROPIC_API_KEY -- model
+    is recorded as "external" and token counts stay zero regardless of key
+    configuration."""
+    client.get("/api/athlete")  # create the default athlete row
+
+    resp = client.post(
+        "/api/coach/weekly-review/external",
+        json={"week_start": "2026-08-10", "markdown": "## Week 2\n\nVerdict: solid week."},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["markdown"] == "## Week 2\n\nVerdict: solid week."
+    assert body["model"] == "external"
+    assert body["input_tokens"] == 0 and body["output_tokens"] == 0
+    assert body["error"] is None
+
+    listed = client.get("/api/coach/reviews").json()
+    assert len(listed) == 1
+
+
+def test_external_weekly_review_is_idempotent_per_week(client):
+    """Re-posting for the same week updates the existing row rather than
+    stacking a duplicate -- same contract as generate_weekly_review."""
+    client.get("/api/athlete")
+
+    client.post("/api/coach/weekly-review/external", json={"week_start": "2026-08-10", "markdown": "First draft."})
+    resp = client.post("/api/coach/weekly-review/external", json={"week_start": "2026-08-12", "markdown": "Revised."})
+    assert resp.status_code == 200
+
+    listed = client.get("/api/coach/reviews").json()
+    assert len(listed) == 1  # both dates fall in the same Mon-Sun week
+    assert listed[0]["markdown"] == "Revised."
+
+
 def test_config_check_never_exposes_actual_credential_values(client):
     resp = client.get("/api/config-check")
     assert resp.status_code == 200
