@@ -397,6 +397,51 @@ the other two pages, which really were near-duplicates of each other.
 
 ---
 
+## 14. Strength <-> intervals.icu sync -- researched, declined
+
+Runs already push to intervals.icu (`intervals_sync.py`) and from there to the
+watch; the natural next ask was doing the same for strength sessions. Investigated
+both directions before writing any code -- an Explore pass over `intervals_sync.py`,
+`integrations/intervals_icu.py`, `jobs/daily_autoregulation.py`, `models.py`,
+`schemas.py`, `api/routes.py`, `app.js`, plus intervals.icu's own public forum
+(their API docs don't cover strength) -- and decided not to build it, in either
+direction:
+
+- **Push (app -> intervals.icu -> watch) is redundant, not just extra.** The app's
+  own gym-mode UI (`StrengthEntry` in `app.js`, `_session_card.html`'s prescription
+  markup) already shows the athlete their prescribed sets/reps/weight during the
+  session, on the phone they're already holding between sets -- a watch face would
+  only relocate that display somewhere worse. It's also technically murkier than the
+  run integration: that one works because this app spiked and confirmed
+  intervals.icu's `%HR`/`Pace` token syntax against a live account (see
+  `integrations/intervals_icu.py`'s docstring); no equivalent documented syntax
+  exists for strength, per [an unanswered intervals.icu forum
+  thread](https://forum.intervals.icu/t/bodyweight-strength-workout-syntax-for-garmin-sync/118740)
+  asking exactly this.
+- **Pull (watch -> intervals.icu -> app) is blocked by intervals.icu itself, not by
+  this codebase** -- confirmed twice independently on their forum: per-set data
+  exists in the Garmin FIT file but [intervals.icu doesn't parse or expose
+  it](https://forum.intervals.icu/t/pulling-strength-workout-exercise-sets-reps-weight-from-garmin/123171),
+  and [their API's strength activities carry only a single `kg_lifted` field, no
+  sets/reps/per-exercise
+  breakdown](https://forum.intervals.icu/t/is-there-structure-way-to-upload-a-weight-training-activity/126508).
+  `IntervalsIcuClient.get_activities()` already fetches every activity type
+  unfiltered, so strength activities from Garmin do arrive in the daily job's raw
+  payload -- they're just discarded, since the matching branch is gated to
+  `SessionType.RUN`. The pipe exists; intervals.icu's API just doesn't carry
+  anything useful through it, and no code in this repo works around that.
+
+Strength logging stays exactly as it is -- in-app via `StrengthEntry`'s stepper,
+which already captures more than intervals.icu could anyway (RIR per set, the
+e1RM-based load progression in `engines/strength.py`). A narrower one-way,
+after-the-fact push of a coarse summary (`kg_lifted` + a free-text note, purely so a
+completed strength session shows up on intervals.icu's own calendar/load view next
+to runs) was scoped as a fallback if ever wanted, but was explicitly declined too --
+it adds no logging convenience, only a "see everything in one dashboard" nicety, and
+duplicates data this app already tracks better. No code in this repo either way.
+
+---
+
 ## Suggested order
 
 1. ~~Athlete/race management UI~~ -- done
@@ -419,6 +464,8 @@ the other two pages, which really were near-duplicates of each other.
 12. ~~Backup the SQLite data file (GitHub issue #53)~~ -- done, via Synology Hyper
     Backup, no code
 13. ~~End-to-end design consistency pass (Tier 1-3)~~ -- done
+14. ~~Strength <-> intervals.icu sync~~ -- researched, declined both directions, no
+    code
 
 **Open GitHub issues: #46-#50** (filed 2026-07-11, not yet picked up -- see section
 "Where things stand" above for a one-line summary of each). Further work beyond
