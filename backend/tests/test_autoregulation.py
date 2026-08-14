@@ -4,7 +4,7 @@ from app.engines.autoregulation import (
     evaluate_quality_session,
     evaluate_strength_log,
 )
-from app.engines.strength import best_e1rm_from_sets, prescribe, prescribe_next_load
+from app.engines.strength import best_e1rm_from_sets, prescribe, prescribe_next_load, round_to_plate_increment
 
 
 def test_easy_run_softens_on_hr_drift():
@@ -66,15 +66,18 @@ def test_strength_log_no_sets_logged():
 def test_strength_log_back_off_includes_a_reduced_kg_target():
     """Regression test for #28: 'back_off' must include an actual kg target
     (~7.5% below the recomputed load, per the note's own '5-10%' guidance),
-    not just the prose label."""
+    not just the prose label. Regression test for the impossible-fraction bug
+    (2026-08-13): the target must land on a plate-loadable 2.5kg increment,
+    not a bare round(x, 1) fraction like 30.1kg that can't be loaded."""
     prescription = prescribe("squat", "compound", local_week=2, mode="accumulate")
     logged = [StrengthLogSet(reps=2, weight_kg=80, rir_actual=0.5)]
     result = evaluate_strength_log(prescription, logged)
 
     e1rm = best_e1rm_from_sets(logged)
-    expected_load = round(prescribe_next_load(e1rm, prescription.reps, prescription.rir) * 0.925, 1)
+    expected_load = round_to_plate_increment(prescribe_next_load(e1rm, prescription.reps, prescription.rir) * 0.925)
     assert result.action == "back_off"
     assert f"{expected_load}kg" in result.next_instruction
+    assert (expected_load * 2) % 5 == 0  # i.e. a multiple of 2.5kg
 
 
 def test_strength_log_progress_includes_a_kg_target_for_next_session():

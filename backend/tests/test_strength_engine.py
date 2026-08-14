@@ -283,7 +283,10 @@ def test_e1rm_trend_by_pattern_skips_unusable_sets_and_empty_patterns():
 def test_prescribe_next_load_projects_e1rm_at_the_target_rep_rir():
     e1rm = estimate_e1rm(100, 5)  # 116.67
     # target_reps = midpoint of "3-5" = 4; effective_reps = 4 + rir(2) = 6.
-    expected = round(e1rm / (1 + 6 / 30), 1)
+    # Result must land on a plate-loadable 2.5kg increment, not a bare
+    # round(x, 1) fraction -- see round_to_plate_increment.
+    raw = e1rm / (1 + 6 / 30)
+    expected = round(raw / 2.5) * 2.5
     assert prescribe_next_load(e1rm, "3-5", 2) == expected
 
 

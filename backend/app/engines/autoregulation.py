@@ -100,7 +100,7 @@ def evaluate_strength_log(
             "hold",
         )
 
-    from app.engines.strength import best_e1rm_from_sets, prescribe_next_load
+    from app.engines.strength import best_e1rm_from_sets, prescribe_next_load, round_to_plate_increment
 
     lo, _hi = _parse_rep_range(prescription.reps)
     hit_reps = all(s.reps >= lo for s in logged_sets)
@@ -116,7 +116,7 @@ def evaluate_strength_log(
     summary = f"{len(logged_sets)}x{first.reps}x{first.weight_kg}kg logged for {prescription.pattern} (target {prescription.sets}x{prescription.reps} @ RIR {prescription.rir})"
 
     if not hit_reps:
-        back_off_load = round(next_load * 0.925, 1) if next_load else None  # ~7.5%, midpoint of "5-10%"
+        back_off_load = round_to_plate_increment(next_load * 0.925) if next_load else None  # ~7.5%, midpoint of "5-10%"
         instruction = (
             f"Back off: aim for ~{back_off_load}kg next session (reduce load ~7.5%)."
             if back_off_load is not None
