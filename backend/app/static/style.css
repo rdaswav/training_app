@@ -821,6 +821,13 @@ table.calendar th, table.calendar td {
 .flag.race .pin { background: var(--red); }
 .flag.race b { color: var(--red); }
 
+/* This-week hero card + the disclosure it sits above (Plan page reformat --
+   see PROJECT_PLAN.md). .hero-week is otherwise a plain .card; only the
+   border/glow differ, so it still stacks and scrolls like every other card. */
+.hero-week { border-color: rgba(53, 196, 174, 0.5); box-shadow: 0 0 0 1px rgba(53, 196, 174, 0.25) inset; }
+.week-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; margin-bottom: 0.5rem; }
+.week-card-head h3 { margin: 0; }
+
 /* stat cards row */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 /* Grid items default to min-width: auto, so a wide min-content child (the

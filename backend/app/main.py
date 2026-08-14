@@ -652,13 +652,24 @@ def plan_view(request: Request):
         if current_week_load and prior_week_load and prior_week_load.run_km:
             volume_delta_pct = round((current_week_load.run_km - prior_week_load.run_km) / prior_week_load.run_km * 100)
 
+        # This week is hero'd above the fold; every other week (past and
+        # future) lives inside the "Full schedule" disclosure below it -- see
+        # PROJECT_PLAN.md's Plan-page reformat entry. Falls back to no hero
+        # (current_week=None) if there's simply no session data for this
+        # week yet, e.g. right at the very start/end of a macrocycle.
+        weeks_sorted = sorted(weeks.items())
+        this_monday = week_start(today)
+        current_week = next((w for w in weeks_sorted if w[0] == this_monday), None)
+        other_weeks = [w for w in weeks_sorted if w[0] != this_monday]
+
         return templates.TemplateResponse(
             "plan.html",
             {
                 "request": request,
                 "race": race,
                 "phase_segments": phase_segments,
-                "weeks": sorted(weeks.items()),
+                "current_week": current_week,
+                "other_weeks": other_weeks,
                 "load_series": load_series,
                 "volume_delta_pct": volume_delta_pct,
                 "current_phase": current_phase,

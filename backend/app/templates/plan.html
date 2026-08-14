@@ -3,6 +3,7 @@
 {% block content %}
   {% from "_phase_strip.html" import phase_strip %}
   {% from "_load_chart.html" import load_chart %}
+  {% from "_week_card.html" import week_card %}
   {% if race %}
     <!-- Phase + week is deliberately not restated here -- the ribbon
          immediately below already shows current phase (highlighted block +
@@ -37,126 +38,79 @@
       </div>
     </div>
 
-    {% if week_grid %}
-      <div class="panel two-clocks">
-        <h3>Two clocks</h3>
-        <div class="weekgrid-scroll">
-          <div class="weekgrid-row">
-            <span class="weekgrid-label">Phase</span>
-            {% for wk in week_grid %}
-              <div class="wk-cell" style="background: {{ phase_colors.get(wk.phase_name, '#888') }};" title="Week {{ wk.week_num }}: {{ wk.phase_name }}"></div>
-            {% endfor %}
-          </div>
-          <div class="weekgrid-row">
-            <span class="weekgrid-label">Running recovery</span>
-            {% for wk in week_grid %}
-              <div class="wk-cell{% if wk.is_running_recovery %} recovery{% endif %}" title="Week {{ wk.week_num }}: {{ 'down-week/taper' if wk.is_running_recovery else 'normal load' }}"></div>
-            {% endfor %}
-          </div>
-          <div class="weekgrid-row">
-            <span class="weekgrid-label">Strength deload</span>
-            {% for wk in week_grid %}
-              <div class="wk-cell{% if wk.is_strength_deload %} on{% endif %}" title="Week {{ wk.week_num }}: {{ 'deload' if wk.is_strength_deload else 'accumulating' }}"></div>
-            {% endfor %}
-          </div>
-        </div>
-        <p class="note">Deloads and down-weeks run on different periods, so they only occasionally coincide. The offset is chosen to land them close, not to force a match.</p>
+    {% if current_week %}
+      <div class="card hero-week">
+        {{ week_card(current_week[0], current_week[1], tag="This week") }}
       </div>
     {% endif %}
 
-    <div class="stats">
-      {% if load_series %}
-      <div class="card load-summary">
-        <h3>Weekly Load</h3>
-        {{ load_chart(load_series, volume_delta_pct) }}
-        {% if trade_note %}
-          <div class="trade-note">
-            <span class="label">The trade, in words</span>
-            <p>{{ trade_note }}</p>
+    <details class="disclosure">
+      <summary>
+        <span><span class="t">Full schedule &amp; phase overview</span><span class="d">Weekly load, strength mesocycle, two clocks, every other week</span></span>
+        <span class="car">&#9656;</span>
+      </summary>
+      <div class="body">
+        {% if week_grid %}
+          <div class="panel two-clocks">
+            <h3>Two clocks</h3>
+            <div class="weekgrid-scroll">
+              <div class="weekgrid-row">
+                <span class="weekgrid-label">Phase</span>
+                {% for wk in week_grid %}
+                  <div class="wk-cell" style="background: {{ phase_colors.get(wk.phase_name, '#888') }};" title="Week {{ wk.week_num }}: {{ wk.phase_name }}"></div>
+                {% endfor %}
+              </div>
+              <div class="weekgrid-row">
+                <span class="weekgrid-label">Running recovery</span>
+                {% for wk in week_grid %}
+                  <div class="wk-cell{% if wk.is_running_recovery %} recovery{% endif %}" title="Week {{ wk.week_num }}: {{ 'down-week/taper' if wk.is_running_recovery else 'normal load' }}"></div>
+                {% endfor %}
+              </div>
+              <div class="weekgrid-row">
+                <span class="weekgrid-label">Strength deload</span>
+                {% for wk in week_grid %}
+                  <div class="wk-cell{% if wk.is_strength_deload %} on{% endif %}" title="Week {{ wk.week_num }}: {{ 'deload' if wk.is_strength_deload else 'accumulating' }}"></div>
+                {% endfor %}
+              </div>
+            </div>
+            <p class="note">Deloads and down-weeks run on different periods, so they only occasionally coincide. The offset is chosen to land them close, not to force a match.</p>
           </div>
         {% endif %}
-      </div>
-      {% endif %}
 
-      {% if mesocycle_status %}
-      <div class="card">
-        <h3>Strength Mesocycle</h3>
-        <div class="mrow"><span class="l">Block position</span><span class="v">Week {{ mesocycle_status.local_week + 1 }} / {{ mesocycle_status.mesocycle_length }}</span></div>
-        <div class="mrow"><span class="l">Mode</span><span class="v">{{ mesocycle_status.mode }}</span></div>
-        <div class="mrow"><span class="l">Effort target</span><span class="v">RIR {{ mesocycle_status.current_rir }}</span></div>
-        <div class="rirbar"><i style="width: {{ mesocycle_status.effort_pct }}%;"></i></div>
-        <p class="note">{{ mesocycle_status.note }}</p>
+        <div class="stats">
+          {% if load_series %}
+          <div class="card load-summary">
+            <h3>Weekly Load</h3>
+            {{ load_chart(load_series, volume_delta_pct) }}
+            {% if trade_note %}
+              <div class="trade-note">
+                <span class="label">The trade, in words</span>
+                <p>{{ trade_note }}</p>
+              </div>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          {% if mesocycle_status %}
+          <div class="card">
+            <h3>Strength Mesocycle</h3>
+            <div class="mrow"><span class="l">Block position</span><span class="v">Week {{ mesocycle_status.local_week + 1 }} / {{ mesocycle_status.mesocycle_length }}</span></div>
+            <div class="mrow"><span class="l">Mode</span><span class="v">{{ mesocycle_status.mode }}</span></div>
+            <div class="mrow"><span class="l">Effort target</span><span class="v">RIR {{ mesocycle_status.current_rir }}</span></div>
+            <div class="rirbar"><i style="width: {{ mesocycle_status.effort_pct }}%;"></i></div>
+            <p class="note">{{ mesocycle_status.note }}</p>
+          </div>
+          {% endif %}
+        </div>
+
+        {% for week_start, sessions in other_weeks %}
+          <div class="card">
+            {{ week_card(week_start, sessions) }}
+          </div>
+        {% endfor %}
       </div>
-      {% endif %}
-    </div>
+    </details>
   {% else %}
     <p class="empty">No race configured yet. POST to /api/races to generate a plan.</p>
   {% endif %}
-
-  {% set day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] %}
-  {% for week_start, sessions in weeks %}
-    {% set by_date = {} %}
-    {% for s in sessions %}{% set _ = by_date.update({s.date: s}) %}{% endfor %}
-    <div class="card">
-      <h3>Week of {{ week_start.strftime("%-d %b") }}</h3>
-
-      <div class="calendar-table-wrap calendar-scroll">
-        <table class="calendar">
-          <thead>
-            <tr>
-              {% for d in day_names %}<th>{{ d }}</th>{% endfor %}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              {% for i in range(7) %}
-                {% set d = week_start + timedelta(days=i) %}
-                {% set s = by_date.get(d) %}
-                <td>
-                  {% if s %}
-                    <a href="/session/{{ s.id }}"><strong>{{ s.name }}</strong></a><br>
-                    <span class="meta">
-                      {% if s.type.value == "run" %}{{ s.content.get("total_distance_km", "") }} km
-                      {% elif s.type.value == "strength" %}{{ s.content.get("prescriptions", [])|length }} patterns{% endif %}
-                      {% if s.status.value != "planned" %} &middot; {{ s.status.value }}{% endif %}
-                    </span>
-                    {% if s.content.get("flagged") %}<span class="stat st-flag" title="{{ s.content.get('note') }}">&#9888; Conflict</span>
-                    {% elif s.content.get("note") %}<div class="note">{{ s.content.get("note") }}</div>{% endif %}
-                  {% else %}
-                    <span class="empty">Rest</span>
-                  {% endif %}
-                </td>
-              {% endfor %}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="calendar-cards">
-        {% for i in range(7) %}
-          {% set d = week_start + timedelta(days=i) %}
-          {% set s = by_date.get(d) %}
-          {% if s %}
-            {% set intensity = "session-strength" if s.type.value == "strength" else ("session-hard" if s.content.get("role") == "quality" else "session-easy") %}
-            <a class="card day-card {{ intensity }}" href="/session/{{ s.id }}">
-              <div class="day-card-date">{{ day_names[i] }} &middot; {{ d.strftime("%-d %b") }}</div>
-              <strong>{{ s.name }}</strong>
-              <div class="meta">
-                {% if s.type.value == "run" %}{{ s.content.get("total_distance_km", "") }} km
-                {% elif s.type.value == "strength" %}{{ s.content.get("prescriptions", [])|length }} patterns{% endif %}
-                {% if s.status.value != "planned" %} &middot; {{ s.status.value }}{% endif %}
-              </div>
-              {% if s.content.get("flagged") %}<span class="stat st-flag" title="{{ s.content.get('note') }}">&#9888; Conflict</span>
-              {% elif s.content.get("note") %}<div class="note">{{ s.content.get("note") }}</div>{% endif %}
-            </a>
-          {% else %}
-            <div class="card day-card day-card-rest">
-              <div class="day-card-date">{{ day_names[i] }} &middot; {{ d.strftime("%-d %b") }}</div>
-              <span class="empty">Rest</span>
-            </div>
-          {% endif %}
-        {% endfor %}
-      </div>
-    </div>
-  {% endfor %}
 {% endblock %}
