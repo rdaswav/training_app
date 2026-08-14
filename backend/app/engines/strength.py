@@ -289,6 +289,18 @@ def e1rm_trend_by_pattern(
     return result
 
 
+WEIGHT_STEP_KG = 2.5  # matches app.js's WEIGHT_STEP_KG -- plates load in pairs,
+# so even the smallest 1.25kg plate only moves the bar in 2.5kg steps.
+
+
+def round_to_plate_increment(weight_kg: float) -> float:
+    """Round any computed working weight to the nearest plate-loadable step.
+    Every prescribed/suggested weight the app surfaces must pass through this --
+    a bare round(x, 1) produces "impossible" fractions like 30.1kg that can't
+    actually be loaded on a barbell."""
+    return round(weight_kg / WEIGHT_STEP_KG) * WEIGHT_STEP_KG
+
+
 def prescribe_next_load(e1rm: float, reps: str, rir: float) -> float:
     """Given an e1RM (per movement pattern) and a target rep-range/RIR
     prescription, back out an actual kg working-weight target via Epley:
@@ -297,10 +309,11 @@ def prescribe_next_load(e1rm: float, reps: str, rir: float) -> float:
     lo, hi = _parse_rep_range(reps)
     target_reps = (lo + hi) / 2
     effective_reps = max(target_reps + rir, 1)
-    return round(e1rm / (1 + effective_reps / 30), 1)
+    raw = e1rm / (1 + effective_reps / 30)
+    return round_to_plate_increment(raw)
 
 
-def _reps_for(category: str) -> str:
+def reps_for(category: str) -> str:
     # Compounds stay in the 3-5 rep strength range; accessories/core higher-rep (spec section 6).
     return "3-5" if category == "compound" else "8-12"
 
@@ -310,26 +323,26 @@ def prescribe(pattern: str, category: str, local_week: int, mode: str) -> Streng
 
     if mode == "minimal":
         return StrengthPrescription(
-            pattern, category, sets=1, reps=_reps_for(category), rir=4.0,
+            pattern, category, sets=1, reps=reps_for(category), rir=4.0,
             note="Taper: movement-pattern only, strip fatigue, no new stimulus",
         )
     if mode == "maintenance":
         return StrengthPrescription(
-            pattern, category, sets=landmark.mev, reps=_reps_for(category), rir=2.5,
+            pattern, category, sets=landmark.mev, reps=reps_for(category), rir=2.5,
             note="Race build: maintenance at MV, hold load, minimise soreness",
         )
 
     # mode == "accumulate": follow the mesocycle skeleton.
     if is_deload_week(local_week):
         return StrengthPrescription(
-            pattern, category, sets=landmark.mv_or_default(), reps=_reps_for(category), rir=4.0,
+            pattern, category, sets=landmark.mv_or_default(), reps=reps_for(category), rir=4.0,
             note="Deload: light, strip fatigue before next block",
         )
     frac = local_week / max(ACCUMULATION_WEEKS - 1, 1)
     sets = round(landmark.mev + (landmark.mrv - landmark.mev) * frac)
     rir = round(3.0 - (3.0 - 1.0) * frac, 1)
     return StrengthPrescription(
-        pattern, category, sets=sets, reps=_reps_for(category), rir=rir,
+        pattern, category, sets=sets, reps=reps_for(category), rir=rir,
         note="Accumulation: progress load next session if reps hit at/below target RIR",
     )
 

@@ -8,7 +8,7 @@ from app.config import INTERVALS_ICU_API_KEY, INTERVALS_ICU_ATHLETE_ID
 from app.db import get_db
 from app.engines import autoregulation
 from app.engines.running import week_start as monday_of
-from app.engines.strength import all_prescriptions_logged
+from app.engines.strength import all_prescriptions_logged, reps_for
 from app.integrations.anthropic_coach import coach_configured
 from app.intervals_sync import delete_synced_events, sync_upcoming_runs_to_intervals
 from app.jobs.daily_autoregulation import run_daily_job
@@ -281,12 +281,28 @@ def swap_exercise(session_id: int, payload: ExerciseSwapRequest, db: Session = D
     if session.status != SessionStatus.PLANNED:
         raise HTTPException(400, "Only still-planned sessions can be edited")
 
+    new_exercise = db.query(Exercise).filter(Exercise.name == payload.exercise_name).first()
+    if not new_exercise:
+        raise HTTPException(400, f"Unknown exercise '{payload.exercise_name}'")
+
     prescriptions = session.content.get("prescriptions", [])
     new_prescriptions = []
     found = False
     for p in prescriptions:
         if p["pattern"] == payload.pattern:
-            new_prescriptions.append({**p, "exercise_name": payload.exercise_name})
+            # movement_type/reps are baked in per-exercise at plan-generation
+            # time (plan_service._select_exercises) -- swapping the exercise
+            # name alone without recomputing them leaves a mismatched pair
+            # (e.g. a bodyweight exercise still carrying a weighted-lift rep
+            # range, or vice versa), which breaks the gym-mode entry UI.
+            movement_type = new_exercise.movement_type
+            reps = new_exercise.rep_range if movement_type == "bodyweight_timed" else reps_for(p["category"])
+            new_prescriptions.append({
+                **p,
+                "exercise_name": payload.exercise_name,
+                "movement_type": movement_type,
+                "reps": reps,
+            })
             found = True
         else:
             new_prescriptions.append(p)

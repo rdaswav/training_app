@@ -336,7 +336,7 @@ function parseRepDefault(repsRange) {
 }
 
 function formatWeight(w) {
-  return Number.isInteger(w) ? String(w) : w.toFixed(1);
+  return Number.isInteger(w) ? String(w) : String(Math.round(w * 100) / 100);
 }
 
 function nextUpAfter(prescriptionEl) {
@@ -368,38 +368,53 @@ function showUndoToast(msg, onUndo) {
 }
 
 let gymRestInterval = null;
+let gymRestEndsAt = null; // wall-clock timestamp, not a tick counter -- see startRestTimer
+let gymRestDurationSec = null;
+
+function paintRestTimer() {
+  if (gymRestEndsAt === null) return;
+  const clock = document.getElementById("gymRestClock");
+  const ring = document.getElementById("gymRestRing");
+  if (!clock || !ring) return;
+  const left = Math.max(0, Math.round((gymRestEndsAt - Date.now()) / 1000));
+  const m = Math.floor(left / 60), s = left % 60;
+  clock.textContent = `${m}:${String(s).padStart(2, "0")}`;
+  ring.style.width = Math.max(0, (left / gymRestDurationSec) * 100) + "%";
+  if (left <= 0) stopRestTimer();
+}
+
 function startRestTimer(durationSec, nextUpHtml) {
   const rest = document.getElementById("gymRest");
   if (!rest) return;
-  let left = durationSec;
-  const clock = document.getElementById("gymRestClock");
-  const ring = document.getElementById("gymRestRing");
   const nextUp = document.getElementById("gymRestNext");
   nextUp.innerHTML = "Up next<br><b>" + nextUpHtml + "</b>";
-  const paint = () => {
-    const m = Math.floor(left / 60), s = left % 60;
-    clock.textContent = `${m}:${String(s).padStart(2, "0")}`;
-    ring.style.width = Math.max(0, (left / durationSec) * 100) + "%";
-  };
-  paint();
+  gymRestDurationSec = durationSec;
+  gymRestEndsAt = Date.now() + durationSec * 1000;
+  // Wall-clock end time, not a per-tick decrement -- a backgrounded tab's
+  // setInterval gets throttled or fully suspended by the browser/OS, so a
+  // counter that just does left-- silently stalls or drifts. Deriving `left`
+  // from Date.now() every paint means the instant the tab becomes visible
+  // again (see the visibilitychange listener below) the clock is immediately
+  // correct, whether or not any ticks fired while it was away.
+  paintRestTimer();
   rest.classList.add("on");
   clearInterval(gymRestInterval);
-  gymRestInterval = setInterval(() => {
-    left--;
-    paint();
-    if (left <= 0) stopRestTimer();
-  }, 1000);
+  gymRestInterval = setInterval(paintRestTimer, 1000);
   document.getElementById("gymRestSkip").onclick = stopRestTimer;
   document.getElementById("gymRestAdd30").onclick = () => {
-    left += 30;
-    paint();
+    gymRestEndsAt += 30000;
+    paintRestTimer();
   };
 }
 function stopRestTimer() {
   clearInterval(gymRestInterval);
+  gymRestEndsAt = null;
   const rest = document.getElementById("gymRest");
   if (rest) rest.classList.remove("on");
 }
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") paintRestTimer();
+});
 
 function updateStickyBarFor(prescriptionEl) {
   const stick = document.getElementById("gymStick");
