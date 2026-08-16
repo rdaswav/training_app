@@ -6,6 +6,7 @@ from app.engines.dashboard_summary import (
     race_flags,
     strength_mesocycle_status,
     timeline_pct,
+    week_result_row,
     week_ticks,
 )
 
@@ -107,3 +108,35 @@ def test_strength_mesocycle_status_respects_a_nonzero_offset():
     assert shifted_status.local_week == 3
     assert "deload" in default_status.note.lower()
     assert "deload" not in shifted_status.note.lower()
+
+
+def test_week_result_row_counts_missed_and_marks_each_day():
+    week = date(2026, 8, 10)  # Monday
+    sessions = [
+        {"date": date(2026, 8, 10), "type": "run", "status": "completed"},
+        {"date": date(2026, 8, 11), "type": "strength", "status": "completed"},
+        {"date": date(2026, 8, 14), "type": "run", "status": "missed"},
+        {"date": date(2026, 8, 16), "type": "run", "status": "completed"},
+    ]
+    row = week_result_row(week, sessions)
+    assert row.week_start == week
+    assert row.missed_count == 1
+    assert len(row.dots) == 7
+    assert row.dots[0].status == "done" and row.dots[0].session_type == "run"  # Mon
+    assert row.dots[1].status == "done" and row.dots[1].session_type == "strength"
+    assert row.dots[2].status == "empty" and row.dots[2].session_type is None  # Wed, rest
+    assert row.dots[4].status == "missed" and row.dots[4].session_type == "run"  # Fri
+    assert row.dots[6].status == "done"  # Sun
+
+
+def test_week_result_row_a_still_planned_session_reads_as_empty():
+    """A week that hasn't fully happened yet (e.g. it contains "now") has
+    still-planned sessions on its later days -- those aren't "done" and
+    aren't "missed" either, so they render the same as a rest day rather
+    than claiming a result that doesn't exist yet."""
+    week = date(2026, 8, 10)
+    sessions = [{"date": date(2026, 8, 14), "type": "run", "status": "planned"}]
+    row = week_result_row(week, sessions)
+    assert row.missed_count == 0
+    assert row.dots[4].status == "empty"
+    assert row.dots[4].session_type == "run"

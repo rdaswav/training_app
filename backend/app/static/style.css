@@ -828,6 +828,39 @@ table.calendar th, table.calendar td {
 .week-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; margin-bottom: 0.5rem; }
 .week-card-head h3 { margin: 0; }
 
+/* One timeline, a NOW line (Parallax Redesign.dc.html option 3b): past
+   weeks are dense "result" rows (what happened, one dot per day), future
+   weeks beyond the immediate next one are dense "intent" rows (a chevron,
+   nothing to show yet), and the NOW divider is the one visible boundary
+   between them -- the next week itself still gets the full .card treatment
+   via week_card, unchanged from the hero's own markup. */
+.week-timeline { display: flex; flex-direction: column; gap: 0.5rem; }
+.week-row {
+  display: grid;
+  grid-template-columns: 4.4rem 1fr auto auto;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--slate);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+}
+.week-row-label { font-family: var(--label-font); font-size: var(--label-size); color: var(--dim); white-space: nowrap; }
+.week-row-phase { font-size: 0.85rem; color: var(--text); }
+.week-row-missed { color: var(--red); }
+.week-row-dots { display: flex; gap: 3px; }
+.week-row-dots i { display: block; width: 8px; height: 8px; border-radius: 2px; background: var(--slate2); }
+.week-row-dots i.done.run { background: var(--teal); }
+.week-row-dots i.done.strength { background: var(--violet); }
+.week-row-dots i.missed { background: var(--red); }
+.week-row-chevron { font-family: var(--mono); font-size: 0.75rem; color: var(--dim); }
+.week-row-stats { display: flex; gap: 0.5rem; font-family: var(--mono); font-size: 0.78rem; color: var(--muted); white-space: nowrap; text-align: right; }
+.week-row-stats b.run { color: var(--teal-hi); font-weight: 500; }
+.week-row-stats b.str { color: var(--violet-hi); font-weight: 500; }
+.now-divider { display: flex; align-items: center; gap: 0.7rem; margin: 0.3rem 0; }
+.now-divider span { font-family: var(--label-font); font-size: var(--label-size); letter-spacing: var(--label-spacing); color: var(--amber-hi); white-space: nowrap; }
+.now-divider::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--amber), transparent); }
+
 /* stat cards row */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 /* Grid items default to min-width: auto, so a wide min-content child (the

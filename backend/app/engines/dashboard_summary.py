@@ -135,3 +135,42 @@ def strength_mesocycle_status(week_idx: int, current_phase_name: str, mesocycle_
         effort_pct=effort_pct,
         note=sample.note,
     )
+
+
+@dataclass
+class DaySlot:
+    status: str  # "done" | "missed" | "empty" -- "empty" covers both rest days and not-yet-due sessions
+    session_type: str | None  # "run" | "strength" | None
+
+
+@dataclass
+class WeekResultRow:
+    week_start: date
+    missed_count: int
+    dots: list[DaySlot]
+
+
+def week_result_row(week_start: date, sessions: list[dict]) -> WeekResultRow:
+    """Per-weekday status dots for one week's compact timeline row (Plan
+    page's "one timeline, NOW line" view -- Parallax Redesign.dc.html option
+    3b). `sessions` is [{"date":, "type":, "status":}, ...], already shaped
+    from ORM rows by the caller. Only "missed" is called out by count since
+    that's the one status worth flagging in a one-line summary; "done" is
+    the unremarkable default for a past week."""
+    by_date = {s["date"]: s for s in sessions}
+    dots: list[DaySlot] = []
+    missed = 0
+    for i in range(7):
+        d = week_start + timedelta(days=i)
+        s = by_date.get(d)
+        if s is None:
+            dots.append(DaySlot("empty", None))
+            continue
+        if s["status"] == "missed":
+            missed += 1
+            dots.append(DaySlot("missed", s["type"]))
+        elif s["status"] == "completed":
+            dots.append(DaySlot("done", s["type"]))
+        else:
+            dots.append(DaySlot("empty", s["type"]))
+    return WeekResultRow(week_start=week_start, missed_count=missed, dots=dots)

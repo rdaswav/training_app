@@ -1,0 +1,24 @@
+{% macro week_row(row, mode) %}
+  {# mode: "result" (past week -- show what happened, one dot per day) or
+     "intent" (future week beyond next -- nothing to show yet, just phase). #}
+  <div class="week-row">
+    <span class="week-row-label">Wk {{ row.week_start.strftime("%-d %b") }}</span>
+    <span class="week-row-phase">
+      {{ row.phase_name }}
+      {%- if mode == "result" and row.missed_count %} <span class="week-row-missed">&middot; {{ row.missed_count }} missed</span>{% endif %}
+    </span>
+    {% if mode == "result" %}
+      <span class="week-row-dots">
+        {% for dot in row.dots %}
+          <i class="{{ dot.status }}{% if dot.session_type %} {{ dot.session_type }}{% endif %}"></i>
+        {% endfor %}
+      </span>
+    {% else %}
+      <span class="week-row-chevron">&#9662;</span>
+    {% endif %}
+    <span class="week-row-stats">
+      {% if row.run_km %}<b class="run">{{ row.run_km|round(1) }} km</b>{% endif %}
+      {% if row.tonnage_kg %}<b class="str">{{ row.tonnage_kg|round|int }} kg</b>{% endif %}
+    </span>
+  </div>
+{% endmacro %}
