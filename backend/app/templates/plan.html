@@ -39,15 +39,9 @@
       </div>
     </div>
 
-    {% if current_week %}
-      <div class="card hero-week">
-        {{ week_card(current_week[0], current_week[1], tag="This week") }}
-      </div>
-    {% endif %}
-
     <details class="disclosure">
       <summary>
-        <span><span class="t">Full schedule &amp; phase overview</span><span class="d">Weekly load, strength mesocycle, two clocks, every other week</span></span>
+        <span><span class="t">Load &amp; phase analytics</span><span class="d">Weekly load, strength mesocycle, two clocks</span></span>
         <span class="car">&#9656;</span>
       </summary>
       <div class="body">
@@ -103,25 +97,25 @@
           </div>
           {% endif %}
         </div>
-
-        {% if past_rows or next_week or later_rows %}
-          <div class="week-timeline">
-            {% for row in past_rows %}{{ week_row(row, "result") }}{% endfor %}
-
-            {% if next_week %}
-              <div class="now-divider">
-                <span>Now &middot; {{ today.strftime("%a %-d %b") }}</span>
-              </div>
-              <div class="card">
-                {{ week_card(next_week[0], next_week[1]) }}
-              </div>
-            {% endif %}
-
-            {% for row in later_rows %}{{ week_row(row, "intent") }}{% endfor %}
-          </div>
-        {% endif %}
       </div>
     </details>
+
+    {% if past_rows or current_week or future_rows %}
+      <div class="week-timeline">
+        {% for row in past_rows %}{{ week_row(row, "result") }}{% endfor %}
+
+        {% if current_week %}
+          <div class="now-divider">
+            <span>Now &middot; {{ today.strftime("%a %-d %b") }}</span>
+          </div>
+          <div class="card">
+            {{ week_card(current_week[0], current_week[1]) }}
+          </div>
+        {% endif %}
+
+        {% for row in future_rows %}{{ week_row(row, "intent") }}{% endfor %}
+      </div>
+    {% endif %}
   {% else %}
     <p class="empty">No race configured yet. POST to /api/races to generate a plan.</p>
   {% endif %}

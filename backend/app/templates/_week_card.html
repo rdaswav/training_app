@@ -1,11 +1,8 @@
-{% macro week_card(week_start, sessions, tag=none) %}
+{% macro week_card(week_start, sessions) %}
   {% set day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] %}
   {% set by_date = {} %}
   {% for s in sessions %}{% set _ = by_date.update({s.date: s}) %}{% endfor %}
-  <div class="week-card-head">
-    <h3>Week of {{ week_start.strftime("%-d %b") }}</h3>
-    {% if tag %}<span class="pill live">{{ tag }}</span>{% endif %}
-  </div>
+  <h3>Week of {{ week_start.strftime("%-d %b") }}</h3>
 
   <div class="calendar-table-wrap calendar-scroll">
     <table class="calendar">

@@ -821,19 +821,14 @@ table.calendar th, table.calendar td {
 .flag.race .pin { background: var(--red); }
 .flag.race b { color: var(--red); }
 
-/* This-week hero card + the disclosure it sits above (Plan page reformat --
-   see PROJECT_PLAN.md). .hero-week is otherwise a plain .card; only the
-   border/glow differ, so it still stacks and scrolls like every other card. */
-.hero-week { border-color: rgba(53, 196, 174, 0.5); box-shadow: 0 0 0 1px rgba(53, 196, 174, 0.25) inset; }
-.week-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; margin-bottom: 0.5rem; }
-.week-card-head h3 { margin: 0; }
-
-/* One timeline, a NOW line (Parallax Redesign.dc.html option 3b): past
-   weeks are dense "result" rows (what happened, one dot per day), future
-   weeks beyond the immediate next one are dense "intent" rows (a chevron,
-   nothing to show yet), and the NOW divider is the one visible boundary
-   between them -- the next week itself still gets the full .card treatment
-   via week_card, unchanged from the hero's own markup. */
+/* One timeline, a NOW line (Parallax Redesign.dc.html option 3b, hero
+   dropped as a follow-up once the NOW line made it redundant): past weeks
+   are dense "result" rows (what happened, one dot per day), future weeks
+   are dense "intent" rows (a chevron, nothing to show yet), and the NOW
+   divider is the one visible boundary between them -- the current week
+   itself sits right at that boundary as the one full .card, via
+   week_card, so the whole timeline renders directly with nothing behind
+   a click except the load/phase analytics disclosure above it. */
 .week-timeline { display: flex; flex-direction: column; gap: 0.5rem; }
 .week-row {
   display: grid;

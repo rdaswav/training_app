@@ -652,20 +652,19 @@ def plan_view(request: Request):
         if current_week_load and prior_week_load and prior_week_load.run_km:
             volume_delta_pct = round((current_week_load.run_km - prior_week_load.run_km) / prior_week_load.run_km * 100)
 
-        # This week is hero'd above the fold, unchanged. Everything else
-        # (Parallax Redesign.dc.html option 3b, "one timeline, a NOW line")
-        # is one continuous list split at today into past ("result" rows --
-        # what happened, dense) and future ("intent" rows -- what's asked),
-        # with only the immediate next week opened to a full card by
-        # default; further-out weeks stay compact until clicked into via
-        # /session or a future "show more" -- see PROJECT_PLAN.md.
+        # One continuous timeline, no separate hero (Parallax Redesign.dc.html
+        # option 3b, "one timeline, a NOW line" -- the hero was dropped as a
+        # follow-up once the NOW line made it redundant, see PROJECT_PLAN.md):
+        # past weeks are dense "result" rows, the current week sits right at
+        # the NOW line as the one full card, and every future week is a dense
+        # "intent" row. The whole thing renders directly, not behind a click
+        # -- only the load/mesocycle/two-clocks analytics stay in a
+        # disclosure, since that's genuinely occasional-lookup content.
         weeks_sorted = sorted(weeks.items())
         this_monday = week_start(today)
         current_week = next((w for w in weeks_sorted if w[0] == this_monday), None)
         past_weeks = [w for w in weeks_sorted if w[0] < this_monday]
         future_weeks = [w for w in weeks_sorted if w[0] > this_monday]
-        next_week = future_weeks[0] if future_weeks else None
-        later_weeks = future_weeks[1:]
 
         def _compact_row(week):
             wk_start, wk_sessions = week
@@ -684,7 +683,7 @@ def plan_view(request: Request):
             }
 
         past_rows = [_compact_row(w) for w in past_weeks]
-        later_rows = [_compact_row(w) for w in later_weeks]
+        future_rows = [_compact_row(w) for w in future_weeks]
 
         return templates.TemplateResponse(
             "plan.html",
@@ -695,8 +694,7 @@ def plan_view(request: Request):
                 "today": today,
                 "current_week": current_week,
                 "past_rows": past_rows,
-                "next_week": next_week,
-                "later_rows": later_rows,
+                "future_rows": future_rows,
                 "load_series": load_series,
                 "volume_delta_pct": volume_delta_pct,
                 "current_phase": current_phase,
