@@ -652,15 +652,39 @@ def plan_view(request: Request):
         if current_week_load and prior_week_load and prior_week_load.run_km:
             volume_delta_pct = round((current_week_load.run_km - prior_week_load.run_km) / prior_week_load.run_km * 100)
 
-        # This week is hero'd above the fold; every other week (past and
-        # future) lives inside the "Full schedule" disclosure below it -- see
-        # PROJECT_PLAN.md's Plan-page reformat entry. Falls back to no hero
-        # (current_week=None) if there's simply no session data for this
-        # week yet, e.g. right at the very start/end of a macrocycle.
+        # This week is hero'd above the fold, unchanged. Everything else
+        # (Parallax Redesign.dc.html option 3b, "one timeline, a NOW line")
+        # is one continuous list split at today into past ("result" rows --
+        # what happened, dense) and future ("intent" rows -- what's asked),
+        # with only the immediate next week opened to a full card by
+        # default; further-out weeks stay compact until clicked into via
+        # /session or a future "show more" -- see PROJECT_PLAN.md.
         weeks_sorted = sorted(weeks.items())
         this_monday = week_start(today)
         current_week = next((w for w in weeks_sorted if w[0] == this_monday), None)
-        other_weeks = [w for w in weeks_sorted if w[0] != this_monday]
+        past_weeks = [w for w in weeks_sorted if w[0] < this_monday]
+        future_weeks = [w for w in weeks_sorted if w[0] > this_monday]
+        next_week = future_weeks[0] if future_weeks else None
+        later_weeks = future_weeks[1:]
+
+        def _compact_row(week):
+            wk_start, wk_sessions = week
+            row = dashboard_summary.week_result_row(
+                wk_start, [{"date": s.date, "type": s.type.value, "status": s.status.value} for s in wk_sessions]
+            )
+            phase = dashboard_summary.active_phase(phase_segments, wk_start)
+            load_pt = next((pt for pt in load_series if pt.week_start == wk_start), None)
+            return {
+                "week_start": wk_start,
+                "phase_name": phase["name"] if phase else "",
+                "missed_count": row.missed_count,
+                "dots": row.dots,
+                "run_km": load_pt.run_km if load_pt else None,
+                "tonnage_kg": load_pt.tonnage_kg if load_pt else None,
+            }
+
+        past_rows = [_compact_row(w) for w in past_weeks]
+        later_rows = [_compact_row(w) for w in later_weeks]
 
         return templates.TemplateResponse(
             "plan.html",
@@ -668,8 +692,11 @@ def plan_view(request: Request):
                 "request": request,
                 "race": race,
                 "phase_segments": phase_segments,
+                "today": today,
                 "current_week": current_week,
-                "other_weeks": other_weeks,
+                "past_rows": past_rows,
+                "next_week": next_week,
+                "later_rows": later_rows,
                 "load_series": load_series,
                 "volume_delta_pct": volume_delta_pct,
                 "current_phase": current_phase,

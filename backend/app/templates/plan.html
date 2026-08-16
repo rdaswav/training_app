@@ -4,6 +4,7 @@
   {% from "_phase_strip.html" import phase_strip %}
   {% from "_load_chart.html" import load_chart %}
   {% from "_week_card.html" import week_card %}
+  {% from "_week_row.html" import week_row %}
   {% if race %}
     <!-- Phase + week is deliberately not restated here -- the ribbon
          immediately below already shows current phase (highlighted block +
@@ -103,11 +104,22 @@
           {% endif %}
         </div>
 
-        {% for week_start, sessions in other_weeks %}
-          <div class="card">
-            {{ week_card(week_start, sessions) }}
+        {% if past_rows or next_week or later_rows %}
+          <div class="week-timeline">
+            {% for row in past_rows %}{{ week_row(row, "result") }}{% endfor %}
+
+            {% if next_week %}
+              <div class="now-divider">
+                <span>Now &middot; {{ today.strftime("%a %-d %b") }}</span>
+              </div>
+              <div class="card">
+                {{ week_card(next_week[0], next_week[1]) }}
+              </div>
+            {% endif %}
+
+            {% for row in later_rows %}{{ week_row(row, "intent") }}{% endfor %}
           </div>
-        {% endfor %}
+        {% endif %}
       </div>
     </details>
   {% else %}
