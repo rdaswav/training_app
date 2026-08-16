@@ -1219,6 +1219,16 @@ form.settings-form .cta {
   .disclosure > summary { padding: 0.9rem 1.1rem; }
   .disclosure .body { padding: 0 1.1rem 1.1rem; }
 
+  /* .week-row's 4-column grid (label/phase/dots-or-chevron/stats) assumes
+     desktop width -- at 375px there isn't room for all four on one line.
+     Wraps to label+phase+dots on one line, stats forced to their own
+     right-aligned line below, rather than cramming or truncating. */
+  .week-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; }
+  .week-row-label { flex: none; }
+  .week-row-phase { flex: 1 1 auto; min-width: 40%; }
+  .week-row-dots, .week-row-chevron { flex: none; }
+  .week-row-stats { flex: 1 1 100%; justify-content: flex-end; }
+
   .rows.cols.numbers-table .row { grid-template-columns: 1.2fr 0.9fr 1.1fr; gap: 0.35rem; }
   .rows.cols.numbers-table .row .v.src { font-size: 0.72rem; }
 
