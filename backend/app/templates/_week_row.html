@@ -1,24 +1,33 @@
 {% macro week_row(row, mode) %}
+  {% from "_week_card.html" import week_card %}
   {# mode: "result" (past week -- show what happened, one dot per day) or
-     "intent" (future week beyond next -- nothing to show yet, just phase). #}
-  <div class="week-row">
-    <span class="week-row-label">Wk {{ row.week_start.strftime("%-d %b") }}</span>
-    <span class="week-row-phase">
-      {{ row.phase_name }}
-      {%- if mode == "result" and row.missed_count %} <span class="week-row-missed">&middot; {{ row.missed_count }} missed</span>{% endif %}
-    </span>
-    {% if mode == "result" %}
-      <span class="week-row-dots">
-        {% for dot in row.dots %}
-          <i class="{{ dot.status }}{% if dot.session_type %} {{ dot.session_type }}{% endif %}"></i>
-        {% endfor %}
+     "intent" (future week -- nothing to show yet, just phase). Either way
+     the row expands to the same full week_card used for the current week,
+     via native <details> so no JS is needed. #}
+  <details class="week-row-details">
+    <summary class="week-row">
+      <span class="week-row-label">Wk {{ row.week_start.strftime("%-d %b") }}</span>
+      <span class="week-row-phase">
+        {{ row.phase_name }}
+        {%- if mode == "result" and row.missed_count %} <span class="week-row-missed">&middot; {{ row.missed_count }} missed</span>{% endif %}
       </span>
-    {% else %}
-      <span class="week-row-chevron">&#9662;</span>
-    {% endif %}
-    <span class="week-row-stats">
-      {% if row.run_km %}<b class="run">{{ row.run_km|round(1) }} km</b>{% endif %}
-      {% if row.tonnage_kg %}<b class="str">{{ row.tonnage_kg|round|int }} kg</b>{% endif %}
-    </span>
-  </div>
+      {% if mode == "result" %}
+        <span class="week-row-dots">
+          {% for dot in row.dots %}
+            <i class="{{ dot.status }}{% if dot.session_type %} {{ dot.session_type }}{% endif %}"></i>
+          {% endfor %}
+        </span>
+      {% else %}
+        <span></span>
+      {% endif %}
+      <span class="week-row-stats">
+        {% if row.run_km %}<b class="run">{{ row.run_km|round(1) }} km</b>{% endif %}
+        {% if row.tonnage_kg %}<b class="str">{{ row.tonnage_kg|round|int }} kg</b>{% endif %}
+        <span class="week-row-car">&#9656;</span>
+      </span>
+    </summary>
+    <div class="week-row-expand">
+      {{ week_card(row.week_start, row.sessions) }}
+    </div>
+  </details>
 {% endmacro %}

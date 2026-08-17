@@ -675,6 +675,7 @@ def plan_view(request: Request):
             load_pt = next((pt for pt in load_series if pt.week_start == wk_start), None)
             return {
                 "week_start": wk_start,
+                "sessions": wk_sessions,
                 "phase_name": phase["name"] if phase else "",
                 "missed_count": row.missed_count,
                 "dots": row.dots,
