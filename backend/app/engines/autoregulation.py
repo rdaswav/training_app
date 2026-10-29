@@ -109,6 +109,18 @@ def evaluate_strength_log(
             "hold",
         )
 
+    if movement_type == "plyometric":
+        # Ground contacts, no load: quality of each contact is the target,
+        # so there's no load to progress -- just record what was done.
+        contacts = sum(s.reps or 0 for s in logged_sets)
+        summary = f"{len(logged_sets)} sets, {contacts} contacts logged for {prescription.pattern}"
+        return StrengthAutoregResult(
+            summary,
+            "Logged.",
+            "Keep every contact quick and springy -- stop the set as soon as they start to slow.",
+            "hold",
+        )
+
     from app.engines.strength import best_e1rm_from_sets, prescribe_next_load, round_to_plate_increment
 
     lo, _hi = _parse_rep_range(prescription.reps)

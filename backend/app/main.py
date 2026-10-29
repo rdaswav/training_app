@@ -527,7 +527,7 @@ def today_view(request: Request):
             current_phase_name = current_phase["name"] if current_phase else None
             week_idx = dashboard_summary.global_week_index(race.macrocycle.start_date, today)
             mesocycle_status = dashboard_summary.strength_mesocycle_status(
-                week_idx, current_phase_name or "Re-base", race.macrocycle.mesocycle_start_week or 0
+                week_idx, current_phase_name or "Re-base", race.macrocycle.mesocycle_start_week or 0, race.distance_km
             )
             mesocycle_mode = mesocycle_status.mode
         cues = {s.id: coaching_copy.session_cue(s.type, current_phase_name, mesocycle_mode) for s in sessions}
@@ -603,7 +603,7 @@ def plan_view(request: Request):
             flags = dashboard_summary.race_flags(race_dicts, start, end)
             mesocycle_start_week = (race.macrocycle.mesocycle_start_week or 0) if race.macrocycle else 0
             mesocycle_status = dashboard_summary.strength_mesocycle_status(
-                week_idx, current_phase["name"] if current_phase else "Re-base", mesocycle_start_week
+                week_idx, current_phase["name"] if current_phase else "Re-base", mesocycle_start_week, race.distance_km
             )
             # "Two clocks" card (Consolidated Pages.dc.html) -- was About's
             # "Why the two clocks don't line up" week grid, moved here since

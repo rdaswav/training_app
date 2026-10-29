@@ -36,6 +36,10 @@ MODE_COPY: dict[str, str] = {
         "Strength volume is building. Sets climb toward MRV week over week, RIR "
         "gets tighter, and the weight room asks for real effort."
     ),
+    "accumulate_capped": (
+        "Strength is still building, but sets top out at MAV rather than MRV "
+        "while weekly mileage peaks -- real effort, with a lid on fatigue."
+    ),
     "maintenance": (
         "Just enough strength work to hold what's been built, without adding "
         "fatigue that would blunt the running. Lighter, shorter, still purposeful."
@@ -56,6 +60,7 @@ _RUN_CUES: dict[str, str] = {
 
 _STRENGTH_CUES: dict[str, str] = {
     "accumulate": "Building phase -- expect the weights to feel heavier by the last set.",
+    "accumulate_capped": "Building, capped -- solid effort, but leave the legs something for the mileage.",
     "maintenance": "Maintenance mode -- enough to hold strength, not enough to add fatigue.",
     "minimal": "Minimal load -- keep this light, the legs need to stay fresh.",
 }

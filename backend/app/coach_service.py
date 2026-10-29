@@ -69,7 +69,7 @@ def _plan_metrics(race: Race | None, week_start: date) -> dict:
     phase_name = phase["name"] if phase else None
     week_idx = dashboard_summary.global_week_index(macro.start_date, week_start)
     meso = dashboard_summary.strength_mesocycle_status(
-        week_idx, phase_name or "Re-base", macro.mesocycle_start_week or 0
+        week_idx, phase_name or "Re-base", macro.mesocycle_start_week or 0, race.distance_km
     )
     return {
         "phase_name": phase_name,

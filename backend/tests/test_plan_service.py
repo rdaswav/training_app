@@ -293,3 +293,36 @@ def test_regenerate_does_not_touch_past_dates(db_session):
     reloaded = db_session.query(PlannedSession).filter(PlannedSession.id == past.id).first()
     assert reloaded is not None
     assert reloaded.status == SessionStatus.MISSED
+
+
+def test_5k_plan_programs_plyometrics_and_ends_on_race_day(db_session):
+    today = date(2026, 11, 2)  # Monday
+    athlete, race = _make_athlete_and_race(db_session, today, race_weeks=9)
+    race.distance_km = 5.0
+    race.race_date = today + timedelta(weeks=9, days=5)  # Saturday
+    db_session.commit()
+    athlete.week_template = {"0": "run", "1": "strength", "2": "run", "3": "strength", "4": "run", "5": "rest", "6": "run"}
+    db_session.commit()
+
+    generate_and_persist_plan(db_session, athlete, race, today=today)
+    sessions = db_session.query(PlannedSession).filter(PlannedSession.athlete_id == athlete.id).all()
+
+    assert max(s.date for s in sessions) == race.race_date
+    race_session = next(s for s in sessions if s.date == race.race_date)
+    assert race_session.content["role"] == "race" and race_session.name == "Race day: 5K"
+
+    lower_days = [s for s in sessions if s.type == SessionType.STRENGTH and s.name == "Lower"]
+    assert lower_days
+    first = lower_days[0].content["prescriptions"][0]
+    assert first["pattern"] == "plyometric"
+    assert first["exercise_name"] == "Pogo hops" and first["movement_type"] == "plyometric"
+    assert not any(s.content.get("flagged") for s in sessions)
+
+
+def test_half_plan_has_no_plyometrics(db_session):
+    today = date(2026, 11, 2)
+    athlete, race = _make_athlete_and_race(db_session, today)
+    generate_and_persist_plan(db_session, athlete, race, today=today)
+    strength = db_session.query(PlannedSession).filter(PlannedSession.type == SessionType.STRENGTH).all()
+    assert strength
+    assert not any(p["pattern"] == "plyometric" for s in strength for p in s.content["prescriptions"])

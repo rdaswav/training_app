@@ -167,6 +167,8 @@ class Exercise(Base):
     # (Plank, Side plank, ...): no weight at all, logged as a held duration
     # instead of reps -- e1RM/load progression doesn't apply, see
     # engines/autoregulation.py's evaluate_strength_log movement_type branch.
+    # "plyometric" (Pogo hops, Box jump, ...): no weight, no RIR -- rep_range
+    # and logged reps are ground contacts per set, and there's no load to progress.
     movement_type: Mapped[str] = mapped_column(String, default="weighted")
 
 

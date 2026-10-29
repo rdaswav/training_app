@@ -97,12 +97,32 @@ SESSION_TEMPLATES: dict[int, list[tuple[str, list[tuple[str, str]]]]] = {
 
 DEFAULT_STRENGTH_DAYS: tuple[int, ...] = (0, 2, 4)  # Mon/Wed/Fri, matching SESSION_TEMPLATES[3]
 
+# Days that get a plyometric block (first, while fresh) under the "power"
+# flavour (5k/10k): the hard-lower days, so the guardrail already keeps them
+# off the day before a key run.
+PLYO_DAY_NAMES = {"Full Body", "Lower"}
 
-def _session_template_for(weekday: int, strength_days: tuple[int, ...]) -> tuple[str, list[tuple[str, str]]] | None:
+
+def templates_for(flavour: str) -> dict[int, list[tuple[str, list[tuple[str, str]]]]]:
+    if flavour != "power":
+        return SESSION_TEMPLATES
+    return {
+        count: [
+            (name, [("plyometric", "plyometric"), *patterns] if name in PLYO_DAY_NAMES else patterns)
+            for name, patterns in templates
+        ]
+        for count, templates in SESSION_TEMPLATES.items()
+    }
+
+
+def _session_template_for(
+    weekday: int, strength_days: tuple[int, ...], flavour: str = "standard"
+) -> tuple[str, list[tuple[str, str]]] | None:
     sorted_days = sorted(strength_days)
     if weekday not in sorted_days:
         return None
-    templates = SESSION_TEMPLATES.get(len(sorted_days)) or SESSION_TEMPLATES[3]
+    all_templates = templates_for(flavour)
+    templates = all_templates.get(len(sorted_days)) or all_templates[3]
     return templates[sorted_days.index(weekday) % len(templates)]
 
 
@@ -121,6 +141,7 @@ DEFAULT_LANDMARKS: dict[str, VolumeLandmark] = {
     "compound": VolumeLandmark(mev=2, mav=4, mrv=6),
     "accessory": VolumeLandmark(mev=2, mav=3, mrv=4),
     "core": VolumeLandmark(mev=2, mav=3, mrv=4),
+    "plyometric": VolumeLandmark(mev=2, mav=3, mrv=4),
 }
 
 RUN_PHASE_MODE = {
@@ -142,9 +163,20 @@ class StrengthPrescription:
     note: str
 
 
-def race_proximity_mode(run_phase_name: str) -> str:
-    """Table from spec section 6: strength behaviour by running-phase proximity to race."""
-    return RUN_PHASE_MODE.get(run_phase_name, "accumulate")
+def race_proximity_mode(run_phase_name: str, flavour: str = "standard", weeks_out: int | None = None) -> str:
+    """Table from spec section 6: strength behaviour by running-phase proximity
+    to race, adjusted for the race profile's strength flavour.
+
+    `weeks_out` (0 = race week) lets a long taper (the marathon's 3 weeks)
+    hold maintenance in its first week rather than going minimal for all three;
+    2-week and shorter tapers are unaffected."""
+    mode = RUN_PHASE_MODE.get(run_phase_name, "accumulate")
+    if mode == "minimal" and weeks_out is not None and weeks_out >= 2:
+        return "maintenance"
+    if flavour == "endurance" and run_phase_name == "Build 1":
+        # Marathon: cap lifting volume at MAV while weekly mileage peaks.
+        return "accumulate_capped"
+    return mode
 
 
 def mesocycle_week_local(global_week_index: int, mesocycle_start_week: int = 0) -> int:
@@ -314,11 +346,36 @@ def prescribe_next_load(e1rm: float, reps: str, rir: float) -> float:
 
 
 def reps_for(category: str) -> str:
-    # Compounds stay in the 3-5 rep strength range; accessories/core higher-rep (spec section 6).
-    return "3-5" if category == "compound" else "8-12"
+    # Compounds stay in the 3-5 rep strength range; accessories/core higher-rep
+    # (spec section 6). Plyometric "reps" are ground contacts per set.
+    if category == "compound":
+        return "3-5"
+    if category == "plyometric":
+        return "5-8"
+    return "8-12"
+
+
+PLYO_NOTE = "Max intent, full 60-90s recovery between sets; stop the set when contacts slow"
+
+
+def _prescribe_plyometric(pattern: str, local_week: int, mode: str) -> StrengthPrescription:
+    """Plyometrics progress by sets (contacts), not load or RIR -- rir is
+    carried as 0 only because the field is required; the UI hides it."""
+    landmark = DEFAULT_LANDMARKS["plyometric"]
+    if mode == "minimal":
+        sets, note = 1, "Race-week primer: a few crisp contacts, nothing fatiguing"
+    elif mode == "maintenance" or is_deload_week(local_week):
+        sets, note = landmark.mev, PLYO_NOTE
+    else:
+        top = landmark.mav if mode == "accumulate_capped" else landmark.mrv
+        frac = local_week / max(ACCUMULATION_WEEKS - 1, 1)
+        sets, note = round(landmark.mev + (top - landmark.mev) * frac), PLYO_NOTE
+    return StrengthPrescription(pattern, "plyometric", sets=sets, reps=reps_for("plyometric"), rir=0.0, note=note)
 
 
 def prescribe(pattern: str, category: str, local_week: int, mode: str) -> StrengthPrescription:
+    if category == "plyometric":
+        return _prescribe_plyometric(pattern, local_week, mode)
     landmark = DEFAULT_LANDMARKS[category]
 
     if mode == "minimal":
@@ -329,17 +386,19 @@ def prescribe(pattern: str, category: str, local_week: int, mode: str) -> Streng
     if mode == "maintenance":
         return StrengthPrescription(
             pattern, category, sets=landmark.mev, reps=reps_for(category), rir=2.5,
-            note="Race build: maintenance at MV, hold load, minimise soreness",
+            note="Race build: maintenance at MEV, hold load, minimise soreness",
         )
 
-    # mode == "accumulate": follow the mesocycle skeleton.
+    # mode == "accumulate" / "accumulate_capped": follow the mesocycle skeleton.
     if is_deload_week(local_week):
         return StrengthPrescription(
             pattern, category, sets=landmark.mv_or_default(), reps=reps_for(category), rir=4.0,
             note="Deload: light, strip fatigue before next block",
         )
+    # Capped (marathon Build 1) ramps to MAV instead of MRV.
+    top = landmark.mav if mode == "accumulate_capped" else landmark.mrv
     frac = local_week / max(ACCUMULATION_WEEKS - 1, 1)
-    sets = round(landmark.mev + (landmark.mrv - landmark.mev) * frac)
+    sets = round(landmark.mev + (top - landmark.mev) * frac)
     rir = round(3.0 - (3.0 - 1.0) * frac, 1)
     return StrengthPrescription(
         pattern, category, sets=sets, reps=reps_for(category), rir=rir,
@@ -370,15 +429,18 @@ def generate_strength_session(
     run_phase_name: str,
     mesocycle_start_week: int = 0,
     strength_days: tuple[int, ...] = DEFAULT_STRENGTH_DAYS,
+    flavour: str = "standard",
+    weeks_out: int | None = None,
 ) -> StrengthSessionPlan | None:
     """Build one strength day's prescription skeleton (patterns only; exercise
-    selection is a separate DB-backed step via select_exercise)."""
-    template = _session_template_for(weekday, strength_days)
+    selection is a separate DB-backed step via select_exercise). `flavour` is
+    the race profile's strength_flavour; `weeks_out` counts down to race week (0)."""
+    template = _session_template_for(weekday, strength_days, flavour)
     if template is None:
         return None
 
     name, patterns = template
-    mode = race_proximity_mode(run_phase_name)
+    mode = race_proximity_mode(run_phase_name, flavour, weeks_out)
     local_week = mesocycle_week_local(global_week_index, mesocycle_start_week)
     prescriptions = [prescribe(pattern, category, local_week, mode) for pattern, category in patterns]
     return StrengthSessionPlan(date=session_date, name=name, prescriptions=prescriptions)
@@ -394,6 +456,7 @@ def generate_strength_plan(
     phase_for_week_index,  # callable: int -> phase name, from the running engine
     mesocycle_start_week: int = 0,
     strength_days: tuple[int, ...] = DEFAULT_STRENGTH_DAYS,
+    flavour: str = "standard",
 ) -> list[StrengthSessionPlan]:
     """Generate strength sessions for every week of the macrocycle, on
     `strength_days` (see SESSION_TEMPLATES for how a day's split is chosen
@@ -411,7 +474,8 @@ def generate_strength_plan(
         for weekday in sorted(strength_days):
             session_date = week_monday + timedelta(days=weekday)
             session = generate_strength_session(
-                weekday, session_date, week_index, phase_name, mesocycle_start_week, strength_days
+                weekday, session_date, week_index, phase_name, mesocycle_start_week, strength_days,
+                flavour=flavour, weeks_out=total_weeks - 1 - week_index,
             )
             if session:
                 sessions.append(session)
