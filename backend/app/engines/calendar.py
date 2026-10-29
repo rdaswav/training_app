@@ -6,8 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-HARD_LOWER_PATTERNS = {"squat", "hinge", "single_leg", "unilateral", "posterior_chain"}
-KEY_RUN_ROLES = {"quality", "long"}
+HARD_LOWER_PATTERNS = {"squat", "hinge", "single_leg", "unilateral", "posterior_chain", "plyometric"}
+KEY_RUN_ROLES = {"quality", "long", "race"}
 
 
 @dataclass

@@ -81,7 +81,8 @@ def test_generate_run_plan_produces_three_runs_per_week():
     )
     phases, weeks = generate_run_plan(today, race, fitness)
     assert len(weeks) == weeks_to_race(today, race)
-    for week in weeks:
+    # Race week is reshaped around race day -- see test_race_week_* below.
+    for week in weeks[:-1]:
         assert len(week.sessions) == 3
         roles = {s.role for s in week.sessions}
         assert roles == {"easy", "quality", "long"}
@@ -103,7 +104,7 @@ def test_generate_run_plan_supports_four_run_days_with_two_easy_sessions():
         aerobic_hr_ceiling=150,
     )
     phases, weeks = generate_run_plan(today, race, fitness, run_days=(0, 2, 4, 6))
-    for week in weeks:
+    for week in weeks[:-1]:  # race week is reshaped around race day
         assert len(week.sessions) == 4
         roles = [s.role for s in week.sessions]
         assert roles.count("long") == 1
@@ -241,3 +242,140 @@ def test_build2_quality_session_uses_goal_time_race_pace_when_set():
     )
     assert race_pace_reps.work.target_pace_sec_per_km == fitness.race_pace_sec_per_km
     assert race_pace_reps.work.target_pace_sec_per_km == round(6300 / HALF_MARATHON_KM)
+
+
+def _fitness(distance_km: float = HALF_MARATHON_KM, **kw) -> AthleteFitness:
+    return AthleteFitness(
+        weekly_volume_km=kw.pop("weekly_volume_km", 35.0),
+        easy_pace_sec_per_km=360,
+        threshold_pace_sec_per_km=290,
+        aerobic_hr_ceiling=150,
+        race_distance_km=distance_km,
+        **kw,
+    )
+
+
+def test_race_week_ends_with_shakeout_then_race_on_race_day():
+    today = date(2026, 11, 2)  # Monday
+    race = date(2027, 2, 14)  # Sunday, a long-run day in the default template
+    _, weeks = generate_run_plan(today, race, _fitness(), run_days=(0, 2, 4, 6))
+    last = weeks[-1].sessions
+    assert last[-1].date == race and last[-1].role == "race"
+    assert last[-2].date == race - timedelta(days=1) and last[-2].name == "Pre-race shakeout"
+    race_step = next(s for s in last[-1].steps if getattr(s, "label", "") == "Race")
+    assert race_step.distance_km == round(HALF_MARATHON_KM, 2)
+    assert not any(s.role == "long" for s in last)
+
+
+def test_saturday_race_drops_the_sunday_long_run_and_adds_race_on_a_non_run_day():
+    today = date(2026, 11, 2)
+    race = date(2027, 1, 16)  # Saturday -- not in run_days
+    _, weeks = generate_run_plan(today, race, _fitness(5.0), run_days=(0, 2, 4, 6))
+    all_sessions = [s for w in weeks for s in w.sessions]
+    assert max(s.date for s in all_sessions) == race
+    races = [s for s in all_sessions if s.role == "race"]
+    assert len(races) == 1 and races[0].date == race and races[0].name == "Race day: 5K"
+    # Friday's template run is replaced by the shakeout, not duplicated.
+    friday = [s for s in all_sessions if s.date == race - timedelta(days=1)]
+    assert [s.name for s in friday] == ["Pre-race shakeout"]
+
+
+def test_monday_race_puts_the_shakeout_in_the_previous_week():
+    today = date(2026, 11, 2)
+    race = date(2027, 1, 11)  # Monday
+    _, weeks = generate_run_plan(today, race, _fitness(10.0), run_days=(0, 2, 4, 6))
+    assert weeks[-2].sessions[-1].name == "Pre-race shakeout"
+    assert [s.role for s in weeks[-1].sessions] == ["race"]
+
+
+@pytest.mark.parametrize("km, taper_weeks", [(5.0, 1), (10.0, 2), (21.0975, 2), (42.195, 3)])
+def test_taper_length_follows_profile(km, taper_weeks):
+    phases, _ = generate_run_plan(date(2026, 11, 2), date(2027, 2, 14), _fitness(km))
+    taper = next(p for p in phases if p.name == "Taper")
+    assert taper.end_week - taper.start_week + 1 == taper_weeks
+
+
+@pytest.mark.parametrize("km, template", [(5.0, 10), (10.0, 12), (42.195, 18)])
+def test_extra_weeks_beyond_profile_template_become_base(km, template):
+    from app.engines.race_profiles import profile_for_distance
+
+    phases = build_phases(template + 3, profile_for_distance(km))
+    base = phases[0]
+    assert base.name == "Base" and base.end_week - base.start_week + 1 == 3
+
+
+def test_5k_long_run_is_capped_and_excess_goes_to_easy_days():
+    _, weeks = generate_run_plan(
+        date(2026, 11, 2), date(2027, 1, 10), _fitness(5.0, weekly_volume_km=80.0), run_days=(0, 2, 4, 6)
+    )
+    for week in weeks[:-1]:
+        long_run = next(s for s in week.sessions if s.role == "long")
+        assert long_run.total_distance_km <= 16.0
+    peak = max(weeks[:-1], key=lambda w: w.target_volume_km)
+    long_run = next(s for s in peak.sessions if s.role == "long")
+    easy = [s for s in peak.sessions if s.role == "easy"]
+    assert long_run.total_distance_km == 16.0
+    assert all(s.total_distance_km > long_run.total_distance_km for s in easy)
+
+
+def test_5k_build1_quality_alternates_repetition_and_threshold():
+    f = _fitness(5.0)
+    _, weeks = generate_run_plan(date(2026, 11, 2), date(2027, 1, 10), f, run_days=(0, 2, 4, 6))
+    build1 = [next(s for s in w.sessions if s.role == "quality") for w in weeks if w.phase_name == "Build 1"]
+    names = {s.name for s in build1}
+    assert names == {"R-pace 400s", "Cruise intervals"}
+    r_session = next(s for s in build1 if s.name == "R-pace 400s")
+    reps = next(s for s in r_session.steps if isinstance(s, RunRepeatStep))
+    assert reps.repeat_count == 8 and reps.work.target_pace_sec_per_km == f.repetition_pace_sec_per_km
+
+
+def test_5k_build2_uses_vo2max_and_race_pace_and_steady_long_runs():
+    f = _fitness(5.0)
+    _, weeks = generate_run_plan(date(2026, 11, 2), date(2027, 1, 10), f, run_days=(0, 2, 4, 6))
+    build2 = [w for w in weeks if w.phase_name == "Build 2"]
+    quality_paces = {
+        step.work.target_pace_sec_per_km
+        for w in build2
+        for s in w.sessions
+        if s.role == "quality"
+        for step in s.steps
+        if isinstance(step, RunRepeatStep)
+    }
+    assert quality_paces == {f.interval_pace_sec_per_km, f.race_pace_sec_per_km}
+    assert all(next(s for s in w.sessions if s.role == "long").name == "Long run" for w in build2)
+
+
+def test_5k_and_10k_add_strides_to_one_easy_run_outside_taper():
+    _, weeks = generate_run_plan(date(2026, 11, 2), date(2027, 1, 10), _fitness(10.0), run_days=(0, 2, 4, 6))
+    for w in weeks[:-1]:
+        names = [s.name for s in w.sessions if s.role == "easy"]
+        if w.phase_name == "Taper":
+            assert "Easy run + strides" not in names
+        else:
+            assert names.count("Easy run + strides") == 1
+            stride_run = next(s for s in w.sessions if s.name == "Easy run + strides")
+            # Strides come out of the easy distance, not on top of it.
+            other = next(s for s in w.sessions if s.name == "Easy run")
+            assert stride_run.total_distance_km == other.total_distance_km
+
+
+def test_marathon_build2_long_run_has_marathon_pace_segment():
+    f = _fitness(42.195)
+    _, weeks = generate_run_plan(date(2026, 11, 2), date(2027, 3, 7), f, run_days=(0, 2, 4, 6))
+    long_runs = [next(s for s in w.sessions if s.role == "long") for w in weeks if w.phase_name == "Build 2"]
+    assert long_runs
+    for lr in long_runs:
+        assert lr.name == "Long run w/ marathon-pace segment"
+        segment = lr.steps[-1]
+        assert segment.target_pace_sec_per_km == f.race_pace_sec_per_km
+        assert segment.distance_km == min(16.0, round(lr.total_distance_km * 0.40, 1))
+
+
+def test_new_profile_quality_distance_is_derived_from_steps():
+    from app.engines.running import steps_distance_km
+
+    _, weeks = generate_run_plan(date(2026, 11, 2), date(2027, 1, 10), _fitness(5.0), run_days=(0, 2, 4, 6))
+    for w in weeks:
+        for s in w.sessions:
+            if s.role == "quality":
+                assert s.total_distance_km == steps_distance_km(s.steps, 360)

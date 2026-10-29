@@ -54,13 +54,24 @@
       <label>Race date
         <input name="race_date" type="date" value="{{ race.race_date if race else '' }}" required>
       </label>
-      <label>Distance (km)
-        <input name="distance_km" type="number" step="0.01" value="{{ race.distance_km if race else 21.1 }}" required list="distance-presets">
-        <datalist id="distance-presets">
-          <option value="5"><option value="10"><option value="21.1"><option value="42.195">
-        </datalist>
+      {% set dist = race.distance_km if race else 21.1 %}
+      {% set presets = [(5, "5K"), (10, "10K"), (21.1, "Half marathon"), (42.195, "Marathon")] %}
+      {% set ns = namespace(matched=false) %}
+      <label>Distance
+        <select name="distance_preset" onchange="updateDistanceUI(this.form)">
+          {% for km, label in presets %}
+            {% set hit = (dist - km)|abs < 0.15 %}
+            {% if hit %}{% set ns.matched = true %}{% endif %}
+            <option value="{{ km }}" {% if hit %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+          <option value="custom" {% if not ns.matched %}selected{% endif %}>Custom distance</option>
+        </select>
       </label>
-      <label>Goal time (H:MM:SS, optional -- overrides race-pace targets in training)
+      <label class="distance-custom" {% if ns.matched %}style="display: none"{% endif %}>Custom distance (km)
+        <input name="distance_km" type="number" step="0.01" min="1" value="{{ dist }}" required>
+      </label>
+      <p class="note distance-hint" aria-live="polite"></p>
+      <label>Goal time (optional -- overrides race-pace targets in training)
         <input name="goal_time" type="text" placeholder="e.g. 1:45:00" value="{{ race.goal_time_sec|goal_time if race and race.goal_time_sec else '' }}">
       </label>
       <label>Priority
@@ -124,5 +135,15 @@
   <div class="settings-footer">Parallax &middot; See your training from both sides.</div>
 {% endblock %}
 {% block scripts %}
+  <script>window.RACE_PROFILES = {{ race_profiles|tojson }};</script>
   <script src="/static/app.js?v={{ static_v }}"></script>
+  <script>
+    document.querySelectorAll("select[name=distance_preset]").forEach((sel) => {
+      const form = sel.form;
+      ["race_date", "plan_start_date", "distance_km"].forEach((n) =>
+        form[n].addEventListener("input", () => updateDistanceUI(form))
+      );
+      updateDistanceUI(form);
+    });
+  </script>
 {% endblock %}

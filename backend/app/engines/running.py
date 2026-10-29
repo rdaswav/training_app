@@ -1,4 +1,8 @@
-"""Deterministic half-marathon-default running periodization engine.
+"""Deterministic running periodization engine, shaped per race distance.
+
+Block length, taper, long-run share/cap and quality-session content all come
+from the race's RaceProfile (engines/race_profiles.py). The "half" profile
+reproduces the original half-marathon-only engine exactly.
 
 Pure functions/dataclasses only -- no DB, no I/O -- so the periodization
 rules (spec section 5) can be unit tested in isolation.
@@ -9,12 +13,11 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from app.engines import vdot as vdot_engine
+from app.engines.race_profiles import HALF, HALF_MARATHON_KM, RaceProfile, profile_for_distance
 
-TAPER_WEEKS = 2
 GROWTH_RATE = 1.09  # ~9%/week, within the 8-10% band
 DOWN_WEEK_FACTOR = 0.75  # ~25% volume cut on down weeks
-TAPER_FACTORS = [0.70, 0.45]  # applied to taper week 1, week 2 (race week)
-LONG_RUN_SHARE = 0.35  # fraction of weekly volume assigned to the long run
+STRIDES_KM = 1.2  # approximate ground covered by 6 x 20s strides + floats
 
 
 @dataclass
@@ -53,7 +56,7 @@ class RunSessionPlan:
     phase_name: str
     steps: list[RunStep | RunRepeatStep]
     total_distance_km: float
-    role: str  # "easy" | "quality" | "long"
+    role: str  # "easy" | "quality" | "long" | "race"
 
 
 @dataclass
@@ -64,9 +67,6 @@ class WeekPlan:
     target_volume_km: float
     is_down_week: bool
     sessions: list[RunSessionPlan] = field(default_factory=list)
-
-
-HALF_MARATHON_KM = 21.0975
 
 
 @dataclass
@@ -92,8 +92,25 @@ class AthleteFitness:
         # Daniels' VDOT model: derive a fitness score from threshold pace
         # (Daniels' own ~60min calibration for Threshold), then the race pace
         # for the actual race distance. See engines/vdot.py.
-        vdot = vdot_engine.vdot_from_threshold_pace(self.threshold_pace_sec_per_km)
-        return vdot_engine.race_pace_sec_per_km(vdot, self.race_distance_km)
+        return vdot_engine.race_pace_sec_per_km(self.vdot, self.race_distance_km)
+
+    @property
+    def vdot(self) -> float:
+        return vdot_engine.vdot_from_threshold_pace(self.threshold_pace_sec_per_km)
+
+    # I/R paces follow current (threshold-derived) fitness, never the goal
+    # time -- same reasoning as threshold/easy above.
+    @property
+    def interval_pace_sec_per_km(self) -> int:
+        return vdot_engine.interval_pace_sec_per_km(self.vdot)
+
+    @property
+    def repetition_pace_sec_per_km(self) -> int:
+        return vdot_engine.repetition_pace_sec_per_km(self.vdot)
+
+    @property
+    def profile(self) -> RaceProfile:
+        return profile_for_distance(self.race_distance_km)
 
 
 def week_start(d: date) -> date:
@@ -106,12 +123,14 @@ def weeks_to_race(today: date, race_date: date) -> int:
     return ((race_date - start).days // 7) + 1
 
 
-def build_phases(total_weeks: int) -> list[PhaseSpec]:
-    """Allocate the phase sequence across `total_weeks` (spec section 5)."""
+def build_phases(total_weeks: int, profile: RaceProfile = HALF) -> list[PhaseSpec]:
+    """Allocate the phase sequence across `total_weeks` (spec section 5),
+    using the race profile's template length, taper length and split."""
     if total_weeks <= 0:
         raise ValueError("total_weeks must be positive")
 
-    taper = min(TAPER_WEEKS, total_weeks)
+    focus = profile.phase_focus
+    taper = min(profile.taper_weeks, total_weeks)
     remaining = total_weeks - taper
 
     if remaining < 4:
@@ -120,21 +139,21 @@ def build_phases(total_weeks: int) -> list[PhaseSpec]:
         phases: list[PhaseSpec] = []
         week = 0
         if remaining > 0:
-            phases.append(PhaseSpec("Build 2", week, week + remaining - 1, "race-specific"))
+            phases.append(PhaseSpec("Build 2", week, week + remaining - 1, focus["Build 2"]))
             week += remaining
-        phases.append(PhaseSpec("Taper", week, week + taper - 1, "sharpen"))
+        phases.append(PhaseSpec("Taper", week, week + taper - 1, focus["Taper"]))
         return phases
 
     base_weeks = 0
     ramp_weeks = remaining
-    if total_weeks > 16:
-        # Extra weeks beyond the standard 16-week template become an
+    if total_weeks > profile.template_weeks:
+        # Extra weeks beyond the profile's standard template become an
         # aerobic-base hold before the ramp begins.
-        base_weeks = total_weeks - 16
-        ramp_weeks = 16 - taper
+        base_weeks = total_weeks - profile.template_weeks
+        ramp_weeks = profile.template_weeks - taper
 
-    rebase = round(ramp_weeks * 0.30) or 1
-    build1 = round(ramp_weeks * 0.35) or 1
+    rebase = round(ramp_weeks * profile.rebase_share) or 1
+    build1 = round(ramp_weeks * profile.build1_share) or 1
     build2 = ramp_weeks - rebase - build1
     if build2 < 1:
         # Rounding pushed build2 to zero on short ramps; borrow a week from build1.
@@ -144,15 +163,15 @@ def build_phases(total_weeks: int) -> list[PhaseSpec]:
     phases = []
     week = 0
     if base_weeks > 0:
-        phases.append(PhaseSpec("Base", week, week + base_weeks - 1, "aerobic hold"))
+        phases.append(PhaseSpec("Base", week, week + base_weeks - 1, focus["Base"]))
         week += base_weeks
-    phases.append(PhaseSpec("Re-base", week, week + rebase - 1, "aerobic rebuild"))
+    phases.append(PhaseSpec("Re-base", week, week + rebase - 1, focus["Re-base"]))
     week += rebase
-    phases.append(PhaseSpec("Build 1", week, week + build1 - 1, "threshold intro"))
+    phases.append(PhaseSpec("Build 1", week, week + build1 - 1, focus["Build 1"]))
     week += build1
-    phases.append(PhaseSpec("Build 2", week, week + build2 - 1, "race-specific"))
+    phases.append(PhaseSpec("Build 2", week, week + build2 - 1, focus["Build 2"]))
     week += build2
-    phases.append(PhaseSpec("Taper", week, week + taper - 1, "sharpen"))
+    phases.append(PhaseSpec("Taper", week, week + taper - 1, focus["Taper"]))
     return phases
 
 
@@ -163,15 +182,19 @@ def phase_for_week(phases: list[PhaseSpec], week_index: int) -> PhaseSpec:
     return phases[-1]
 
 
-def build_weekly_volumes(total_weeks: int, starting_volume_km: float, phases: list[PhaseSpec]) -> list[float]:
-    """Weekly target volumes: 8-10%/week ramp, down week every 3rd-4th week, 2-week taper."""
+def build_weekly_volumes(
+    total_weeks: int, starting_volume_km: float, phases: list[PhaseSpec], profile: RaceProfile = HALF
+) -> list[float]:
+    """Weekly target volumes: 8-10%/week ramp, down week every 3rd-4th week,
+    then the profile's taper factors."""
     taper_start = next(p.start_week for p in phases if p.name == "Taper")
+    taper_factors = profile.taper_factors
     volumes: list[float] = []
     last_up_volume = starting_volume_km
     for i in range(total_weeks):
         if i >= taper_start:
             taper_index = i - taper_start
-            factor = TAPER_FACTORS[min(taper_index, len(TAPER_FACTORS) - 1)]
+            factor = taper_factors[min(taper_index, len(taper_factors) - 1)]
             volumes.append(round(last_up_volume * factor, 1))
             continue
         is_down_week = i > 0 and (i + 1) % 4 == 0
@@ -190,7 +213,143 @@ def is_down_week(week_index: int, taper_start: int) -> bool:
     return week_index < taper_start and week_index > 0 and (week_index + 1) % 4 == 0
 
 
-def _quality_session(phase_name: str, fitness: AthleteFitness, quality_date: date) -> RunSessionPlan:
+def _step_km(step: RunStep, easy_pace: int) -> float:
+    if step.distance_km is not None:
+        return step.distance_km
+    if step.duration_min is not None:
+        # Duration-only legs (warmup, jog recoveries, strides) are costed at
+        # their own target pace, or easy pace if they have none.
+        return step.duration_min * 60 / (step.target_pace_sec_per_km or easy_pace)
+    return 0.0
+
+
+def steps_distance_km(steps: list[RunStep | RunRepeatStep], easy_pace: int) -> float:
+    """Ground covered by a session, derived from its steps rather than hand-coded."""
+    total = 0.0
+    for s in steps:
+        if isinstance(s, RunRepeatStep):
+            per_rep = _step_km(s.work, easy_pace) + (_step_km(s.recovery, easy_pace) if s.recovery else 0.0)
+            total += s.repeat_count * per_rep
+        else:
+            total += _step_km(s, easy_pace)
+    return round(total, 1)
+
+
+def _reps(label: str, count: int, km: float, pace: int, recovery_min: float, recovery_label: str = "Jog recovery") -> RunRepeatStep:
+    work_label = label[:-1] if label.endswith("reps") else label  # "Threshold reps" -> "Threshold rep"
+    return RunRepeatStep(
+        label,
+        repeat_count=count,
+        work=RunStep(work_label, distance_km=km, target_pace_sec_per_km=pace),
+        recovery=RunStep(recovery_label, duration_min=recovery_min),
+    )
+
+
+def _strides(f: AthleteFitness, count: int = 6) -> RunRepeatStep:
+    return RunRepeatStep(
+        "Strides",
+        repeat_count=count,
+        work=RunStep("Stride", duration_min=20 / 60, target_pace_sec_per_km=f.repetition_pace_sec_per_km),
+        recovery=RunStep("Float", duration_min=1.0),
+    )
+
+
+def _hill_sprints(f: AthleteFitness) -> RunRepeatStep:
+    # Effort-based (no pace target): ~10s near-max uphill, walk back down.
+    return RunRepeatStep(
+        "Hill sprints",
+        repeat_count=8,
+        work=RunStep("Hill sprint", duration_min=10 / 60),
+        recovery=RunStep("Walk back", duration_min=2.0),
+    )
+
+
+def _wrap(f: AthleteFitness, *main: RunStep | RunRepeatStep, warmup: float = 15, cooldown: float = 10) -> list:
+    return [
+        RunStep("Warmup", duration_min=warmup, target_pace_sec_per_km=f.easy_pace_sec_per_km),
+        *main,
+        RunStep("Cooldown", duration_min=cooldown, target_pace_sec_per_km=f.easy_pace_sec_per_km),
+    ]
+
+
+# Quality sessions for the non-half profiles: profile -> phase -> variants.
+# With a single quality slot per week, alternating variants by week index is
+# how one slot covers both VO2max/economy and threshold work (Daniels/Pfitzinger
+# 5k-10k emphasis). Each variant: fitness -> (session name, steps).
+QUALITY_LIBRARY = {
+    "5k": {
+        "Base": [
+            lambda f: ("Strides", _wrap(f, _strides(f))),
+            lambda f: ("Hill sprints", _wrap(f, _hill_sprints(f))),
+        ],
+        "Build 1": [
+            lambda f: ("R-pace 400s", _wrap(f, _reps("R-pace reps", 8, 0.4, f.repetition_pace_sec_per_km, 2.5))),
+            lambda f: ("Cruise intervals", _wrap(f, _reps("Cruise interval", 3, 1.6, f.threshold_pace_sec_per_km, 1.5, "Jog"))),
+        ],
+        "Build 2": [
+            lambda f: ("VO2max 1km reps", _wrap(f, _reps("I-pace reps", 5, 1.0, f.interval_pace_sec_per_km, 2.5))),
+            lambda f: ("5k-pace 800s", _wrap(f, _reps("Race-pace reps", 6, 0.8, f.race_pace_sec_per_km, 1.5))),
+        ],
+        "Taper": [
+            lambda f: ("Race-pace touch", _wrap(f, _reps("Race-pace reps", 4, 0.4, f.race_pace_sec_per_km, 2.0), warmup=12, cooldown=8)),
+        ],
+    },
+    "10k": {
+        "Base": [lambda f: ("Strides", _wrap(f, _strides(f)))],
+        "Build 1": [
+            lambda f: ("Cruise intervals", _wrap(f, _reps("Cruise interval", 4, 1.6, f.threshold_pace_sec_per_km, 1.0, "Jog"))),
+            lambda f: ("VO2max 1km reps", _wrap(f, _reps("I-pace reps", 5, 1.0, f.interval_pace_sec_per_km, 2.5))),
+        ],
+        "Build 2": [
+            lambda f: ("10k-pace reps", _wrap(f, _reps("Race-pace reps", 4, 1.6, f.race_pace_sec_per_km, 1.5))),
+            lambda f: (
+                "Threshold + VO2max",
+                _wrap(
+                    f,
+                    _reps("Threshold reps", 2, 2.0, f.threshold_pace_sec_per_km, 2.0),
+                    _reps("I-pace reps", 3, 0.8, f.interval_pace_sec_per_km, 2.0),
+                ),
+            ),
+        ],
+        "Taper": [
+            lambda f: ("Race-pace touch", _wrap(f, _reps("Race-pace reps", 3, 1.0, f.race_pace_sec_per_km, 2.0), warmup=12, cooldown=8)),
+        ],
+    },
+    "marathon": {
+        "Base": [lambda f: ("Strides", _wrap(f, _strides(f)))],
+        "Build 1": [
+            lambda f: ("Cruise intervals", _wrap(f, _reps("Cruise interval", 4, 1.6, f.threshold_pace_sec_per_km, 1.0, "Jog"))),
+            lambda f: ("Threshold 4km reps", _wrap(f, _reps("Threshold reps", 2, 4.0, f.threshold_pace_sec_per_km, 3.0))),
+        ],
+        "Build 2": [
+            lambda f: ("Threshold reps", _wrap(f, _reps("Threshold reps", 3, 2.0, f.threshold_pace_sec_per_km, 2.0))),
+            lambda f: ("Marathon-pace run", _wrap(f, RunStep("Marathon pace", distance_km=8.0, target_pace_sec_per_km=f.race_pace_sec_per_km))),
+        ],
+        "Taper": [
+            lambda f: ("Marathon-pace touch", _wrap(f, _reps("Race-pace reps", 3, 1.6, f.race_pace_sec_per_km, 2.0), warmup=12, cooldown=8)),
+        ],
+    },
+}
+
+
+def _quality_session(phase_name: str, fitness: AthleteFitness, quality_date: date, week_index: int = 0) -> RunSessionPlan:
+    profile = fitness.profile
+    if profile.key not in QUALITY_LIBRARY:
+        return _half_quality_session(phase_name, fitness, quality_date)
+    by_phase = QUALITY_LIBRARY[profile.key]
+    variants = by_phase.get(phase_name) or by_phase["Base"]  # Re-base shares Base's variants
+    name, steps = variants[week_index % len(variants)](fitness)
+    return RunSessionPlan(
+        date=quality_date,
+        name=name,
+        phase_name=phase_name,
+        steps=steps,
+        total_distance_km=steps_distance_km(steps, fitness.easy_pace_sec_per_km),
+        role="quality",
+    )
+
+
+def _half_quality_session(phase_name: str, fitness: AthleteFitness, quality_date: date) -> RunSessionPlan:
     easy = fitness.easy_pace_sec_per_km
     threshold = fitness.threshold_pace_sec_per_km
     race_pace = fitness.race_pace_sec_per_km
@@ -266,36 +425,111 @@ def _quality_session(phase_name: str, fitness: AthleteFitness, quality_date: dat
     )
 
 
-def _easy_session(fitness: AthleteFitness, distance_km: float, run_date: date, phase_name: str) -> RunSessionPlan:
-    steps = [
+def _easy_session(
+    fitness: AthleteFitness, distance_km: float, run_date: date, phase_name: str, with_strides: bool = False
+) -> RunSessionPlan:
+    # Strides eat into the easy distance rather than adding on top, so the
+    # week still sums to its target volume.
+    run_km = round(max(distance_km - STRIDES_KM, 3.0), 1) if with_strides else distance_km
+    steps: list[RunStep | RunRepeatStep] = [
         RunStep(
             "Easy/recovery run",
-            distance_km=distance_km,
+            distance_km=run_km,
             target_pace_sec_per_km=fitness.easy_pace_sec_per_km,
             hr_ceiling=fitness.aerobic_hr_ceiling,
         )
     ]
+    name = "Easy run"
+    if with_strides:
+        steps.append(_strides(fitness))
+        name = "Easy run + strides"
     return RunSessionPlan(
-        date=run_date, name="Easy run", phase_name=phase_name, steps=steps, total_distance_km=round(distance_km, 1), role="easy"
+        date=run_date, name=name, phase_name=phase_name, steps=steps, total_distance_km=round(distance_km, 1), role="easy"
     )
 
 
 def _long_run_session(fitness: AthleteFitness, distance_km: float, run_date: date, phase_name: str) -> RunSessionPlan:
-    if phase_name == "Build 2":
-        # Later long runs embed race-pace segments (spec section 5).
-        race_segment_km = min(4.0, round(distance_km * 0.25, 1))
-        steady_km = round(distance_km - race_segment_km, 1)
+    profile_key = fitness.profile.key
+    if phase_name == "Build 2" and profile_key in ("half", "marathon", "10k"):
+        # Later long runs embed a race-specific segment (spec section 5):
+        # race pace for half/marathon, a threshold finish for 10k. 5k long
+        # runs stay steady -- 5k-specific work lives in the quality slot.
+        if profile_key == "half":
+            segment_km = min(4.0, round(distance_km * 0.25, 1))
+            segment = ("Race-pace segment", fitness.race_pace_sec_per_km)
+            name = "Long run w/ race-pace segment"
+        elif profile_key == "marathon":
+            segment_km = min(16.0, round(distance_km * 0.40, 1))
+            segment = ("Marathon-pace segment", fitness.race_pace_sec_per_km)
+            name = "Long run w/ marathon-pace segment"
+        else:
+            segment_km = min(3.0, round(distance_km * 0.25, 1))
+            segment = ("Threshold finish", fitness.threshold_pace_sec_per_km)
+            name = "Long run w/ threshold finish"
+        steady_km = round(distance_km - segment_km, 1)
         steps = [
             RunStep("Steady", distance_km=steady_km, target_pace_sec_per_km=fitness.easy_pace_sec_per_km),
-            RunStep("Race-pace segment", distance_km=race_segment_km, target_pace_sec_per_km=fitness.race_pace_sec_per_km),
+            RunStep(segment[0], distance_km=segment_km, target_pace_sec_per_km=segment[1]),
         ]
-        name = "Long run w/ race-pace segment"
     else:
         steps = [RunStep("Steady long run", distance_km=distance_km, target_pace_sec_per_km=fitness.easy_pace_sec_per_km)]
         name = "Long run"
     return RunSessionPlan(
         date=run_date, name=name, phase_name=phase_name, steps=steps, total_distance_km=round(distance_km, 1), role="long"
     )
+
+
+def _race_session(fitness: AthleteFitness, race_date: date, phase_name: str) -> RunSessionPlan:
+    easy = fitness.easy_pace_sec_per_km
+    race_step = RunStep("Race", distance_km=round(fitness.race_distance_km, 2), target_pace_sec_per_km=fitness.race_pace_sec_per_km)
+    if fitness.profile.key in ("5k", "10k"):
+        # Short races want a proper warmup with some faster running in it.
+        steps = [
+            RunStep("Warmup", duration_min=15, target_pace_sec_per_km=easy),
+            _strides(fitness, count=4),
+            race_step,
+            RunStep("Cooldown", duration_min=10, target_pace_sec_per_km=easy),
+        ]
+    else:
+        steps = [RunStep("Warmup", duration_min=10, target_pace_sec_per_km=easy), race_step]
+    return RunSessionPlan(
+        date=race_date,
+        name=f"Race day: {fitness.profile.label}",
+        phase_name=phase_name,
+        steps=steps,
+        total_distance_km=steps_distance_km(steps, easy),
+        role="race",
+    )
+
+
+def _shakeout_session(fitness: AthleteFitness, run_date: date, phase_name: str) -> RunSessionPlan:
+    steps = [
+        RunStep("Easy shakeout", duration_min=20, target_pace_sec_per_km=fitness.easy_pace_sec_per_km, hr_ceiling=fitness.aerobic_hr_ceiling),
+        _strides(fitness, count=4),
+    ]
+    return RunSessionPlan(
+        date=run_date,
+        name="Pre-race shakeout",
+        phase_name=phase_name,
+        steps=steps,
+        total_distance_km=steps_distance_km(steps, fitness.easy_pace_sec_per_km),
+        role="easy",
+    )
+
+
+def _place_race_day(weeks: list[WeekPlan], race_date: date, fitness: AthleteFitness) -> None:
+    """Race on race_date, shakeout the day before, nothing after -- replacing
+    whatever the weekly template put on those days (or adding them if the
+    template has no run there, e.g. a Saturday race on a Sunday-long-run week)."""
+    shakeout_date = race_date - timedelta(days=1)
+    for week in weeks:
+        week_end = week.start_date + timedelta(days=6)
+        week.sessions = [s for s in week.sessions if s.date < shakeout_date]
+        if week.start_date <= shakeout_date <= week_end:
+            week.sessions.append(_shakeout_session(fitness, shakeout_date, week.phase_name))
+        if week.start_date <= race_date <= week_end:
+            week.sessions.append(_race_session(fitness, race_date, week.phase_name))
+        week.sessions.sort(key=lambda s: s.date)
 
 
 def _assign_run_roles(sorted_days: list[int]) -> dict[int, str]:
@@ -331,12 +565,17 @@ def generate_week(
     roles = _assign_run_roles(sorted_days)
     easy_days = [d for d in sorted_days if roles[d] == "easy"]
 
-    long_km = round(target_volume_km * LONG_RUN_SHARE, 1)
+    profile = fitness.profile
+    long_km = round(target_volume_km * profile.long_run_share, 1)
+    if profile.long_run_cap_km is not None:
+        # Anything over the cap flows to the easy days via `remainder`.
+        long_km = min(long_km, profile.long_run_cap_km)
     remainder = max(target_volume_km - long_km, 0.0)
     # Split the non-long volume evenly across the easy days plus one "slot"
     # for quality (quality's own distance is actually dictated by its
     # structure -- see _quality_session -- this just sizes the easy days).
     easy_km = round(remainder / (len(easy_days) + 1), 1)
+    strides_day = easy_days[0] if easy_days and profile.easy_strides and phase.name != "Taper" else None
 
     sessions: list[RunSessionPlan] = []
     for d in sorted_days:
@@ -345,9 +584,9 @@ def generate_week(
         if role == "long":
             sessions.append(_long_run_session(fitness, long_km, session_date, phase.name))
         elif role == "quality":
-            sessions.append(_quality_session(phase.name, fitness, session_date))
+            sessions.append(_quality_session(phase.name, fitness, session_date, week_index))
         else:
-            sessions.append(_easy_session(fitness, easy_km, session_date, phase.name))
+            sessions.append(_easy_session(fitness, easy_km, session_date, phase.name, with_strides=d == strides_day))
 
     return WeekPlan(
         week_index=week_index,
@@ -365,12 +604,13 @@ def generate_run_plan(
     fitness: AthleteFitness,
     run_days: tuple[int, ...] = (1, 3, 6),
 ) -> tuple[list[PhaseSpec], list[WeekPlan]]:
-    """Top-level entry point: race date + distance (implicit via fitness/race context) +
-    current fitness -> full block of weekly plans."""
+    """Top-level entry point: race date + distance (via fitness.race_distance_km,
+    which picks the RaceProfile) + current fitness -> full block of weekly plans."""
+    profile = fitness.profile
     total_weeks = weeks_to_race(today, race_date)
-    phases = build_phases(total_weeks)
+    phases = build_phases(total_weeks, profile)
     taper_start = next(p.start_week for p in phases if p.name == "Taper")
-    volumes = build_weekly_volumes(total_weeks, fitness.weekly_volume_km, phases)
+    volumes = build_weekly_volumes(total_weeks, fitness.weekly_volume_km, phases, profile)
 
     weeks: list[WeekPlan] = []
     base_monday = week_start(today)
@@ -379,4 +619,5 @@ def generate_run_plan(
         week_plan = generate_week(i, base_monday + timedelta(weeks=i), volumes[i], phase, fitness, run_days)
         week_plan.is_down_week = is_down_week(i, taper_start)
         weeks.append(week_plan)
+    _place_race_day(weeks, race_date, fitness)
     return phases, weeks

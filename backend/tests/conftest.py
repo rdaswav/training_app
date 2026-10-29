@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -7,6 +9,8 @@ from sqlalchemy.pool import StaticPool
 from app import db as db_module
 from app.db import Base, get_db
 from app import models  # noqa: F401 register models on Base.metadata
+
+PINNED_TODAY = date(2026, 7, 9)
 
 
 @pytest.fixture()
@@ -36,6 +40,11 @@ def client(monkeypatch):
     monkeypatch.setattr(db_module, "engine", test_engine)
     monkeypatch.setattr(db_module, "SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.config.ENABLE_SCHEDULER", False)
+    # The API tests hard-code a Jul-Oct 2026 race block. Plan generation only
+    # writes sessions from "today" forward, so once the real date passed that
+    # block they silently generated nothing -- pin "today" to the block's start.
+    monkeypatch.setattr("app.plan_service.local_today", lambda: PINNED_TODAY)
+    monkeypatch.setattr("app.api.routes.local_today", lambda: PINNED_TODAY)
 
     from app import main as main_module
     from app.main import app

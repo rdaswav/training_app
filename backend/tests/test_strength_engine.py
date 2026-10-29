@@ -297,3 +297,52 @@ def test_prescribe_next_load_lower_rir_target_prescribes_more_weight():
     easier = prescribe_next_load(e1rm, "3-5", rir=3)
     harder = prescribe_next_load(e1rm, "3-5", rir=1)
     assert harder > easier
+
+
+def test_power_flavour_puts_plyometrics_first_on_lower_days_only():
+    days = (1, 3)  # Upper / Lower split
+    upper = generate_strength_session(1, date(2026, 7, 7), 0, "Re-base", strength_days=days, flavour="power")
+    lower = generate_strength_session(3, date(2026, 7, 9), 0, "Re-base", strength_days=days, flavour="power")
+    assert lower.prescriptions[0].pattern == "plyometric"
+    assert lower.prescriptions[0].reps == "5-8"
+    assert "plyometric" not in [p.pattern for p in upper.prescriptions]
+    full_body = generate_strength_session(2, date(2026, 7, 8), 0, "Re-base", strength_days=(2,), flavour="power")
+    assert full_body.prescriptions[0].pattern == "plyometric"
+
+
+def test_standard_flavour_has_no_plyometrics():
+    for weekday in (0, 2, 4):
+        session = generate_strength_session(weekday, date(2026, 7, 6), 0, "Re-base")
+        assert "plyometric" not in [p.pattern for p in session.prescriptions]
+
+
+def test_plyometric_sets_progress_by_mode():
+    assert [prescribe("plyometric", "plyometric", w, "accumulate").sets for w in range(ACCUMULATION_WEEKS)] == [2, 3, 3, 4]
+    assert prescribe("plyometric", "plyometric", ACCUMULATION_WEEKS, "accumulate").sets == 2  # deload
+    assert prescribe("plyometric", "plyometric", 2, "maintenance").sets == 2
+    primer = prescribe("plyometric", "plyometric", 2, "minimal")
+    assert primer.sets == 1 and "primer" in primer.note
+
+
+def test_endurance_flavour_caps_build1_at_mav():
+    assert race_proximity_mode("Build 1", "endurance") == "accumulate_capped"
+    assert race_proximity_mode("Build 1", "standard") == "accumulate"
+    top_week = ACCUMULATION_WEEKS - 1
+    assert prescribe("squat", "compound", top_week, "accumulate_capped").sets == 4  # MAV
+    assert prescribe("squat", "compound", top_week, "accumulate").sets == 6  # MRV
+
+
+def test_long_taper_holds_maintenance_until_two_weeks_out():
+    assert race_proximity_mode("Taper", weeks_out=2) == "maintenance"
+    assert race_proximity_mode("Taper", weeks_out=1) == "minimal"
+    assert race_proximity_mode("Taper", weeks_out=0) == "minimal"
+    assert race_proximity_mode("Taper") == "minimal"
+
+
+def test_plyometric_log_always_holds():
+    from app.engines.autoregulation import evaluate_strength_log
+
+    p = prescribe("plyometric", "plyometric", 1, "accumulate")
+    result = evaluate_strength_log(p, [StrengthLogSet(reps=6), StrengthLogSet(reps=5)], movement_type="plyometric")
+    assert result.action == "hold"
+    assert "11 contacts" in result.summary

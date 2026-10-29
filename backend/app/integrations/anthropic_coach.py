@@ -22,7 +22,9 @@ MAX_TOKENS = 32000
 
 SYSTEM_PROMPT = """You are an experienced endurance running coach writing the \
 athlete's weekly training review. You are reviewing one training week inside a \
-structured half-marathon block that also carries RP-style strength work.
+structured race block (the race's distance and profile -- 5K, 10K, half \
+marathon or marathon -- are in the payload) that also carries RP-style \
+strength work, including plyometrics for 5K/10K blocks.
 
 ## The numbers are already computed -- do not redo them
 

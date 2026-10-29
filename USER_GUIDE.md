@@ -18,10 +18,14 @@ Open `/settings`. Three forms live there:
   HR/pace numbers" nudge above this form, since fitness changes over a training
   block and nothing re-tests these automatically -- re-saving the form (even with
   unchanged values) clears it.
-- **Race**: name, date, distance (`21.1` half, `42.195` full, `10`, `5`, etc.),
-  an optional **goal time** (`H:MM:SS` or `M:SS`, e.g. `1:45:00`) -- if set, this
-  overrides the race-pace target used in race-pace-specific segments (Build 2's
-  race-pace reps, the Taper's race-pace touch) directly. Your threshold/easy paces
+- **Race**: name, date, distance (pick 5K / 10K / Half / Marathon, or Custom for
+  any other km -- it snaps to the nearest of those four profiles, which set the
+  block length, taper, long-run cap, workout mix and strength flavour; the form
+  shows the standard block length for the distance and warns if you have much
+  less time than that), an optional **goal time** (`H:MM:SS` or `M:SS`, e.g.
+  `22:30` for a 5K or `1:45:00` for a half) -- if set, this overrides the
+  race-pace target used in race-pace-specific segments (race-pace reps, the
+  Taper's race-pace touch, race day itself) directly. Your threshold/easy paces
   stay derived from your actual current fitness either way -- a goal time doesn't
   push you into paces harder than you've earned, it only sets the aspirational
   target for the segments that are explicitly about racing that goal. Priority

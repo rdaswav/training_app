@@ -41,7 +41,7 @@
       {% set d = week_start + timedelta(days=i) %}
       {% set s = by_date.get(d) %}
       {% if s %}
-        {% set intensity = "session-strength" if s.type.value == "strength" else ("session-hard" if s.content.get("role") == "quality" else "session-easy") %}
+        {% set intensity = "session-strength" if s.type.value == "strength" else ("session-hard" if s.content.get("role") in ("quality", "race") else "session-easy") %}
         <a class="card day-card {{ intensity }}" href="/session/{{ s.id }}">
           <div class="day-card-date">{{ day_names[i] }} &middot; {{ d.strftime("%-d %b") }}</div>
           <strong>{{ s.name }}</strong>

@@ -25,6 +25,7 @@ from app.db import SessionLocal, init_db
 from app.engines import coaching_copy, dashboard_summary, load_summary
 from app.engines import strength as strength_engine
 from app.engines import vdot as vdot_engine
+from app.engines.race_profiles import PROFILE_UPPER_BOUNDS_KM, PROFILES, profile_for_distance
 from app.engines.running import week_start
 from app.integrations.anthropic_coach import coach_configured
 from app.jobs.daily_autoregulation import MAX_PACE_DRIFT_SEC_PER_KM, run_daily_job
@@ -163,6 +164,20 @@ templates.env.filters["pace_mmss"] = format_pace_mmss
 templates.env.filters["duration"] = format_duration
 templates.env.filters["goal_time"] = format_goal_time
 templates.env.filters["markdown"] = format_markdown
+templates.env.filters["race_profile"] = profile_for_distance
+# Settings' distance picker reads block length/taper per profile from here,
+# so the hint text can't drift from engines/race_profiles.py.
+_upper_km = {p.key: km for p, km in PROFILE_UPPER_BOUNDS_KM}
+templates.env.globals["race_profiles"] = [
+    {
+        "key": p.key,
+        "label": p.label,
+        "template_weeks": p.template_weeks,
+        "taper_weeks": p.taper_weeks,
+        "max_km": _upper_km.get(p.key),  # None = no upper bound (marathon)
+    }
+    for p in PROFILES.values()
+]
 
 
 def _attach_logged_patterns(db, sessions: list[PlannedSession]) -> None:
@@ -527,10 +542,14 @@ def today_view(request: Request):
             current_phase_name = current_phase["name"] if current_phase else None
             week_idx = dashboard_summary.global_week_index(race.macrocycle.start_date, today)
             mesocycle_status = dashboard_summary.strength_mesocycle_status(
-                week_idx, current_phase_name or "Re-base", race.macrocycle.mesocycle_start_week or 0
+                week_idx, current_phase_name or "Re-base", race.macrocycle.mesocycle_start_week or 0, race.distance_km
             )
             mesocycle_mode = mesocycle_status.mode
-        cues = {s.id: coaching_copy.session_cue(s.type, current_phase_name, mesocycle_mode) for s in sessions}
+        profile_key = profile_for_distance(race.distance_km).key if race else None
+        cues = {
+            s.id: coaching_copy.session_cue(s.type, current_phase_name, mesocycle_mode, s.content.get("role"), profile_key)
+            for s in sessions
+        }
         clocks = _weekly_clocks(db, athlete, today) if race else None
 
         return templates.TemplateResponse(
@@ -603,7 +622,7 @@ def plan_view(request: Request):
             flags = dashboard_summary.race_flags(race_dicts, start, end)
             mesocycle_start_week = (race.macrocycle.mesocycle_start_week or 0) if race.macrocycle else 0
             mesocycle_status = dashboard_summary.strength_mesocycle_status(
-                week_idx, current_phase["name"] if current_phase else "Re-base", mesocycle_start_week
+                week_idx, current_phase["name"] if current_phase else "Re-base", mesocycle_start_week, race.distance_km
             )
             # "Two clocks" card (Consolidated Pages.dc.html) -- was About's
             # "Why the two clocks don't line up" week grid, moved here since
@@ -754,6 +773,9 @@ def about_view(request: Request):
                 {
                     "vdot": round(vdot, 1),
                     "race_pace_sec_per_km": fitness.race_pace_sec_per_km,
+                    "interval_pace_sec_per_km": fitness.interval_pace_sec_per_km,
+                    "repetition_pace_sec_per_km": fitness.repetition_pace_sec_per_km,
+                    "race_profile": fitness.profile,
                     "race_pace_from_goal": bool(race.goal_time_sec),
                     "e1rm_by_pattern": e1rm_by_pattern,
                 }

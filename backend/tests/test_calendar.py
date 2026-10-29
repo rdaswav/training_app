@@ -65,3 +65,22 @@ def test_find_adjacency_conflicts_detects_easy_run_as_non_key():
     easy_run = UnifiedSession(date=monday + timedelta(days=1), session_type="run", name="Easy", role="easy")
     conflicts = find_adjacency_conflicts([strength, easy_run])
     assert conflicts == []
+
+
+def test_plyometric_day_before_quality_run_is_a_conflict():
+    monday = date(2026, 7, 6)
+    run_by_date = {monday + timedelta(days=1): {"name": "VO2max 1km reps", "role": "quality"}}
+    strength_by_date = {monday: {"name": "Upper", "prescriptions": [{"pattern": "plyometric"}, {"pattern": "horizontal_push"}]}}
+    week = build_unified_week(run_by_date, strength_by_date, _week_dates(monday))
+    assert find_adjacency_conflicts(week) == []  # auto-shuffled to a rest day
+    moved = next(s for s in week if s.session_type == "strength")
+    assert moved.date != monday and "Auto-shuffled" in moved.note
+
+
+def test_race_day_is_protected_like_a_key_run():
+    monday = date(2026, 7, 6)
+    run_by_date = {monday + timedelta(days=6): {"name": "Race day: 5K", "role": "race"}}
+    strength_by_date = {monday + timedelta(days=5): {"name": "Lower", "prescriptions": [{"pattern": "squat"}]}}
+    week = build_unified_week(run_by_date, strength_by_date, _week_dates(monday))
+    strength = next(s for s in week if s.session_type == "strength")
+    assert strength.date != monday + timedelta(days=5)

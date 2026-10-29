@@ -36,6 +36,10 @@ MODE_COPY: dict[str, str] = {
         "Strength volume is building. Sets climb toward MRV week over week, RIR "
         "gets tighter, and the weight room asks for real effort."
     ),
+    "accumulate_capped": (
+        "Strength is still building, but sets top out at MAV rather than MRV "
+        "while weekly mileage peaks -- real effort, with a lid on fatigue."
+    ),
     "maintenance": (
         "Just enough strength work to hold what's been built, without adding "
         "fatigue that would blunt the running. Lighter, shorter, still purposeful."
@@ -56,6 +60,7 @@ _RUN_CUES: dict[str, str] = {
 
 _STRENGTH_CUES: dict[str, str] = {
     "accumulate": "Building phase -- expect the weights to feel heavier by the last set.",
+    "accumulate_capped": "Building, capped -- solid effort, but leave the legs something for the mileage.",
     "maintenance": "Maintenance mode -- enough to hold strength, not enough to add fatigue.",
     "minimal": "Minimal load -- keep this light, the legs need to stay fresh.",
 }
@@ -63,8 +68,38 @@ _STRENGTH_CUES: dict[str, str] = {
 _FALLBACK_CUE = "No active race plan -- log this session as usual."
 
 
-def session_cue(session_type: SessionType, phase_name: str | None, mesocycle_mode: str | None) -> str:
+# Per-profile overrides of _RUN_CUES where the half-marathon wording would be
+# wrong (e.g. a 5k Build 1 is economy + threshold, not threshold alone).
+_PROFILE_RUN_CUES: dict[str, dict[str, str]] = {
+    "5k": {
+        "Build 1": "Economy and threshold -- fast reps stay relaxed, threshold stays controlled.",
+        "Build 2": "VO2max and 5k-pace work -- hard, but every rep should look the same.",
+    },
+    "10k": {
+        "Build 1": "Threshold and VO2max -- hold the effort, don't chase the number.",
+        "Build 2": "10k-specific work -- rehearse the rhythm you'll race at.",
+    },
+    "marathon": {
+        "Build 2": "Marathon-pace work -- smooth, sustainable, fuelled. It should feel easier than it looks.",
+    },
+}
+
+_RACE_CUE = "Race day -- the work is done. Start controlled, settle into pace, race the last third."
+
+
+def session_cue(
+    session_type: SessionType,
+    phase_name: str | None,
+    mesocycle_mode: str | None,
+    role: str | None = None,
+    profile_key: str | None = None,
+) -> str:
     if session_type == SessionType.RUN:
+        if role == "race":
+            return _RACE_CUE
+        override = _PROFILE_RUN_CUES.get(profile_key or "", {}).get(phase_name or "")
+        if override:
+            return override
         if phase_name and phase_name in _RUN_CUES:
             return _RUN_CUES[phase_name]
     elif session_type == SessionType.STRENGTH:

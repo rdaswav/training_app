@@ -21,7 +21,7 @@
 {% endmacro %}
 
 {% macro session_card(s, show_date=False, cue=None) %}
-{% set intensity = "session-strength" if s.type.value == "strength" else ("session-hard" if s.content.get("role") == "quality" else "session-easy") %}
+{% set intensity = "session-strength" if s.type.value == "strength" else ("session-hard" if s.content.get("role") in ("quality", "race") else "session-easy") %}
 <div class="card {{ intensity }}" data-session-id="{{ s.id }}">
   <div class="session-type">
     {{ _type_icon(s.type.value) }} {{ s.type.value }} &middot; {{ s.phase_name or "" }}
@@ -60,6 +60,8 @@
           {% if c and ns.pace is none and c.target_pace_sec_per_km %}{% set ns.pace = c.target_pace_sec_per_km %}{% endif %}
           {% if c and ns.hr is none and c.hr_ceiling %}{% set ns.hr = c.hr_ceiling %}{% endif %}
         {% endfor %}
+        {# A race is logged at race pace, not the warmup's easy pace that comes first. #}
+        {% if s.content.get("role") == "race" and step.get("label") == "Race" %}{% set ns.pace = step.target_pace_sec_per_km %}{% endif %}
       {% endfor %}
       <div class="entry run-entry" data-session-id="{{ s.id }}"
            data-target-pace="{{ ns.pace or '' }}" data-target-hr="{{ ns.hr or '' }}">
@@ -104,6 +106,7 @@
     {% for p in s.content.get("prescriptions", []) %}
       {% set is_timed = p.movement_type == 'bodyweight_timed' %}
       {% set is_bodyweight = p.movement_type == 'bodyweight_reps' %}
+      {% set is_plyo = p.movement_type == 'plyometric' %}
       <div class="prescription"
            data-session-id="{{ s.id }}" data-pattern="{{ p.pattern }}"
            data-exercise-name="{{ p.exercise_name or p.pattern }}" data-sets="{{ p.sets }}"
@@ -117,7 +120,11 @@
         <div class="prescription-head">
           <div>
             <strong>{{ p.exercise_name or p.pattern }}</strong>
+            {% if is_plyo %}
+            <div class="meta">{{ p.pattern }} &middot; {{ p.sets }} x {{ p.reps }} contacts &middot; max intent</div>
+            {% else %}
             <div class="meta">{{ p.pattern }} &middot; {{ p.sets }} x {{ p.reps }}{% if is_timed %}s{% endif %} @ RIR <span class="value">{{ p.rir }}</span></div>
+            {% endif %}
           </div>
           {% if p.pattern in s.logged_patterns %}
             <span class="stat st-done">&#10003; Logged</span>
@@ -133,6 +140,15 @@
                   <div class="step">
                     <button type="button" class="stepbtn" data-step="d" data-dir="-1" aria-label="Decrease hold 5 seconds">&minus;</button>
                     <button type="button" class="stepbtn" data-step="d" data-dir="1" aria-label="Increase hold 5 seconds">+</button>
+                  </div>
+                </div>
+              {% elif is_plyo %}
+                <div class="field">
+                  <label for="r-{{ s.id }}-{{ p.pattern }}">Contacts</label>
+                  <div class="val"><span class="rval" id="r-{{ s.id }}-{{ p.pattern }}">&ndash;</span></div>
+                  <div class="step">
+                    <button type="button" class="stepbtn" data-step="r" data-dir="-1" aria-label="Decrease contacts">&minus;</button>
+                    <button type="button" class="stepbtn" data-step="r" data-dir="1" aria-label="Increase contacts">+</button>
                   </div>
                 </div>
               {% else %}
@@ -153,12 +169,14 @@
                   </div>
                 </div>
               {% endif %}
+              {% if not is_plyo %}
               <div class="field field-rir">
                 <label for="rir-{{ s.id }}-{{ p.pattern }}">RIR</label>
                 <input class="rir-input" id="rir-{{ s.id }}-{{ p.pattern }}" type="number" step="0.5" placeholder="{{ p.rir }}">
               </div>
+              {% endif %}
             </div>
-            <div class="hint">{% if is_bodyweight %}Weight is *added* weight (belt/vest) &mdash; leave at 0 for bodyweight only.{% else %}Prefilled from your target.{% endif %} <b>Tap only if it changed.</b></div>
+            <div class="hint">{% if is_plyo %}{{ p.note }}.{% elif is_bodyweight %}Weight is *added* weight (belt/vest) &mdash; leave at 0 for bodyweight only.{% else %}Prefilled from your target.{% endif %} <b>Tap only if it changed.</b></div>
             <div class="done-row">
               {% for i in range(p.sets) %}<span class="dchip pending">set {{ i + 1 }}</span>{% endfor %}
             </div>

@@ -14,11 +14,28 @@
         <div class="row"><span class="l">VDOT</span><span class="v">{{ vdot }}</span><span class="v src">derived</span></div>
         <div class="row"><span class="l">Threshold pace</span><span class="v">{{ athlete.threshold_pace_sec_per_km|pace }}</span><span class="v src">autoregulated</span></div>
         <div class="row"><span class="l">Easy pace</span><span class="v">{{ athlete.easy_pace_sec_per_km|pace }}</span><span class="v src">autoregulated</span></div>
+        <div class="row"><span class="l">Interval (I) pace</span><span class="v">{{ interval_pace_sec_per_km|pace }}</span><span class="v src">derived</span></div>
+        <div class="row"><span class="l">Repetition (R) pace</span><span class="v">{{ repetition_pace_sec_per_km|pace }}</span><span class="v src">derived</span></div>
         <div class="row"><span class="l">Race pace</span><span class="v">{{ race_pace_sec_per_km|pace }}</span><span class="v src">{% if race_pace_from_goal %}from goal time{% else %}derived{% endif %}</span></div>
         <div class="row"><span class="l">Baseline threshold</span><span class="v">{{ athlete.threshold_pace_baseline_sec_per_km|pace }}</span><span class="v src">set by you</span></div>
         <div class="row"><span class="l">Drift bound</span><span class="v">&plusmn;{{ max_pace_drift }} s/km</span><span class="v src">set by you</span></div>
       </div>
-      <p class="note">Threshold and easy pace autoregulate off real sessions, but only within &plusmn;{{ max_pace_drift }} s/km of your baseline before the plan stops adjusting further. This is a live readout, not an input &mdash; <a href="/settings">change what they're set from in Settings &rarr;</a></p>
+      <p class="note">Threshold and easy pace autoregulate off real sessions, but only within &plusmn;{{ max_pace_drift }} s/km of your baseline before the plan stops adjusting further. I and R pace follow your VDOT (Daniels' VO2max and repetition paces) and never your goal time. This is a live readout, not an input &mdash; <a href="/settings">change what they're set from in Settings &rarr;</a></p>
+      {% if race_pace_from_goal and race_pace_sec_per_km < interval_pace_sec_per_km %}
+        <p class="note">Your goal pace ({{ race_pace_sec_per_km|pace }}) is faster than your current VO2max pace ({{ interval_pace_sec_per_km|pace }}), so race-pace reps will be harder than the plan's VO2max work. Either the goal is a stretch for now, or your threshold pace is out of date &mdash; worth rechecking one of them.</p>
+      {% endif %}
+    </div>
+
+    <div class="panel">
+      <h3>Race profile</h3>
+      <div class="rows cols numbers-table">
+        <div class="row head"><span class="l">Value</span><span class="v">Now</span><span class="v src">Source</span></div>
+        <div class="row"><span class="l">Profile</span><span class="v">{{ race_profile.label }}</span><span class="v src">from {{ race.distance_km }} km</span></div>
+        <div class="row"><span class="l">Standard block</span><span class="v">{{ race_profile.template_weeks }} weeks</span><span class="v src">extra weeks become Base</span></div>
+        <div class="row"><span class="l">Taper</span><span class="v">{{ race_profile.taper_weeks }} week{{ 's' if race_profile.taper_weeks != 1 }}</span><span class="v src">{% for f in race_profile.taper_factors %}{{ (f * 100)|round|int }}%{{ ", " if not loop.last }}{% endfor %} volume</span></div>
+        <div class="row"><span class="l">Long run</span><span class="v">{{ (race_profile.long_run_share * 100)|round|int }}% of week</span><span class="v src">{% if race_profile.long_run_cap_km %}capped at {{ race_profile.long_run_cap_km|int }} km{% else %}no cap{% endif %}</span></div>
+        <div class="row"><span class="l">Strength</span><span class="v">{{ {"power": "+ plyos", "endurance": "Capped", "standard": "Standard"}[race_profile.strength_flavour] }}</span><span class="v src">{{ {"power": "plyometrics on lower days", "endurance": "Build 1 tops out at MAV", "standard": "by distance"}[race_profile.strength_flavour] }}</span></div>
+      </div>
     </div>
 
     <div class="panel">

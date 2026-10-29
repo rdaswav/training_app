@@ -219,10 +219,17 @@ def generate_and_persist_plan(
         return running_engine.phase_for_week(phases, week_index).name
 
     strength_sessions = strength_engine.generate_strength_plan(
-        macro_start, total_weeks, phase_name_for_week, mesocycle_start_week=mesocycle_start_week, strength_days=strength_days
+        macro_start,
+        total_weeks,
+        phase_name_for_week,
+        mesocycle_start_week=mesocycle_start_week,
+        strength_days=strength_days,
+        flavour=fitness.profile.strength_flavour,
     )
     strength_session_dicts = []
     for s in strength_sessions:
+        if s.date > race.race_date:
+            continue  # the block ends at the race; nothing is scheduled after it
         prescriptions = _select_exercises(db, s.prescriptions, athlete.injury_flags or [])
         strength_session_dicts.append({"date": s.date, "name": s.name, "prescriptions": prescriptions})
 

@@ -6,7 +6,7 @@ A personal running + strength periodization app. Replaces a Runna subscription a
 
 ## 1. Goals
 
-- Generate a progressive running block from a **race date + distance + current fitness**, following half-marathon periodization best practice.
+- Generate a progressive running block from a **race date + distance + current fitness**, shaped per distance (5K / 10K / half / marathon) following each distance's periodization best practice. Originally built half-marathon-only; see "Race profiles" in section 5.
 - Run and strength live in **one unified calendar**, with strength load automatically modulated by race proximity.
 - Plans are **rule-based (deterministic)**; an LLM (Claude) edits them as life/goals change.
 - View today's session on **phone**; plan and visualise on **desktop**.
@@ -78,12 +78,27 @@ Non-goals for v1: multi-user, social features, Strava integration, an in-app LLM
 ## 5. Running periodization engine
 
 ### Inputs
-Race date, distance (default: half), and current fitness derived from intervals.icu (recent weekly volume, recent easy/threshold paces, VO2max/fitness trend).
+Race date, distance, and current fitness derived from intervals.icu (recent weekly volume, recent easy/threshold paces, VO2max/fitness trend).
 
-### Block construction (half-marathon default)
+### Race profiles
+The race's distance snaps to a profile (`backend/app/engines/race_profiles.py`): ≤7.5 km → 5K, ≤15 km → 10K, ≤30 km → half, longer → marathon. No race type is stored, so a custom distance just picks the nearest profile.
+
+| | 5K | 10K | Half | Marathon |
+|---|---|---|---|---|
+| Standard block | 10 wk | 12 wk | 16 wk | 18 wk |
+| Taper (volume vs last up-week) | 1 wk: 60% | 2 wk: 80%, 55% | 2 wk: 70%, 45% | 3 wk: 80%, 65%, 45% |
+| Re-base / Build 1 share of ramp | 25% / 40% | 30% / 35% | 30% / 35% | 30% / 35% |
+| Long run | 25% of week, ≤16 km | 28%, ≤19 km | 35%, no cap | 35%, ≤34 km |
+| Strides on an easy run | yes | yes | no | no |
+| Strength flavour | power (plyometrics) | power | standard | endurance (Build 1 capped at MAV) |
+
+Taper lengths follow the Mujika/Bosquet taper meta-analysis (8–14 days, cut volume 40–60%, keep intensity): shorter for 5K, longer for the marathon. Paces come from Daniels' VDOT, which is derived from threshold pace: easy, T, I (97.5% VO2max), R (≈ mile race pace) and race pace. A goal time only overrides race pace.
+
+### Block construction
 Weeks-to-race determines the shape:
-- If **≥ 12 weeks**: full build. If **> 16**, hold a base phase, then start the ramp.
-- If **< 12**: compress phases proportionally, protecting the taper.
+- If the profile's taper plus **≥ 4 weeks** fit: full build. If it's **longer than the profile's standard block**, the extra weeks become a Base phase before the ramp starts.
+- Otherwise: the block is Build 2 + Taper only, and the taper is protected.
+- The block ends on race day: a race session on the date itself, an easy shakeout with strides the day before, and nothing after.
 
 Phase sequence (maps to what we already discussed):
 
@@ -93,6 +108,17 @@ Phase sequence (maps to what we already discussed):
 | **Build 1** | Threshold intro | tempo / cruise intervals | steady + light progression |
 | **Build 2** | Race-specific | threshold + race-pace reps | long run w/ race-pace segments |
 | **Taper** | Sharpen | short race-pace touches | volume cut, freshness |
+
+That table is the half profile. With one quality slot a week, the other profiles alternate two variants week to week so both VO2max/economy and threshold work get covered:
+
+| Phase | 5K | 10K | Marathon |
+|---|---|---|---|
+| Base / Re-base | strides ↔ 8×10s hill sprints | strides | strides |
+| Build 1 | 8×400 @R ↔ 3×1.6 km @T | 4×1.6 km @T ↔ 5×1 km @I | 4×1.6 km @T ↔ 2×4 km @T |
+| Build 2 | 5×1 km @I ↔ 6×800 @5K pace | 4×1.6 km @10K pace ↔ 2×2 km @T + 3×800 @I | 3×2 km @T ↔ 8 km @M |
+| Taper | 4×400 @race pace | 3×1 km @race pace | 3×1.6 km @M |
+
+Build 2 long runs: 5K steady; 10K a 3 km threshold finish; half a race-pace segment ≤4 km; marathon a marathon-pace segment ≤16 km (40%).
 
 ### Weekly structure (3 runs)
 1. **Easy/recovery** — prescribed by pace, but **conservative pace + HR ceiling guardrail** (keep sub-aerobic-threshold; solves the Z4 problem). Fenix 8 displays both.
@@ -148,8 +174,13 @@ Strength mesocycles **nest inside the running macrocycle**. As the race nears, s
 | Run phase | Strength behaviour |
 |-----------|--------------------|
 | Re-base / Build 1 | Full accumulation — normal RP mesocycle, progress strength |
-| Build 2 | **Maintenance (MV)** — hold load, cut volume, minimise soreness |
+| Build 2 | **Maintenance (MEV)** — hold load, cut volume, minimise soreness |
 | Taper | **Minimal** — movement pattern only, strip fatigue, no new stimulus |
+
+### Strength by race profile
+- **Power (5K/10K):** a plyometric block goes first on Lower / Full Body days, while you're fresh: pogo hops, box jumps, bounds and so on. It's logged as ground contacts per set (5–8), with no load and no RIR. Sets go 2→4 through accumulation, 2 in maintenance and deloads, and 1 as a race-week primer. Plyometric days count as hard lower-body for the guardrail. This follows the evidence that heavy strength plus plyometrics improves running economy, which matters most over shorter races.
+- **Endurance (marathon):** Build 1 strength ramps sets to **MAV, not MRV**, while weekly mileage peaks. The marathon's 3-week taper holds maintenance in its first week, then goes minimal.
+- **Standard (half):** unchanged.
 
 ---
 
