@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.engines import dashboard_summary, load_summary, weekly_review
 from app.engines import strength as strength_engine
 from app.engines import vdot as vdot_engine
+from app.engines.race_profiles import profile_for_distance
 from app.engines.running import week_start as monday_of
 from app.integrations.anthropic_coach import generate_review, render_prompt
 from app.jobs.daily_autoregulation import MAX_PACE_DRIFT_SEC_PER_KM
@@ -181,6 +182,7 @@ def build_metrics(db: Session, athlete: AthleteProfile, week_start: date) -> dic
             "name": race.name,
             "race_date": race.race_date.isoformat(),
             "distance_km": race.distance_km,
+            "race_profile": profile_for_distance(race.distance_km).label,
             "goal_time_sec": race.goal_time_sec,
             "priority": race.priority.value,
             "days_out_at_week_end": (race.race_date - week_end).days,

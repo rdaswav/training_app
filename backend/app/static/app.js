@@ -134,6 +134,48 @@ async function submitAthleteProfile(event) {
   return false;
 }
 
+// Goal-time placeholder per race profile -- a typical intermediate time, just
+// to show the expected format (MM:SS for short races, H:MM:SS for long).
+const GOAL_TIME_EXAMPLES = { "5k": "22:30", "10k": "47:00", half: "1:45:00", marathon: "3:45:00" };
+
+function raceProfileFor(km) {
+  // Mirrors engines/race_profiles.py's profile_for_distance; bounds come from
+  // the server (window.RACE_PROFILES) so the two can't drift.
+  const profiles = window.RACE_PROFILES || [];
+  return profiles.find((p) => p.max_km !== null && km <= p.max_km) || profiles.find((p) => p.max_km === null);
+}
+
+function updateDistanceUI(form) {
+  const preset = form.distance_preset.value;
+  const customLabel = form.querySelector(".distance-custom");
+  if (preset === "custom") {
+    customLabel.hidden = false;
+  } else {
+    customLabel.hidden = true;
+    form.distance_km.value = preset;
+  }
+  const km = Number(form.distance_km.value);
+  const profile = km > 0 ? raceProfileFor(km) : null;
+  const hint = form.querySelector(".distance-hint");
+  if (!profile) {
+    hint.textContent = "";
+    return;
+  }
+  form.goal_time.placeholder = `e.g. ${GOAL_TIME_EXAMPLES[profile.key]}`;
+  const taper = `${profile.taper_weeks}-week taper`;
+  let text = `${profile.label} block: ${profile.template_weeks} weeks is the standard length, with a ${taper}.`;
+  if (form.race_date.value) {
+    const start = form.plan_start_date.value ? new Date(form.plan_start_date.value) : new Date();
+    const weeks = Math.ceil((new Date(form.race_date.value) - start) / (7 * 24 * 3600 * 1000));
+    if (weeks > 0 && weeks < profile.template_weeks * 0.6) {
+      text += ` You have about ${weeks} weeks, so the phases will be compressed.`;
+    } else if (weeks > profile.template_weeks) {
+      text += ` You have about ${weeks} weeks; the extra time becomes an aerobic Base phase first.`;
+    }
+  }
+  hint.textContent = text;
+}
+
 async function submitRaceForm(event, existingRaceId) {
   event.preventDefault();
   const form = event.target;
@@ -327,6 +369,7 @@ function initRunMode() {
 
 const WEIGHT_STEP_KG = 2.5;
 const REST_DURATION_SEC = 150; // no per-exercise rest convention in the data; a sane default, easy to tune here
+const PLYO_REST_DURATION_SEC = 90; // plyometrics: full recovery so every contact stays fast
 const UNDO_WINDOW_MS = 6000;
 
 function parseRepDefault(repsRange) {
@@ -423,8 +466,11 @@ function updateStickyBarFor(prescriptionEl) {
   const loggedCount = entry ? entry.logged.length : 0;
   const total = Number(prescriptionEl.dataset.sets);
   const isTimed = prescriptionEl.dataset.movementType === "bodyweight_timed";
+  const isPlyo = prescriptionEl.dataset.movementType === "plyometric";
   const target = isTimed
     ? `${prescriptionEl.dataset.reps}s hold`
+    : isPlyo
+    ? `${prescriptionEl.dataset.reps} contacts`
     : prescriptionEl.dataset.suggested
       ? `${prescriptionEl.dataset.reps} &times; ${prescriptionEl.dataset.suggested}`
       : `${prescriptionEl.dataset.reps} reps`;
@@ -441,8 +487,8 @@ function updateStickyBarFor(prescriptionEl) {
     </div>
     <div class="r2">
       <span class="chip tgt">Target <b>${target}</b></span>
-      <span class="chip">RIR <b>${prescriptionEl.dataset.rir}</b></span>
-      ${lastChip}
+      ${isPlyo ? `<span class="chip">Max intent</span>` : `<span class="chip">RIR <b>${prescriptionEl.dataset.rir}</b></span>`}
+      ${isPlyo ? "" : lastChip}
     </div>`;
   stick.classList.add("on");
 }
@@ -459,6 +505,8 @@ class StrengthEntry {
     this.rirTarget = prescriptionEl.dataset.rir;
     this.movementType = prescriptionEl.dataset.movementType || "weighted";
     this.isTimed = this.movementType === "bodyweight_timed";
+    // plyometric: .reps is ground contacts per set, no load and no RIR.
+    this.isPlyo = this.movementType === "plyometric";
 
     if (this.isTimed) {
       // .reps here holds the exercise's own seconds-per-hold range (e.g.
@@ -525,7 +573,9 @@ class StrengthEntry {
   }
 
   _doneText(done) {
-    return this.isTimed ? `${done.duration}s` : `${done.reps} × ${formatWeight(done.weight)}`;
+    if (this.isTimed) return `${done.duration}s`;
+    if (this.isPlyo) return `${done.reps} contacts`;
+    return `${done.reps} × ${formatWeight(done.weight)}`;
   }
 
   logCurrentSet() {
@@ -537,9 +587,9 @@ class StrengthEntry {
     const doneText = this._doneText(setEntry);
     const nextUpHtml = isLast
       ? nextUpAfter(this.el)
-      : `${this.el.dataset.exerciseName} &middot; set ${this.logged.length + 1} of ${this.totalSets}<br>${doneText} &middot; RIR ${this.rirTarget}`;
+      : `${this.el.dataset.exerciseName} &middot; set ${this.logged.length + 1} of ${this.totalSets}<br>${doneText}${this.isPlyo ? "" : ` &middot; RIR ${this.rirTarget}`}`;
     showUndoToast(isLast ? `Session logged · ${doneText}` : `Set logged · ${doneText}`, () => this.undoLastSet());
-    startRestTimer(REST_DURATION_SEC, nextUpHtml);
+    startRestTimer(this.isPlyo ? PLYO_REST_DURATION_SEC : REST_DURATION_SEC, nextUpHtml);
     updateStickyBarFor(this.el);
     if (isLast) this.scheduleSubmit();
   }
@@ -562,6 +612,8 @@ class StrengthEntry {
       pattern: this.pattern,
       sets: this.isTimed
         ? this.logged.map((s) => ({ duration_sec: s.duration, rir_actual: rirActual }))
+        : this.isPlyo
+        ? this.logged.map((s) => ({ reps: s.reps }))
         : this.logged.map((s) => ({ reps: s.reps, weight_kg: s.weight, rir_actual: rirActual })),
     };
     this.pendingTimeoutId = setTimeout(async () => {

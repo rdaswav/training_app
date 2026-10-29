@@ -15,7 +15,7 @@
       <div class="countdown">{{ days_to_race }} days to go</div>
     </div>
     <p class="lede">
-      {{ race.distance_km }} km
+      {{ (race.distance_km|race_profile).label }} block &middot; {{ race.distance_km }} km
       {% if race.goal_time_sec %} &middot; Goal {{ race.goal_time_sec|goal_time }}{% endif %}
       {% if current_phase %} &middot; {{ current_phase.focus }}{% endif %}
       &middot; Priority {{ race.priority.value|upper }}

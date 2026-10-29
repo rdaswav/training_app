@@ -120,15 +120,16 @@ MARATHON = RaceProfile(
 
 PROFILES = {p.key: p for p in (FIVE_K, TEN_K, HALF, MARATHON)}
 
+# Inclusive upper bound (km) for each profile, shortest first; anything longer
+# than the last bound is a marathon.
+PROFILE_UPPER_BOUNDS_KM = ((FIVE_K, 7.5), (TEN_K, 15.0), (HALF, 30.0))
+
 
 def profile_for_distance(distance_km: float | None) -> RaceProfile:
     """Snap any race distance to the nearest training profile."""
     if distance_km is None:
         return HALF
-    if distance_km <= 7.5:
-        return FIVE_K
-    if distance_km <= 15:
-        return TEN_K
-    if distance_km <= 30:
-        return HALF
+    for profile, upper_km in PROFILE_UPPER_BOUNDS_KM:
+        if distance_km <= upper_km:
+            return profile
     return MARATHON
