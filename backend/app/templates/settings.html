@@ -67,7 +67,7 @@
           <option value="custom" {% if not ns.matched %}selected{% endif %}>Custom distance</option>
         </select>
       </label>
-      <label class="distance-custom" {% if ns.matched %}hidden{% endif %}>Custom distance (km)
+      <label class="distance-custom" {% if ns.matched %}style="display: none"{% endif %}>Custom distance (km)
         <input name="distance_km" type="number" step="0.01" min="1" value="{{ dist }}" required>
       </label>
       <p class="note distance-hint" aria-live="polite"></p>

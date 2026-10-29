@@ -148,10 +148,11 @@ function raceProfileFor(km) {
 function updateDistanceUI(form) {
   const preset = form.distance_preset.value;
   const customLabel = form.querySelector(".distance-custom");
+  // Inline style, not `hidden`: .settings-form label's display rule overrides it.
   if (preset === "custom") {
-    customLabel.hidden = false;
+    customLabel.style.display = "";
   } else {
-    customLabel.hidden = true;
+    customLabel.style.display = "none";
     form.distance_km.value = preset;
   }
   const km = Number(form.distance_km.value);

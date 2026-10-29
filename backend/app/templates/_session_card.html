@@ -60,6 +60,8 @@
           {% if c and ns.pace is none and c.target_pace_sec_per_km %}{% set ns.pace = c.target_pace_sec_per_km %}{% endif %}
           {% if c and ns.hr is none and c.hr_ceiling %}{% set ns.hr = c.hr_ceiling %}{% endif %}
         {% endfor %}
+        {# A race is logged at race pace, not the warmup's easy pace that comes first. #}
+        {% if s.content.get("role") == "race" and step.get("label") == "Race" %}{% set ns.pace = step.target_pace_sec_per_km %}{% endif %}
       {% endfor %}
       <div class="entry run-entry" data-session-id="{{ s.id }}"
            data-target-pace="{{ ns.pace or '' }}" data-target-hr="{{ ns.hr or '' }}">
