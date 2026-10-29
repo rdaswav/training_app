@@ -479,6 +479,59 @@ def _long_run_session(fitness: AthleteFitness, distance_km: float, run_date: dat
     )
 
 
+def _race_session(fitness: AthleteFitness, race_date: date, phase_name: str) -> RunSessionPlan:
+    easy = fitness.easy_pace_sec_per_km
+    race_step = RunStep("Race", distance_km=round(fitness.race_distance_km, 2), target_pace_sec_per_km=fitness.race_pace_sec_per_km)
+    if fitness.profile.key in ("5k", "10k"):
+        # Short races want a proper warmup with some faster running in it.
+        steps = [
+            RunStep("Warmup", duration_min=15, target_pace_sec_per_km=easy),
+            _strides(fitness, count=4),
+            race_step,
+            RunStep("Cooldown", duration_min=10, target_pace_sec_per_km=easy),
+        ]
+    else:
+        steps = [RunStep("Warmup", duration_min=10, target_pace_sec_per_km=easy), race_step]
+    return RunSessionPlan(
+        date=race_date,
+        name=f"Race day: {fitness.profile.label}",
+        phase_name=phase_name,
+        steps=steps,
+        total_distance_km=steps_distance_km(steps, easy),
+        role="race",
+    )
+
+
+def _shakeout_session(fitness: AthleteFitness, run_date: date, phase_name: str) -> RunSessionPlan:
+    steps = [
+        RunStep("Easy shakeout", duration_min=20, target_pace_sec_per_km=fitness.easy_pace_sec_per_km, hr_ceiling=fitness.aerobic_hr_ceiling),
+        _strides(fitness, count=4),
+    ]
+    return RunSessionPlan(
+        date=run_date,
+        name="Pre-race shakeout",
+        phase_name=phase_name,
+        steps=steps,
+        total_distance_km=steps_distance_km(steps, fitness.easy_pace_sec_per_km),
+        role="easy",
+    )
+
+
+def _place_race_day(weeks: list[WeekPlan], race_date: date, fitness: AthleteFitness) -> None:
+    """Race on race_date, shakeout the day before, nothing after -- replacing
+    whatever the weekly template put on those days (or adding them if the
+    template has no run there, e.g. a Saturday race on a Sunday-long-run week)."""
+    shakeout_date = race_date - timedelta(days=1)
+    for week in weeks:
+        week_end = week.start_date + timedelta(days=6)
+        week.sessions = [s for s in week.sessions if s.date < shakeout_date]
+        if week.start_date <= shakeout_date <= week_end:
+            week.sessions.append(_shakeout_session(fitness, shakeout_date, week.phase_name))
+        if week.start_date <= race_date <= week_end:
+            week.sessions.append(_race_session(fitness, race_date, week.phase_name))
+        week.sessions.sort(key=lambda s: s.date)
+
+
 def _assign_run_roles(sorted_days: list[int]) -> dict[int, str]:
     """Assign easy/quality/long roles across an arbitrary number of weekly run
     days: the latest day in the week is always the long run, the middle of
@@ -566,4 +619,5 @@ def generate_run_plan(
         week_plan = generate_week(i, base_monday + timedelta(weeks=i), volumes[i], phase, fitness, run_days)
         week_plan.is_down_week = is_down_week(i, taper_start)
         weeks.append(week_plan)
+    _place_race_day(weeks, race_date, fitness)
     return phases, weeks

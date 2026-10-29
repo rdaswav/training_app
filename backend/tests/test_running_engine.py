@@ -81,7 +81,8 @@ def test_generate_run_plan_produces_three_runs_per_week():
     )
     phases, weeks = generate_run_plan(today, race, fitness)
     assert len(weeks) == weeks_to_race(today, race)
-    for week in weeks:
+    # Race week is reshaped around race day -- see test_race_week_* below.
+    for week in weeks[:-1]:
         assert len(week.sessions) == 3
         roles = {s.role for s in week.sessions}
         assert roles == {"easy", "quality", "long"}
@@ -103,7 +104,7 @@ def test_generate_run_plan_supports_four_run_days_with_two_easy_sessions():
         aerobic_hr_ceiling=150,
     )
     phases, weeks = generate_run_plan(today, race, fitness, run_days=(0, 2, 4, 6))
-    for week in weeks:
+    for week in weeks[:-1]:  # race week is reshaped around race day
         assert len(week.sessions) == 4
         roles = [s.role for s in week.sessions]
         assert roles.count("long") == 1
@@ -241,3 +242,47 @@ def test_build2_quality_session_uses_goal_time_race_pace_when_set():
     )
     assert race_pace_reps.work.target_pace_sec_per_km == fitness.race_pace_sec_per_km
     assert race_pace_reps.work.target_pace_sec_per_km == round(6300 / HALF_MARATHON_KM)
+
+
+def _fitness(distance_km: float = HALF_MARATHON_KM, **kw) -> AthleteFitness:
+    return AthleteFitness(
+        weekly_volume_km=kw.pop("weekly_volume_km", 35.0),
+        easy_pace_sec_per_km=360,
+        threshold_pace_sec_per_km=290,
+        aerobic_hr_ceiling=150,
+        race_distance_km=distance_km,
+        **kw,
+    )
+
+
+def test_race_week_ends_with_shakeout_then_race_on_race_day():
+    today = date(2026, 11, 2)  # Monday
+    race = date(2027, 2, 14)  # Sunday, a long-run day in the default template
+    _, weeks = generate_run_plan(today, race, _fitness(), run_days=(0, 2, 4, 6))
+    last = weeks[-1].sessions
+    assert last[-1].date == race and last[-1].role == "race"
+    assert last[-2].date == race - timedelta(days=1) and last[-2].name == "Pre-race shakeout"
+    race_step = next(s for s in last[-1].steps if getattr(s, "label", "") == "Race")
+    assert race_step.distance_km == round(HALF_MARATHON_KM, 2)
+    assert not any(s.role == "long" for s in last)
+
+
+def test_saturday_race_drops_the_sunday_long_run_and_adds_race_on_a_non_run_day():
+    today = date(2026, 11, 2)
+    race = date(2027, 1, 16)  # Saturday -- not in run_days
+    _, weeks = generate_run_plan(today, race, _fitness(5.0), run_days=(0, 2, 4, 6))
+    all_sessions = [s for w in weeks for s in w.sessions]
+    assert max(s.date for s in all_sessions) == race
+    races = [s for s in all_sessions if s.role == "race"]
+    assert len(races) == 1 and races[0].date == race and races[0].name == "Race day: 5K"
+    # Friday's template run is replaced by the shakeout, not duplicated.
+    friday = [s for s in all_sessions if s.date == race - timedelta(days=1)]
+    assert [s.name for s in friday] == ["Pre-race shakeout"]
+
+
+def test_monday_race_puts_the_shakeout_in_the_previous_week():
+    today = date(2026, 11, 2)
+    race = date(2027, 1, 11)  # Monday
+    _, weeks = generate_run_plan(today, race, _fitness(10.0), run_days=(0, 2, 4, 6))
+    assert weeks[-2].sessions[-1].name == "Pre-race shakeout"
+    assert [s.role for s in weeks[-1].sessions] == ["race"]

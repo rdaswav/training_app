@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 HARD_LOWER_PATTERNS = {"squat", "hinge", "single_leg", "unilateral", "posterior_chain"}
-KEY_RUN_ROLES = {"quality", "long"}
+KEY_RUN_ROLES = {"quality", "long", "race"}
 
 
 @dataclass

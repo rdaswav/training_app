@@ -55,6 +55,15 @@ def evaluate_quality_session(
     return RunAutoregResult("hold", 0, "Hit the prescribed target -- hold.")
 
 
+def evaluate_race() -> RunAutoregResult:
+    """A race is an all-out effort, not a session to autoregulate from: its
+    average pace would read as wildly "faster than easy" against the warmup's
+    target and wrongly progress training paces. Always hold."""
+    return RunAutoregResult(
+        "hold", 0, "Race logged -- training paces aren't adjusted from a race. Update threshold pace in Settings if it was a breakthrough."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Strength autoregulation
 # ---------------------------------------------------------------------------

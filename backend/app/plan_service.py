@@ -223,6 +223,8 @@ def generate_and_persist_plan(
     )
     strength_session_dicts = []
     for s in strength_sessions:
+        if s.date > race.race_date:
+            continue  # the block ends at the race; nothing is scheduled after it
         prescriptions = _select_exercises(db, s.prescriptions, athlete.injury_flags or [])
         strength_session_dicts.append({"date": s.date, "name": s.name, "prescriptions": prescriptions})
 

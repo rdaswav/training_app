@@ -188,7 +188,9 @@ def complete_run_session(session_id: int, payload: RunCompleteRequest, db: Sessi
     steps = session.content.get("steps", [])
     prescribed_pace = next((s["target_pace_sec_per_km"] for s in steps if s.get("target_pace_sec_per_km")), None)
 
-    if role == "quality":
+    if role == "race":
+        result = autoregulation.evaluate_race()
+    elif role == "quality":
         result = autoregulation.evaluate_quality_session(
             prescribed_pace or athlete.threshold_pace_sec_per_km, payload.actual_pace_sec_per_km, payload.hit_reps, payload.wellness_ok
         )
