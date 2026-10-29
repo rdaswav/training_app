@@ -20,9 +20,14 @@ actual pace/HR, strength loads progress or back off off actual reps/RIR.
   timing is nudged toward the running plan's own down-weeks and taper, and a guardrail
   automatically shuffles (or flags) sessions so a hard lower-body day never sits the day
   before a quality or long run.
-- **Race-driven planning.** Give it a race date and distance and it builds the whole
-  block backwards from there, with a VDOT-based race-pace model and an optional goal
-  time that overrides pace targets without touching your autoregulated day-to-day paces.
+- **Race-driven planning, any distance.** Give it a race date and distance (5K, 10K,
+  half, marathon or anything in between) and it builds the whole block backwards from
+  there: block length, taper, long-run cap and workout mix are set per distance, with
+  Daniels' VDOT paces (easy, threshold, VO2max intervals, repetition, race pace) and an
+  optional goal time that overrides race-pace targets without touching your
+  autoregulated day-to-day paces. The block ends with a race-day session and a shakeout
+  run the day before. Strength follows the distance too: plyometrics for 5K/10K, and
+  capped lifting volume while marathon mileage peaks.
 - **Autoregulation, not a fixed plan.** Log a run's actual pace/HR and the next
   session's targets adjust (bounded to a sane drift cap from your baseline). Log a
   strength set's actual reps/RIR and the next load is computed from an e1RM-based
