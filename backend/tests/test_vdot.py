@@ -33,3 +33,22 @@ def test_shorter_race_distance_has_faster_pace_than_longer_for_same_vdot():
     pace_10k = race_pace_sec_per_km(vdot, 10.0)
     pace_half = race_pace_sec_per_km(vdot, 21.0975)
     assert pace_10k < pace_half
+
+
+import pytest
+
+from app.engines.vdot import interval_pace_sec_per_km, repetition_pace_sec_per_km
+
+
+# Daniels' Running Formula table: VDOT -> (I pace s/km, R pace s/km, R from 400m splits).
+@pytest.mark.parametrize("vdot, i_pace, r_pace", [(40, 282, 265), (50, 235, 220), (60, 203, 188)])
+def test_interval_and_repetition_paces_match_daniels_table(vdot, i_pace, r_pace):
+    assert abs(interval_pace_sec_per_km(vdot) - i_pace) <= 5
+    assert abs(repetition_pace_sec_per_km(vdot) - r_pace) <= 5
+
+
+def test_pace_zones_are_ordered_fastest_to_slowest():
+    vdot = vdot_from_threshold_pace(290)
+    r, i = repetition_pace_sec_per_km(vdot), interval_pace_sec_per_km(vdot)
+    five_k, marathon = race_pace_sec_per_km(vdot, 5.0), race_pace_sec_per_km(vdot, 42.195)
+    assert r < i < five_k < 290 < marathon
