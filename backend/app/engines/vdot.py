@@ -30,6 +30,21 @@ def vdot_from_threshold_pace(threshold_pace_sec_per_km: int) -> float:
     return _vo2_from_velocity(v) / _pct_vo2max(THRESHOLD_CALIBRATION_MINUTES)
 
 
+INTERVAL_PCT_VO2MAX = 0.975  # Daniels' I pace sits at ~95-100% VO2max; 97.5%
+# reproduces his published I paces within a couple of s/km across VDOT 40-60.
+MILE_KM = 1.609
+
+
+def interval_pace_sec_per_km(vdot: float) -> int:
+    """Daniels I (VO2max interval) pace."""
+    return round(1000 / _velocity_from_vo2(vdot * INTERVAL_PCT_VO2MAX) * 60)
+
+
+def repetition_pace_sec_per_km(vdot: float) -> int:
+    """Daniels R (repetition/economy) pace -- approximately current mile race pace."""
+    return race_pace_sec_per_km(vdot, MILE_KM)
+
+
 def race_pace_sec_per_km(vdot: float, distance_km: float, iterations: int = 6) -> int:
     """Fixed-point iteration: predicted race time and %VO2max depend on each
     other (a longer race sustains a lower %VO2max), so this converges rather
